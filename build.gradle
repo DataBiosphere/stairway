@@ -1,0 +1,32 @@
+plugins {
+    id 'java-library'
+}
+
+group 'bio.terra.stairway'
+version '0.0.1'
+
+sourceCompatibility = 1.8
+
+repositories {
+    mavenCentral()
+}
+
+dependencies {
+    implementation group: 'org.postgresql', name: 'postgresql', version: '42.1.4'
+    implementation group: 'org.apache.commons', name: 'commons-dbcp2', version: '2.7.0'
+    implementation group: 'org.apache.commons', name: 'commons-pool2', version: '2.8.0'
+    implementation group: 'org.apache.commons', name: 'commons-lang3', version: '3.9'
+    implementation group: 'org.liquibase', name: 'liquibase-core', version: '3.8.6'
+
+    // JSON processing
+    implementation group: 'com.fasterxml.jackson.core', name: 'jackson-databind', version: '2.10.2'
+    implementation group: 'com.fasterxml.jackson.datatype', name: 'jackson-datatype-jsr310', version: '2.10.2'
+    implementation group: 'com.fasterxml.jackson.datatype', name: 'jackson-datatype-jdk8', version: '2.10.2'
+    implementation group: 'com.fasterxml.jackson.module', name: 'jackson-module-parameter-names', version: '2.10.2'
+
+    // For HttpStatus:
+    implementation group: 'org.springframework', name: 'spring-web', version: '5.2.2.RELEASE'
+
+    testImplementation group: 'org.junit.jupiter', name: 'junit-jupiter-api', version: '5.5.2'
+
+}
