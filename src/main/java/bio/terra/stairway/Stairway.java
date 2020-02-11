@@ -126,13 +126,12 @@ public class Stairway {
      */
     public void submit(String flightId,
                        Class<? extends Flight> flightClass,
-                       FlightMap inputParameters,
-                       UserRequestInfo userRequestInfo) throws DatabaseOperationException {
+                       FlightMap inputParameters) throws DatabaseOperationException {
 
         if (flightClass == null || inputParameters == null) {
             throw new MakeFlightException("Must supply non-null flightClass and inputParameters to submit");
         }
-        Flight flight = makeFlight(flightClass, inputParameters, userRequestInfo);
+        Flight flight = makeFlight(flightClass, inputParameters);
 
         flight.context().setFlightId(flightId);
         flightDao.submit(flight.context());
@@ -196,12 +195,12 @@ public class Stairway {
         return flightDao.getFlights(offset, limit);
     }
 
-    public List<FlightState> getFlightsForUser(int offset,
-                                               int limit,
-                                               UserRequestInfo userReq) throws DatabaseOperationException {
-        return flightDao.getFlightsForUser(offset, limit, userReq.getSubjectId());
+    // TODO: add a query input parameters entrypoint instead of this one:
+/*
+    public List<FlightState> getFlightsForUser(int offset, int limit) throws DatabaseOperationException {
+        return flightDao.getFlightsForUser(offset, limit, TBD);
     }
-
+*/
     private void releaseFlight(String flightId) {
         TaskContext taskContext = taskContextMap.get(flightId);
         if (taskContext != null) {
@@ -232,8 +231,7 @@ public class Stairway {
     private void recoverFlights() throws DatabaseOperationException {
         List<FlightContext> flightList = flightDao.recover();
         for (FlightContext flightContext : flightList) {
-            Flight flight = makeFlightFromName(
-                flightContext.getFlightClassName(), flightContext.getInputParameters(), flightContext.getUser());
+            Flight flight = makeFlightFromName(flightContext.getFlightClassName(), flightContext.getInputParameters());
             flightContext.nextStepIndex();
             flight.setFlightContext(flightContext);
             launchFlight(flight);
@@ -278,13 +276,12 @@ public class Stairway {
      * @return flight object suitable for submitting for execution
      */
     private Flight makeFlight(
-        Class<? extends Flight> flightClass, FlightMap inputParameters, UserRequestInfo userRequestInfo) {
+        Class<? extends Flight> flightClass, FlightMap inputParameters) {
         try {
             // Find the flightClass constructor that takes the input parameter map and
             // use it to make the flight.
-            Constructor constructor = flightClass.getConstructor(
-                FlightMap.class, Object.class, UserRequestInfo.class);
-            Flight flight = (Flight)constructor.newInstance(inputParameters, applicationContext, userRequestInfo);
+            Constructor constructor = flightClass.getConstructor(FlightMap.class, Object.class);
+            Flight flight = (Flight)constructor.newInstance(inputParameters, applicationContext);
             return flight;
         } catch (InvocationTargetException |
                 NoSuchMethodException |
@@ -300,12 +297,12 @@ public class Stairway {
      *
      * We use the class name to store and retrieve from the flightDao when we recover.
      */
-    private Flight makeFlightFromName(String className, FlightMap inputMap, UserRequestInfo user) {
+    private Flight makeFlightFromName(String className, FlightMap inputMap) {
         try {
             Class<?> someClass = Class.forName(className);
             if (Flight.class.isAssignableFrom(someClass)) {
                 Class<? extends Flight> flightClass = (Class<? extends Flight>) someClass;
-                return makeFlight(flightClass, inputMap, user);
+                return makeFlight(flightClass, inputMap);
             }
             // Error case
             throw new MakeFlightException("Failed to make a flight from class name '" + className +

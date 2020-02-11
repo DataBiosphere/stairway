@@ -65,8 +65,8 @@ class FlightDao {
     public void submit(FlightContext flightContext) throws DatabaseOperationException {
         final String sqlInsertFlight =
             "INSERT INTO " + FLIGHT_TABLE +
-                " (flightId, submit_time, class_name, input_parameters, status, owner_id, owner_email)" +
-                "VALUES (:flightid, CURRENT_TIMESTAMP, :class_name, :inputs, :status, :subject, :email)";
+                " (flightId, submit_time, class_name, input_parameters, status)" +
+                "VALUES (:flightid, CURRENT_TIMESTAMP, :class_name, :inputs, :status)";
 
         try (Connection connection = dataSource.getConnection();
              NamedParameterPreparedStatement statement =
@@ -76,8 +76,6 @@ class FlightDao {
             statement.setString("class_name", flightContext.getFlightClassName());
             statement.setString("inputs", flightContext.getInputParameters().toJson());
             statement.setString("status", flightContext.getFlightStatus().name());
-            statement.setString("subject", flightContext.getUser().getSubjectId());
-            statement.setString("email", flightContext.getUser().getName());
             statement.getPreparedStatement().executeUpdate();
 
         } catch (SQLException ex) {
@@ -186,41 +184,11 @@ class FlightDao {
         }
     }
 
-    boolean ownsFlight(String flightId, String subject) throws DatabaseOperationException {
-        final String sqlFlight = "SELECT COUNT(*) AS matches" +
-            " FROM " + FLIGHT_TABLE +
-            " WHERE flightId = :flightid" +
-            " AND owner_id = :ownerid";
-
-        // We can assume correct functioning of the database system.
-        // flightId is a primary key, so there will be at most one returned
-        // and we know there will be one row returned in the row set containing the count.
-        long matches = 0;
-
-        try (Connection connection = dataSource.getConnection();
-             NamedParameterPreparedStatement ownsFlight =
-                 new NamedParameterPreparedStatement(connection, sqlFlight)) {
-
-            ownsFlight.setString("flightid", flightId);
-            ownsFlight.setString("ownerid", subject);
-
-            try (ResultSet rs = ownsFlight.getPreparedStatement().executeQuery()) {
-                rs.next();
-                matches = rs.getLong("matches");
-            }
-        } catch (SQLException ex) {
-            throw new DatabaseOperationException("Failed to get flight list", ex);
-        }
-
-        return (matches == 1);
-    }
-
     /**
      * Find all active flights and return their flight contexts
      */
     public List<FlightContext> recover() throws DatabaseOperationException {
-        // TODO: change owner_id and owner_email into a key-value list
-        final String sqlActiveFlights = "SELECT flightid, class_name, input_parameters, owner_id, owner_email" +
+        final String sqlActiveFlights = "SELECT flightid, class_name, input_parameters" +
             " FROM " + FLIGHT_TABLE +
             " WHERE status = 'RUNNING'";
 
@@ -243,12 +211,7 @@ class FlightDao {
                     FlightMap inputParameters = new FlightMap();
                     inputParameters.fromJson(rs.getString("input_parameters"));
 
-                    FlightContext flightContext = new FlightContext(
-                        inputParameters,
-                        rs.getString("class_name"),
-                        new UserRequestInfo()
-                            .subjectId(rs.getString("owner_id"))
-                            .name(rs.getString("owner_email")));
+                    FlightContext flightContext = new FlightContext(inputParameters, rs.getString("class_name"));
                     flightContext.setFlightId(rs.getString("flightid"));
                     activeFlights.add(flightContext);
                 }
@@ -301,7 +264,7 @@ class FlightDao {
      */
     public FlightState getFlightState(String flightId) throws DatabaseOperationException {
         final String sqlOneFlight = "SELECT flightid, submit_time, input_parameters," +
-            " completed_time, output_parameters, status, serialized_exception, owner_id, owner_email" +
+            " completed_time, output_parameters, status, serialized_exception" +
             " FROM " + FLIGHT_TABLE +
             " WHERE flightid = :flightid";
 
@@ -331,15 +294,11 @@ class FlightDao {
         return getFlights(offset, limit, "", Collections.EMPTY_MAP);
     }
 
-    List<FlightState> getFlightsForUser(int offset, int limit, String subject) throws DatabaseOperationException {
-        return getFlights(offset, limit, " WHERE owner_id = :subject ", Collections.singletonMap("subject", subject));
-    }
-
     private List<FlightState> getFlights(int offset, int limit, String whereClause, Map<String, String> whereParams)
         throws DatabaseOperationException {
 
         final String sqlFlightRange = "SELECT flightid, submit_time, input_parameters," +
-            " completed_time, output_parameters, status, serialized_exception, owner_id, owner_email" +
+            " completed_time, output_parameters, status, serialized_exception" +
             " FROM " + FLIGHT_TABLE +
             whereClause +
             " ORDER BY submit_time" +  // should this be descending?
@@ -375,9 +334,6 @@ class FlightDao {
             flightState.setFlightId(rs.getString("flightid"));
             flightState.setFlightStatus(FlightStatus.valueOf(rs.getString("status")));
             flightState.setSubmitted(rs.getTimestamp("submit_time").toInstant());
-            flightState.setUser(new UserRequestInfo()
-                .subjectId(rs.getString("owner_id"))
-                .name(rs.getString("owner_email")));
 
             FlightMap inputParameters = new FlightMap();
             inputParameters.fromJson(rs.getString("input_parameters"));

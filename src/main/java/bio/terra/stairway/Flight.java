@@ -40,8 +40,8 @@ public class Flight implements Callable<FlightState> {
     private FlightContext flightContext;
     private Object applicationContext;
 
-    public Flight(FlightMap inputParameters, Object applicationContext, UserRequestInfo userRequestInfo) {
-        flightContext = new FlightContext(inputParameters, this.getClass().getName(), userRequestInfo);
+    public Flight(FlightMap inputParameters, Object applicationContext) {
+        flightContext = new FlightContext(inputParameters, this.getClass().getName());
         this.applicationContext = applicationContext;
         steps = new LinkedList<>();
     }
