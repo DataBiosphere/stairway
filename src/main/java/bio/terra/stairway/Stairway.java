@@ -5,6 +5,7 @@ import bio.terra.stairway.exception.DatabaseSetupException;
 import bio.terra.stairway.exception.FlightException;
 import bio.terra.stairway.exception.FlightNotFoundException;
 import bio.terra.stairway.exception.MakeFlightException;
+import bio.terra.stairway.exception.MigrateException;
 import org.apache.commons.lang3.builder.ToStringBuilder;
 import org.apache.commons.lang3.builder.ToStringStyle;
 import org.slf4j.Logger;
@@ -70,7 +71,7 @@ public class Stairway {
     /**
      * We do initialization in two steps. The constructor does the first step of constructing the object
      * and remembering the inputs. It does not do any flightDao activity. That lets the rest of the
-     * application come up and do any flightDao configuration.
+     * application come up and do any database configuration.
      *
      * The second step is the 'initialize' call (below) that sets up the flightDao and performs
      * any recovery needed.
@@ -101,9 +102,15 @@ public class Stairway {
     /**
      * Second step of initialization
      * @param forceCleanStart true will drop any existing stairway data. Otherwise existing flights are recovered.
+     * @param migrateUpgrade true will run the migrate to upgrade the database
      */
-    public void initialize(DataSource dataSource, boolean forceCleanStart)
-        throws DatabaseSetupException, DatabaseOperationException {
+    public void initialize(DataSource dataSource, boolean forceCleanStart, boolean migrateUpgrade)
+        throws DatabaseSetupException, DatabaseOperationException, MigrateException {
+
+        if (migrateUpgrade) {
+            Migrate migrate = new Migrate();
+            migrate.initialize("db/changelog.xml", dataSource);
+        }
 
         this.flightDao = new FlightDao(dataSource, exceptionSerializer);
         if (forceCleanStart) {
@@ -122,7 +129,6 @@ public class Stairway {
      *
      * @param flightClass class object of the class derived from Flight; e.g., MyFlight.class
      * @param inputParameters key-value map of parameters to the flight
-     * @return unique flight id of the submitted flight
      */
     public void submit(String flightId,
                        Class<? extends Flight> flightClass,

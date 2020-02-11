@@ -40,10 +40,11 @@ public final class TestUtil {
         return value;
     }
 
-    static Stairway setupStairway(DataSource dataSource) throws Exception {
+    static Stairway setupStairway() throws Exception {
+        DataSource dataSource = makeDataSource();
         ExecutorService executorService = Executors.newFixedThreadPool(2);
         Stairway stairway = new Stairway(executorService, null);
-        stairway.initialize(dataSource, true);
+        stairway.initialize(dataSource, true, true);
         return stairway;
     }
 
