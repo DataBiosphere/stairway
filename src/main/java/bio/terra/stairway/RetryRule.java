@@ -19,6 +19,7 @@ public interface RetryRule {
      *
      * @return true indicates the caller should attempt another retry. False indicates that no more
      * retries should be attempted.
+     * @throws InterruptedException propagated when sleep is interrupted
      */
     boolean retrySleep() throws InterruptedException;
 }

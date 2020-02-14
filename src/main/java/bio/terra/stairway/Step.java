@@ -25,7 +25,9 @@ public interface Step {
      * Called by the Flight controller when running "forward" on the success path
      *
      * @param context The sequencer context
-     * @returns step result
+     * @return step result object
+     * @throws RetryException - may through retry exception, causing the Flight machinery to run the
+     * RetryRule associated with the step.
      */
     StepResult doStep(FlightContext context) throws RetryException;
 
@@ -33,7 +35,7 @@ public interface Step {
      * Called by the sequencer when running "backward" on the failure/rollback path
      *
      * @param context The sequencer context
-     * @returns step result
+     * @return step result object
      */
     StepResult undoStep(FlightContext context);
 }

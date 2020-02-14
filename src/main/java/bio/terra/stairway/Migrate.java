@@ -26,6 +26,7 @@ public class Migrate {
      *
      * @param changesetFile - relative path to the changeset file in the project
      * @param dataSource - database to operate on
+     * @throws MigrateException - wraps exceptions from liquibase and SQL
      */
     public void initialize(String changesetFile, DataSource dataSource) throws MigrateException {
         migrateWorker(changesetFile, dataSource, true);
@@ -38,6 +39,7 @@ public class Migrate {
      *
      * @param changesetFile - relative path to the changeset file in the project
      * @param dataSource - database to operate on
+     * @throws MigrateException - wraps exceptions from liquibase and SQL
      */
     public void upgrade(String changesetFile, DataSource dataSource) throws MigrateException {
         migrateWorker(changesetFile, dataSource, false);

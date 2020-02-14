@@ -167,6 +167,12 @@ match the values in the sql file above:
     - STAIRWAY_URI - default is `jdbc:postgresql://127.0.0.1:5432/stairwaylib`
 4. Run the tests. For example, `./gradlew test`    
 
+## Deploying to Artifactory
+
+For Broad-Verily development, you can publish the stairway library to Broad's Artifactory instance
+using the artifactoryPublish task. For that to work, define the following environment variables:
+- ARTIFACTORY_USER
+- ARTIFACTORY_PASSWORD
 
 ## Future Enhancements
 

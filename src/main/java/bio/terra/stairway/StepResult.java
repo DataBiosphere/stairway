@@ -7,14 +7,21 @@ import org.slf4j.LoggerFactory;
 
 import java.util.Optional;
 
+/**
+ * Step result objects are returned from the do() and undo() methods of a step.
+ * The step status lets the Flight code know whether to continue forward,
+ * go backward, or retry the step.
+ */
 public class StepResult {
     private static final Logger logger = LoggerFactory.getLogger(StepResult.class);
 
     private StepStatus stepStatus;
     private Exception exception;
 
-    // Static version of success result
     private static StepResult stepResultSuccess = new StepResult(StepStatus.STEP_RESULT_SUCCESS);
+    /**
+     * Static version of success result, so every step doesn't have to make one
+     */
     public static StepResult getStepResultSuccess() {
         return stepResultSuccess;
     }

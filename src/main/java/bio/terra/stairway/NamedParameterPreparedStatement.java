@@ -32,7 +32,7 @@ public class NamedParameterPreparedStatement implements AutoCloseable {
      *
      * @param connection SQL connection in which to prepare the statement
      * @param sql statement to prepare
-     * @throws SQLException
+     * @throws SQLException obviously
      */
     public NamedParameterPreparedStatement(Connection connection, String sql) throws SQLException {
         nameIndexMap = new HashMap<>();
@@ -58,7 +58,7 @@ public class NamedParameterPreparedStatement implements AutoCloseable {
 
     /**
      * Support AutoCloseable by providing a close method.
-     * @throws SQLException
+     * @throws SQLException - obviously
      */
     @Override
     public void close() throws SQLException {

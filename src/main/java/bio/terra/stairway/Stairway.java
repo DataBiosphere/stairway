@@ -6,6 +6,8 @@ import bio.terra.stairway.exception.FlightException;
 import bio.terra.stairway.exception.FlightNotFoundException;
 import bio.terra.stairway.exception.MakeFlightException;
 import bio.terra.stairway.exception.MigrateException;
+import org.apache.commons.lang3.builder.EqualsBuilder;
+import org.apache.commons.lang3.builder.HashCodeBuilder;
 import org.apache.commons.lang3.builder.ToStringBuilder;
 import org.apache.commons.lang3.builder.ToStringStyle;
 import org.slf4j.Logger;
@@ -15,7 +17,6 @@ import javax.sql.DataSource;
 import java.lang.reflect.Constructor;
 import java.lang.reflect.InvocationTargetException;
 import java.util.List;
-import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.ExecutorService;
@@ -101,8 +102,12 @@ public class Stairway {
 
     /**
      * Second step of initialization
+     * @param dataSource database to be used to store Stairway data
      * @param forceCleanStart true will drop any existing stairway data. Otherwise existing flights are recovered.
      * @param migrateUpgrade true will run the migrate to upgrade the database
+     * @throws DatabaseSetupException failed to clean the database on startup
+     * @throws DatabaseOperationException failures to perform recovery
+     * @throws MigrateException migration failures
      */
     public void initialize(DataSource dataSource, boolean forceCleanStart, boolean migrateUpgrade)
         throws DatabaseSetupException, DatabaseOperationException, MigrateException {
@@ -120,15 +125,27 @@ public class Stairway {
         }
     }
 
-    public UUID createFlightId() {
-        return UUID.randomUUID();
+    /**
+     * Method to generate a flight id. This is a convenience method to allow clients to generate
+     * compliant flight ids for Stairway. You don't have to use it.
+     *
+     * @return 22 character, base64url-encoded UUID
+     * @see <a href="https://base64.guru/standards/base64url">Base64 URL</a>
+     */
+    public String createFlightId() {
+        return ShortUUID.get();
     }
 
     /**
      * Submit a flight for execution
      *
+     * @param flightId Stairway allows clients to choose flight ids. That lets a client record an id, perhaps
+     *                 persistently, before the flight is run. Stairway requires that the ids be unique in the
+     *                 scope of a Stairway instance. As a convenience, you can use {@link #createFlightId()}
+     *                 to generate globally unique ids.
      * @param flightClass class object of the class derived from Flight; e.g., MyFlight.class
      * @param inputParameters key-value map of parameters to the flight
+     * @throws DatabaseOperationException failure during flight object creation, persisting to database or launching
      */
     public void submit(String flightId,
                        Class<? extends Flight> flightClass,
@@ -144,6 +161,14 @@ public class Stairway {
         launchFlight(flight);
     }
 
+    /**
+     * Delete a flight - this removes the execution context and the database record of a flight.
+     * Note that this does allow deleting a flight that is not marked as done. We allow that
+     * in case the flight state gets corrupted somehow and needs forceable clean-up.
+     *
+     * @param flightId flight to delete
+     * @throws DatabaseOperationException errors from removing the flight in memory and in database
+     */
     public void deleteFlight(String flightId) throws DatabaseOperationException {
         releaseFlight(flightId);
         flightDao.delete(flightId);
@@ -151,9 +176,10 @@ public class Stairway {
 
     /**
      * Wait for a flight to complete. When it completes, the flight is removed from the taskContextMap.
-     * Callers must be sure user has access to flight results
      *
-     * @param flightId
+     * @param flightId the flight to wait for
+     * @return flight state object
+     * @throws FlightException flight does not exist
      */
     public FlightState waitForFlight(String flightId) throws FlightException {
         TaskContext taskContext = lookupFlight(flightId);
@@ -177,8 +203,9 @@ public class Stairway {
      * The logic is that if getFlightState is called, then either the wait
      * finished or we are polling and won't perform a wait.
      *
-     * @param flightId
-     * @return FlightState
+     * @param flightId identifies the flight to retrieve state for
+     * @return FlightState state of the flight
+     * @throws DatabaseOperationException not found in the database or unexpected database issues
      */
     public FlightState getFlightState(String flightId) throws DatabaseOperationException {
         FlightState flightState = flightDao.getFlightState(flightId);
@@ -196,6 +223,7 @@ public class Stairway {
      * @param offset offset of the row ordered by most recent flight first
      * @param limit limit the number of rows returned
      * @return List of FlightState
+     * @throws DatabaseOperationException unexpected database errors
      */
     public List<FlightState> getFlights(int offset, int limit) throws DatabaseOperationException {
         return flightDao.getFlights(offset, limit);
@@ -225,7 +253,7 @@ public class Stairway {
         return taskContext;
     }
 
-    /**
+    /*
      * Find any incomplete flights and recover them. We overwrite the flight context of this flight
      * with the recovered flight context. The normal constructor path needs to give the input parameters
      * to the flight subclass. This is a case where we don't really want to have the Flight object set up
@@ -244,7 +272,7 @@ public class Stairway {
         }
     }
 
-    /**
+    /*
      * Build the task context to keep track of the running flight.
      * Once it is launched, hook it into the {@link #taskContextMap} so other
      * calls can resolve it.
@@ -271,15 +299,11 @@ public class Stairway {
         taskContextMap.put(flight.context().getFlightId(), taskContext);
     }
 
-    /**
-     *  Create a Flight instance given the class name of the derived class of Flight
+    /*
+     * Create a Flight instance given the class name of the derived class of Flight
      * and the input parameters.
      *
      * Note that you can adjust the steps you generate based on the input parameters.
-     *
-     * @param flightClass class object of the class derived from Flight; e.g., MyFlight.class
-     * @param inputParameters key-value map of parameters to the flight
-     * @return flight object suitable for submitting for execution
      */
     private Flight makeFlight(
         Class<? extends Flight> flightClass, FlightMap inputParameters) {
@@ -297,10 +321,8 @@ public class Stairway {
         }
     }
 
-    /**
-     * Version of makeFlight that accepts the class name instead of the class
-     * object as in {@link #makeFlight}
-     *
+    /*
+     * Version of makeFlight that accepts the class name instead of the class object
      * We use the class name to store and retrieve from the flightDao when we recover.
      */
     private Flight makeFlightFromName(String className, FlightMap inputMap) {
@@ -328,5 +350,35 @@ public class Stairway {
                 .append("flightDao", flightDao)
                 .append("applicationContext", applicationContext)
                 .toString();
+    }
+
+    @Override
+    public boolean equals(Object o) {
+        if (this == o) return true;
+
+        if (o == null || getClass() != o.getClass()) return false;
+
+        Stairway stairway = (Stairway) o;
+
+        return new EqualsBuilder()
+                .append(logger, stairway.logger)
+                .append(taskContextMap, stairway.taskContextMap)
+                .append(threadPool, stairway.threadPool)
+                .append(flightDao, stairway.flightDao)
+                .append(applicationContext, stairway.applicationContext)
+                .append(exceptionSerializer, stairway.exceptionSerializer)
+                .isEquals();
+    }
+
+    @Override
+    public int hashCode() {
+        return new HashCodeBuilder(17, 37)
+                .append(logger)
+                .append(taskContextMap)
+                .append(threadPool)
+                .append(flightDao)
+                .append(applicationContext)
+                .append(exceptionSerializer)
+                .toHashCode();
     }
 }

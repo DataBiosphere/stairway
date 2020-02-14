@@ -17,7 +17,7 @@ import java.util.HashMap;
 import java.util.Map;
 
 /**
- * FlightMap wraps a HashMap<String, Object>
+ * FlightMap wraps a {@code HashMap<String, Object>}
  * It provides a subset of the HashMap methods. It localizes code that casts from Object to
  * the target type. It provides a way to set the map to be immutable.
  */
@@ -40,6 +40,7 @@ public class FlightMap {
      * Return the object from the hash map cast to the right type.
      * Throw an exception if the Object cannot be cast to that type.
      *
+     * @param <T> - type of class to expect in the hash map
      * @param key - key to lookup in the hash map
      * @param type - class requested
      * @return null if not found

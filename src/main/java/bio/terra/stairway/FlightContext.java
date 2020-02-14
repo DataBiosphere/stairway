@@ -100,7 +100,7 @@ public class FlightContext {
      * Check the termination condition (either undo to 0 or do to stepListSize)
      * depending on which direction we are going.
      *
-     * @param stepListSize
+     * @param stepListSize size of the step list
      * @return true if there is a step to be executed
      */
     public boolean haveStepToDo(int stepListSize) {

@@ -22,7 +22,7 @@ import java.lang.reflect.InvocationTargetException;
  * If those requirements are not met, then we generate the UnmappableException to hold the
  * class name string and message string.
  */
-class DefaultExceptionSerializer implements ExceptionSerializer {
+public class DefaultExceptionSerializer implements ExceptionSerializer {
     private static final String SEPARATOR = ";";
 
     @Override
