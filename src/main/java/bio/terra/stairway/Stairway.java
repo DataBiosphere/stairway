@@ -114,7 +114,7 @@ public class Stairway {
 
         if (migrateUpgrade) {
             Migrate migrate = new Migrate();
-            migrate.initialize("db/changelog.xml", dataSource);
+            migrate.initialize("stairway/db/changelog.xml", dataSource);
         }
 
         this.flightDao = new FlightDao(dataSource, exceptionSerializer);
