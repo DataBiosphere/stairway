@@ -21,6 +21,7 @@ public class StepResult {
     private static StepResult stepResultSuccess = new StepResult(StepStatus.STEP_RESULT_SUCCESS);
     /**
      * Static version of success result, so every step doesn't have to make one
+     * @return returns a static StepResult of STEP_RESULT_SUCCESS
      */
     public static StepResult getStepResultSuccess() {
         return stepResultSuccess;

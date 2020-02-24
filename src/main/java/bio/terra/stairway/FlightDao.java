@@ -32,6 +32,7 @@ class FlightDao {
 
     private static String FLIGHT_TABLE = "flight";
     private static String FLIGHT_LOG_TABLE = "flightlog";
+    private static String FLIGHT_INPUT_TABLE = "flightinput";
 
     private final DataSource dataSource;
     private final ExceptionSerializer exceptionSerializer;
@@ -46,8 +47,9 @@ class FlightDao {
      */
     public void startClean() throws DatabaseSetupException {
         final String sqlTruncateTables = "TRUNCATE TABLE " +
-            FLIGHT_TABLE + "," +
-            FLIGHT_LOG_TABLE;
+                FLIGHT_TABLE + "," +
+                FLIGHT_INPUT_TABLE + "," +
+                FLIGHT_LOG_TABLE;
 
         try (Connection connection = dataSource.getConnection();
              Statement statement = connection.createStatement()) {
@@ -65,19 +67,22 @@ class FlightDao {
     public void submit(FlightContext flightContext) throws DatabaseOperationException {
         final String sqlInsertFlight =
             "INSERT INTO " + FLIGHT_TABLE +
-                " (flightId, submit_time, class_name, input_parameters, status)" +
-                "VALUES (:flightid, CURRENT_TIMESTAMP, :class_name, :inputs, :status)";
+                " (flightId, submit_time, class_name, status)" +
+                "VALUES (:flightid, CURRENT_TIMESTAMP, :class_name, :status)";
 
         try (Connection connection = dataSource.getConnection();
              NamedParameterPreparedStatement statement =
                  new NamedParameterPreparedStatement(connection, sqlInsertFlight)) {
 
+            connection.setAutoCommit(false); // begin transaction
             statement.setString("flightid", flightContext.getFlightId());
             statement.setString("class_name", flightContext.getFlightClassName());
-            statement.setString("inputs", flightContext.getInputParameters().toJson());
             statement.setString("status", flightContext.getFlightStatus().name());
             statement.getPreparedStatement().executeUpdate();
 
+            storeInputParameters(connection, flightContext.getFlightId(), flightContext.getInputParameters());
+
+            connection.commit(); // commit transaction
         } catch (SQLException ex) {
             throw new DatabaseOperationException("Failed to create database tables", ex);
         }
@@ -116,7 +121,7 @@ class FlightDao {
     }
 
     /**
-     * Record completion of a flight and remove the data from the log
+     * Record completion of a flight and remove the detailed step data from the log table.
      * This is idempotent; repeated execution will work properly.
      */
     public void complete(FlightContext flightContext) throws DatabaseOperationException {
@@ -159,13 +164,21 @@ class FlightDao {
         }
     }
 
+    /**
+     * Remove all record of this flight from the database
+     * @param flightId flight to remove
+     * @throws DatabaseOperationException on any database error
+     */
     public void delete(String flightId) throws DatabaseOperationException {
         final String sqlDeleteFlightLog = "DELETE FROM " + FLIGHT_LOG_TABLE + " WHERE flightid = :flightid";
         final String sqlDeleteFlight = "DELETE FROM " + FLIGHT_TABLE + " WHERE flightid = :flightid";
+        final String sqlDeleteFlightInput = "DELETE FROM " + FLIGHT_INPUT_TABLE + " WHERE flightid = :flightid";
 
         try (Connection connection = dataSource.getConnection();
              NamedParameterPreparedStatement deleteFlightStatement =
-                 new NamedParameterPreparedStatement(connection, sqlDeleteFlight);
+                     new NamedParameterPreparedStatement(connection, sqlDeleteFlight);
+             NamedParameterPreparedStatement deleteInputStatement =
+                     new NamedParameterPreparedStatement(connection, sqlDeleteFlightInput);
              NamedParameterPreparedStatement deleteLogStatement =
                  new NamedParameterPreparedStatement(connection, sqlDeleteFlightLog)) {
 
@@ -173,6 +186,9 @@ class FlightDao {
 
             deleteFlightStatement.setString("flightid", flightId);
             deleteFlightStatement.getPreparedStatement().executeUpdate();
+
+            deleteInputStatement.setString("flightid", flightId);
+            deleteInputStatement.getPreparedStatement().executeUpdate();
 
             deleteLogStatement.setString("flightid", flightId);
             deleteLogStatement.getPreparedStatement().executeUpdate();
@@ -188,7 +204,7 @@ class FlightDao {
      * Find all active flights and return their flight contexts
      */
     public List<FlightContext> recover() throws DatabaseOperationException {
-        final String sqlActiveFlights = "SELECT flightid, class_name, input_parameters" +
+        final String sqlActiveFlights = "SELECT flightid, class_name " +
             " FROM " + FLIGHT_TABLE +
             " WHERE status = 'RUNNING'";
 
@@ -206,13 +222,15 @@ class FlightDao {
              NamedParameterPreparedStatement lastFlightLogStatement =
                  new NamedParameterPreparedStatement(connection, sqlLastFlightLog)) {
 
+            connection.setAutoCommit(false);
+
             try (ResultSet rs = activeFlightsStatement.getPreparedStatement().executeQuery()) {
                 while (rs.next()) {
-                    FlightMap inputParameters = new FlightMap();
-                    inputParameters.fromJson(rs.getString("input_parameters"));
-
+                    String flightId = rs.getString("flightid");
+                    List<FlightInput> inputList = retrieveInputParameters(connection, flightId);
+                    FlightMap inputParameters = new FlightMap(inputList);
                     FlightContext flightContext = new FlightContext(inputParameters, rs.getString("class_name"));
-                    flightContext.setFlightId(rs.getString("flightid"));
+                    flightContext.setFlightId(flightId);
                     activeFlights.add(flightContext);
                 }
             }
@@ -249,6 +267,7 @@ class FlightDao {
                 }
             }
 
+            connection.commit(); // The transaction is read-only, so commit is not needed, but feels cleaner...
         } catch (SQLException ex) {
             throw new DatabaseOperationException("Failed to get active flight list", ex);
         }
@@ -263,7 +282,7 @@ class FlightDao {
      * @return FlightState for the flight
      */
     public FlightState getFlightState(String flightId) throws DatabaseOperationException {
-        final String sqlOneFlight = "SELECT flightid, submit_time, input_parameters," +
+        final String sqlOneFlight = "SELECT flightid, submit_time, " +
             " completed_time, output_parameters, status, serialized_exception" +
             " FROM " + FLIGHT_TABLE +
             " WHERE flightid = :flightid";
@@ -275,7 +294,7 @@ class FlightDao {
             oneFlightStatement.setString("flightid", flightId);
 
             try (ResultSet rs = oneFlightStatement.getPreparedStatement().executeQuery()) {
-                List<FlightState> flightStateList = makeFlightStateList(rs);
+                List<FlightState> flightStateList = makeFlightStateList(connection, rs);
                 if (flightStateList.size() == 0) {
                     throw new FlightNotFoundException("Flight not found: " + flightId);
                 }
@@ -297,7 +316,7 @@ class FlightDao {
     private List<FlightState> getFlights(int offset, int limit, String whereClause, Map<String, String> whereParams)
         throws DatabaseOperationException {
 
-        final String sqlFlightRange = "SELECT flightid, submit_time, input_parameters," +
+        final String sqlFlightRange = "SELECT flightid, submit_time, " +
             " completed_time, output_parameters, status, serialized_exception" +
             " FROM " + FLIGHT_TABLE +
             whereClause +
@@ -307,37 +326,42 @@ class FlightDao {
         try (Connection connection = dataSource.getConnection();
              NamedParameterPreparedStatement flightRangeStatement =
                  new NamedParameterPreparedStatement(connection, sqlFlightRange)) {
+            connection.setAutoCommit(false);
 
             flightRangeStatement.setInt("limit", limit);
             flightRangeStatement.setInt("offset", offset);
-            // TODO: maybe add this as a method to NamedParameterPreparedStatement?
+
             for (Map.Entry<String, String> entry : whereParams.entrySet()) {
                 flightRangeStatement.setString(entry.getKey(), entry.getValue());
             }
 
+            List<FlightState> flightStateList;
             try (ResultSet rs = flightRangeStatement.getPreparedStatement().executeQuery()) {
-                return makeFlightStateList(rs);
+                 flightStateList = makeFlightStateList(connection, rs);
             }
 
+            connection.commit();
+            return flightStateList;
         } catch (SQLException ex) {
             throw new DatabaseOperationException("Failed to get flights", ex);
         }
     }
 
-    private List<FlightState> makeFlightStateList(ResultSet rs) throws SQLException {
+    private List<FlightState> makeFlightStateList(Connection connection, ResultSet rs)
+            throws SQLException, DatabaseOperationException {
         List<FlightState> flightStateList = new ArrayList<>();
 
         while (rs.next()) {
+            String flightId = rs.getString("flightid");
             FlightState flightState = new FlightState();
 
             // Flight data that is always present
-            flightState.setFlightId(rs.getString("flightid"));
+            flightState.setFlightId(flightId);
             flightState.setFlightStatus(FlightStatus.valueOf(rs.getString("status")));
             flightState.setSubmitted(rs.getTimestamp("submit_time").toInstant());
 
-            FlightMap inputParameters = new FlightMap();
-            inputParameters.fromJson(rs.getString("input_parameters"));
-            flightState.setInputParameters(inputParameters);
+            List<FlightInput> flightInput = retrieveInputParameters(connection, flightId);
+            flightState.setInputParameters(new FlightMap(flightInput));
 
             if (flightState.getFlightStatus() != FlightStatus.RUNNING) {
                 // If the optional flight data is present, then we fill it in
@@ -356,4 +380,51 @@ class FlightDao {
 
         return flightStateList;
     }
+
+    private void storeInputParameters(Connection connection, String flightId, FlightMap inputParameters) throws DatabaseOperationException {
+        List<FlightInput> inputList = inputParameters.makeFlightInputList();
+
+        final String sqlInsertInput =
+                "INSERT INTO " + FLIGHT_INPUT_TABLE + " (flightId, key, value) VALUES (:flightid, :key, :value)";
+
+        try (NamedParameterPreparedStatement statement =
+                     new NamedParameterPreparedStatement(connection, sqlInsertInput)) {
+
+            statement.setString("flightid", flightId);
+
+            for (FlightInput input : inputList) {
+                statement.setString("key", input.getKey());
+                statement.setString("value", input.getValue());
+                statement.getPreparedStatement().executeUpdate();
+            }
+
+        } catch (SQLException ex) {
+            throw new DatabaseOperationException("Failed to insert input", ex);
+        }
+    }
+
+    private List<FlightInput> retrieveInputParameters(Connection connection, String flightId)
+            throws DatabaseOperationException {
+        final String sqlSelectInput =
+                "SELECT flightId, key, value FROM " + FLIGHT_INPUT_TABLE + " WHERE flightId = :flightid";
+
+        List<FlightInput> inputList = new ArrayList<>();
+
+        try (NamedParameterPreparedStatement statement =
+                     new NamedParameterPreparedStatement(connection, sqlSelectInput)) {
+            statement.setString("flightid", flightId);
+
+            try (ResultSet rs = statement.getPreparedStatement().executeQuery()) {
+                while (rs.next()) {
+                    FlightInput input = new FlightInput(rs.getString("key"), rs.getString("value"));
+                    inputList.add(input);
+                }
+            }
+        } catch (SQLException ex) {
+            throw new DatabaseOperationException("Failed to select input", ex);
+        }
+
+        return inputList;
+    }
+
 }

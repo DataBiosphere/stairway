@@ -23,9 +23,6 @@ databaseChangeLog:
                   constraints:
                     nullable: false
               - column:
-                  name: input_parameters
-                  type: text
-              - column:
                   name: completed_time
                   type: timestamp
               - column:
@@ -85,3 +82,27 @@ databaseChangeLog:
             tableName: flightlog
             columnNames: flightid, log_time
             constraintName: pk_flightlog
+
+        - createTable:
+            tableName: flightinput
+            columns:
+              - column:
+                  name: flightid
+                  type: varchar(36)
+                  constraints:
+                    nullable: false
+              - column:
+                  name: key
+                  type: text
+                  constraints:
+                    nullable: false
+              - column:
+                  name: value
+                  type: text
+                  remarks: json with type information
+                  constraints:
+                    nullable: false
+        - addPrimaryKey:
+            tableName: flightinput
+            columnNames: flightid, key
+            constraintName: pk_flightinput

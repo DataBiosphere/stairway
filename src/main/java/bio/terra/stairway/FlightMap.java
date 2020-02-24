@@ -12,8 +12,10 @@ import org.apache.commons.lang3.builder.ToStringBuilder;
 import org.apache.commons.lang3.builder.ToStringStyle;
 
 import java.io.IOException;
+import java.util.ArrayList;
 import java.util.Collections;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 
 /**
@@ -27,6 +29,43 @@ public class FlightMap {
 
     public FlightMap() {
         map = new HashMap<>();
+    }
+
+    /**
+     * Alternate constructor, used by the DAO to re-create FlightMap from its
+     * serialized form.
+     *
+     * @param inputList input list form of the input parameters
+     */
+    FlightMap(List<FlightInput> inputList) {
+        map = new HashMap<>();
+        for (FlightInput input : inputList) {
+            try {
+                Object value = getObjectMapper().readValue(input.getValue(), Object.class);
+                map.put(input.getKey(), value);
+            } catch (IOException ex) {
+                throw new JsonConversionException("Failed to convert json string to object", ex);
+            }
+        }
+    }
+
+    /**
+     * Convert a flight map into the input list form. Used by the DAO to serialize
+     * the input parameters.
+     *
+     * @return list of FlightInput
+     */
+    List<FlightInput> makeFlightInputList() {
+        ArrayList<FlightInput> inputList = new ArrayList<>();
+        for (Map.Entry<String, Object> entry : map.entrySet()) {
+            try {
+                String value = getObjectMapper().writeValueAsString(entry.getValue());
+                inputList.add(new FlightInput(entry.getKey(), value));
+            } catch (JsonProcessingException ex) {
+                throw new JsonConversionException("Failed to convert value to json string", ex);
+            }
+        }
+        return inputList;
     }
 
     /**
