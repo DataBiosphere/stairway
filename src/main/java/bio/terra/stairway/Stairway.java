@@ -137,7 +137,7 @@ public class Stairway {
     }
 
     /**
-     * Submit a flight for execution
+     * Submit a flight for execution.
      *
      * @param flightId Stairway allows clients to choose flight ids. That lets a client record an id, perhaps
      *                 persistently, before the flight is run. Stairway requires that the ids be unique in the
@@ -217,24 +217,28 @@ public class Stairway {
 
     /**
      * Enumerate flights - returns a range of flights ordered by submit time.
-     * Note that there can be "jitter" in the paging through flights, if new flights
+     * Note that there can be "jitter" in the paging through flights if new flights
      * are submitted.
+     *
+     * You can add one or more predicates in a filter list. The filters are logically
+     * ANDed together and applied to the input parameters of flights. That lets you
+     * add input parameters (like who is running the flight) and then select by that
+     * to show flights being run by that user.
+     * {@link FlightFilter} documents the different filters and their arguments.
+     *
+     * The and limit are applied after the filtering is done.
      *
      * @param offset offset of the row ordered by most recent flight first
      * @param limit limit the number of rows returned
+     * @param filter predicates to apply to filter flights
      * @return List of FlightState
      * @throws DatabaseOperationException unexpected database errors
      */
-    public List<FlightState> getFlights(int offset, int limit) throws DatabaseOperationException {
-        return flightDao.getFlights(offset, limit);
+    public List<FlightState> getFlights(int offset, int limit, FlightFilter filter)
+            throws DatabaseOperationException {
+        return flightDao.getFlights(offset, limit, filter);
     }
 
-    // TODO: add a query input parameters entrypoint instead of this one:
-/*
-    public List<FlightState> getFlightsForUser(int offset, int limit) throws DatabaseOperationException {
-        return flightDao.getFlightsForUser(offset, limit, TBD);
-    }
-*/
     private void releaseFlight(String flightId) {
         TaskContext taskContext = taskContextMap.get(flightId);
         if (taskContext != null) {

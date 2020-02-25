@@ -5,6 +5,8 @@ import org.apache.commons.lang3.StringUtils;
 import java.sql.Connection;
 import java.sql.PreparedStatement;
 import java.sql.SQLException;
+import java.sql.Timestamp;
+import java.time.Instant;
 import java.util.HashMap;
 import java.util.Map;
 
@@ -91,6 +93,10 @@ public class NamedParameterPreparedStatement implements AutoCloseable {
 
     public void setString(String name, String value) throws SQLException {
         preparedStatement.setString(getIndex(name), value);
+    }
+
+    public void setInstant(String name, Instant value) throws SQLException {
+        preparedStatement.setTimestamp(getIndex(name), Timestamp.from(value));
     }
 
 }

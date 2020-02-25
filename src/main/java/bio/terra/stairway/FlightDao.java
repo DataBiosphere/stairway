@@ -2,6 +2,7 @@ package bio.terra.stairway;
 
 import bio.terra.stairway.exception.DatabaseOperationException;
 import bio.terra.stairway.exception.DatabaseSetupException;
+import bio.terra.stairway.exception.FlightFilterException;
 import bio.terra.stairway.exception.FlightNotFoundException;
 
 import javax.sql.DataSource;
@@ -10,29 +11,27 @@ import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.sql.Statement;
 import java.util.ArrayList;
-import java.util.Collections;
 import java.util.LinkedList;
 import java.util.List;
-import java.util.Map;
 
 /**
  * The general layout of the stairway database tables is:
  * <ul>
- * <li>flight - records the flight, its inputs, and its outputs if any</li>
+ * <li>flight - records the flight and its outputs if any</li>
+ * <li>flight input - records the inputs of a flight in a query-ably form</li>
  * <li>flight log - records the steps of a running flight for recovery</li>
  * </ul>
  * This code assumes that the database is created and matches this codes schema
  * expectations. If not, we will crash and burn.
  * <p>
  * May want to split this into an interface and an implementation. This implementation
- * assumes Postgres.
+ * has only been tested on Postgres. It may work on other databases, but who knows?
  * <p>
  */
 class FlightDao {
-
-    private static String FLIGHT_TABLE = "flight";
-    private static String FLIGHT_LOG_TABLE = "flightlog";
-    private static String FLIGHT_INPUT_TABLE = "flightinput";
+    static String FLIGHT_TABLE = "flight";
+    static String FLIGHT_LOG_TABLE = "flightlog";
+    static String FLIGHT_INPUT_TABLE = "flightinput";
 
     private final DataSource dataSource;
     private final ExceptionSerializer exceptionSerializer;
@@ -45,7 +44,7 @@ class FlightDao {
     /**
      * Truncate the tables
      */
-    public void startClean() throws DatabaseSetupException {
+    void startClean() throws DatabaseSetupException {
         final String sqlTruncateTables = "TRUNCATE TABLE " +
                 FLIGHT_TABLE + "," +
                 FLIGHT_INPUT_TABLE + "," +
@@ -64,7 +63,7 @@ class FlightDao {
     /**
      * Record a new flight
      */
-    public void submit(FlightContext flightContext) throws DatabaseOperationException {
+    void submit(FlightContext flightContext) throws DatabaseOperationException {
         final String sqlInsertFlight =
             "INSERT INTO " + FLIGHT_TABLE +
                 " (flightId, submit_time, class_name, status)" +
@@ -91,7 +90,7 @@ class FlightDao {
     /**
      * Record the flight state right before a step
      */
-    public void step(FlightContext flightContext) throws DatabaseOperationException {
+    void step(FlightContext flightContext) throws DatabaseOperationException {
         final String sqlInsertFlightLog =
             "INSERT INTO " + FLIGHT_LOG_TABLE +
                 "(flightid, log_time, working_parameters, step_index, doing," +
@@ -124,7 +123,7 @@ class FlightDao {
      * Record completion of a flight and remove the detailed step data from the log table.
      * This is idempotent; repeated execution will work properly.
      */
-    public void complete(FlightContext flightContext) throws DatabaseOperationException {
+    void complete(FlightContext flightContext) throws DatabaseOperationException {
         // Make the update idempotent; that is, only do it if the status is RUNNING
         final String sqlUpdateFlight =
             "UPDATE " + FLIGHT_TABLE +
@@ -169,7 +168,7 @@ class FlightDao {
      * @param flightId flight to remove
      * @throws DatabaseOperationException on any database error
      */
-    public void delete(String flightId) throws DatabaseOperationException {
+    void delete(String flightId) throws DatabaseOperationException {
         final String sqlDeleteFlightLog = "DELETE FROM " + FLIGHT_LOG_TABLE + " WHERE flightid = :flightid";
         final String sqlDeleteFlight = "DELETE FROM " + FLIGHT_TABLE + " WHERE flightid = :flightid";
         final String sqlDeleteFlightInput = "DELETE FROM " + FLIGHT_INPUT_TABLE + " WHERE flightid = :flightid";
@@ -203,7 +202,7 @@ class FlightDao {
     /**
      * Find all active flights and return their flight contexts
      */
-    public List<FlightContext> recover() throws DatabaseOperationException {
+    List<FlightContext> recover() throws DatabaseOperationException {
         final String sqlActiveFlights = "SELECT flightid, class_name " +
             " FROM " + FLIGHT_TABLE +
             " WHERE status = 'RUNNING'";
@@ -281,7 +280,7 @@ class FlightDao {
      * @param flightId flight to get
      * @return FlightState for the flight
      */
-    public FlightState getFlightState(String flightId) throws DatabaseOperationException {
+    FlightState getFlightState(String flightId) throws DatabaseOperationException {
         final String sqlOneFlight = "SELECT flightid, submit_time, " +
             " completed_time, output_parameters, status, serialized_exception" +
             " FROM " + FLIGHT_TABLE +
@@ -309,31 +308,80 @@ class FlightDao {
         }
     }
 
-    public List<FlightState> getFlights(int offset, int limit) throws DatabaseOperationException {
-        return getFlights(offset, limit, "", Collections.EMPTY_MAP);
-    }
+    /**
+     * Get a list of flights and their states. The list may be restricted by providing one
+     * or more filters. The filters are logically ANDed together.
+     *
+     * For performance, there are three forms of the query.
+     *
+     * <bold>Form 1: no input parameter filters</bold>
+     *
+     * When there are no input parameter filters, then we can do a single table query on the flight table
+     * like:
+     * {@code SELECT flight.* FROM flight WHERE flight-filters ORDER BY }
+     * The WHERE and flight-filters are omitted if there are none to apply.
+     *
+     * <bold>Form 2: one input parameter</bold>
+     *
+     * When there is one input filter restriction, we can do a simple join with a restricting join against the input
+     * table like:
+     * <pre>
+     * {@code
+     * SELECT flight.*
+     * FROM flight JOIN flight_input
+     *   ON flight.flightId = flight_input.flightId
+     * WHERE flight-filters
+     *   AND flight_input.key = 'key' AND flight_input.value = 'json-of-object'
+     * }
+     * </pre>
+     *
+     * <bold>Form 3: more than one input parameter</bold>
+     *
+     * This one gets complicated. We do a subquery that filters by the OR of the input
+     * filters and groups by the COUNT of the matches. Only flights where we have inputs
+     * that qualify by the filter will have the right count of matches. The query form is like:
+     *
+     * <pre>
+     * {@code
+     * SELECT flight.*
+     * FROM flight
+     * JOIN (SELECT flightId, COUNT(*) AS matchCount
+     *       FROM flight_input
+     *       WHERE (flight_input.key = 'key1' AND flight_input.value = 'json-of-object')
+     *          OR (flight_input.key = 'key1' AND flight_input.value = 'json-of-object')
+     *          OR (flight_input.key = 'key1' AND flight_input.value = 'json-of-object')
+     *       GROUP BY flightId) INPUT
+     * ON flight.flightId = INPUT.flightId
+     * WHERE flight-filters
+     *   AND INPUT.matchCount = 3
+     * }
+     * </pre>
+     *
+     * In all cases, the result is sorted and paged like this:
+     * (@code ORDER BY submit_time LIMIT :limit OFFSET :offset}
+     *
+     * @param offset offset into the result set to start returning
+     * @param limit max number of results to return
+     * @param inFilter filters to apply to the flights
+     * @return list of FlightState objects for the filtered, paged flights
+     * @throws DatabaseOperationException on all database issues
+     */
+    List<FlightState> getFlights(int offset, int limit, FlightFilter inFilter)
+            throws DatabaseOperationException {
 
-    private List<FlightState> getFlights(int offset, int limit, String whereClause, Map<String, String> whereParams)
-        throws DatabaseOperationException {
-
-        final String sqlFlightRange = "SELECT flightid, submit_time, " +
-            " completed_time, output_parameters, status, serialized_exception" +
-            " FROM " + FLIGHT_TABLE +
-            whereClause +
-            " ORDER BY submit_time" +  // should this be descending?
-            " LIMIT :limit OFFSET :offset";
+        // Make an empty filter if one is not provided
+        FlightFilter filter = (inFilter != null) ? inFilter : new FlightFilter();
+        String sql = filter.makeSql();
 
         try (Connection connection = dataSource.getConnection();
              NamedParameterPreparedStatement flightRangeStatement =
-                 new NamedParameterPreparedStatement(connection, sqlFlightRange)) {
+                 new NamedParameterPreparedStatement(connection, sql)) {
             connection.setAutoCommit(false);
+
+            filter.storePredicateValues(flightRangeStatement);
 
             flightRangeStatement.setInt("limit", limit);
             flightRangeStatement.setInt("offset", offset);
-
-            for (Map.Entry<String, String> entry : whereParams.entrySet()) {
-                flightRangeStatement.setString(entry.getKey(), entry.getValue());
-            }
 
             List<FlightState> flightStateList;
             try (ResultSet rs = flightRangeStatement.getPreparedStatement().executeQuery()) {
@@ -342,7 +390,7 @@ class FlightDao {
 
             connection.commit();
             return flightStateList;
-        } catch (SQLException ex) {
+        } catch (SQLException | FlightFilterException ex) {
             throw new DatabaseOperationException("Failed to get flights", ex);
         }
     }

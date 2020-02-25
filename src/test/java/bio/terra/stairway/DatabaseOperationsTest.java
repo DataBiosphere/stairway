@@ -107,7 +107,7 @@ public class DatabaseOperationsTest {
         flightList = flightDao.recover();
         assertThat(flightList.size(), is(equalTo(0)));
 
-        List<FlightState> flightStateList = flightDao.getFlights(0, 99);
+        List<FlightState> flightStateList = flightDao.getFlights(0, 99, null);
         assertThat(flightStateList.size(), is(1));
         flightState = flightStateList.get(0);
         assertThat(flightState.getFlightId(), is(flightId));
