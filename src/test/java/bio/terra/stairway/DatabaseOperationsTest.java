@@ -31,7 +31,7 @@ public class DatabaseOperationsTest {
     public void basicsTest() throws Exception {
         DataSource dataSource = TestUtil.makeDataSource();
         Migrate migrate = new Migrate();
-        migrate.initialize("db/changelog.xml", dataSource);
+        migrate.initialize("stairway/db/changelog.xml", dataSource);
 
         FlightDao flightDao = new FlightDao(dataSource, new DefaultExceptionSerializer());
         flightDao.startClean();
