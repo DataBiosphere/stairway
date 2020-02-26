@@ -149,7 +149,7 @@ public class FlightFilter {
      * {@code
      * SELECT flight.*
      * FROM flight JOIN flight_input
-     *   ON flight.flightId = flight_input.flightId
+     *   ON flight.flightid = flight_input.flightid
      * WHERE flight-filters
      *   AND flight_input.key = 'key' AND flight_input.value = 'json-of-object'
      * }
@@ -165,13 +165,13 @@ public class FlightFilter {
      * {@code
      * SELECT flight.*
      * FROM flight
-     * JOIN (SELECT flightId, COUNT(*) AS matchCount
+     * JOIN (SELECT flightid, COUNT(*) AS matchCount
      *       FROM flight_input
      *       WHERE (flight_input.key = 'key1' AND flight_input.value = 'json-of-object')
      *          OR (flight_input.key = 'key1' AND flight_input.value = 'json-of-object')
      *          OR (flight_input.key = 'key1' AND flight_input.value = 'json-of-object')
-     *       GROUP BY flightId) INPUT
-     * ON flight.flightId = INPUT.flightId
+     *       GROUP BY flightid) INPUT
+     * ON flight.flightid = INPUT.flightid
      * WHERE flight-filters
      *   AND INPUT.matchCount = 3
      * }
@@ -186,7 +186,7 @@ public class FlightFilter {
 
         // All forms start with the same select list
         sb.append("SELECT F.flightid, F.submit_time, F.completed_time,")
-                .append("F.output_parameters, F.status, F.serialized_exception")
+                .append(" F.output_parameters, F.status, F.serialized_exception")
                 .append(" FROM ");
 
         // Decide which form of the query to build.
@@ -225,10 +225,10 @@ public class FlightFilter {
     // Form3: flight table filtering and more than one input parameter filter
     private void makeSqlForm3(StringBuilder sb) {
         sb.append(FlightDao.FLIGHT_TABLE)
-                .append(" F INNER JOIN (SELECT flightId, COUNT(*) AS matchCount")
-                .append(" FROM flight_input I WHERE ");
+                .append(" F INNER JOIN (SELECT flightid, COUNT(*) AS matchCount")
+                .append(" FROM ").append(FlightDao.FLIGHT_INPUT_TABLE).append(" I WHERE ");
         makeInputFilter(sb);
-        sb.append("GROUP BY I.flightid) INPUT ON F.flightid = INPUT.flightid")
+        sb.append(" GROUP BY I.flightid) INPUT ON F.flightid = INPUT.flightid")
                 .append(" WHERE INPUT.matchCount = ")
                 .append(inputPredicates.size());
         makeFlightFilter(sb, " AND ");

@@ -51,4 +51,15 @@ public final class TestUtil {
     static boolean isDone(Stairway stairway, String flightId) throws StairwayException {
         return stairway.getFlightState(flightId).getFlightStatus() != FlightStatus.RUNNING;
     }
+
+    static FlightDao setupFlightDao() throws Exception {
+        DataSource dataSource = makeDataSource();
+        Migrate migrate = new Migrate();
+        migrate.initialize("stairway/db/changelog.xml", dataSource);
+
+        FlightDao flightDao = new FlightDao(dataSource, new DefaultExceptionSerializer());
+        flightDao.startClean();
+
+        return flightDao;
+    }
 }

@@ -6,7 +6,7 @@ import java.sql.SQLException;
 import java.time.Instant;
 
 
-public class FlightFilterPredicate {
+class FlightFilterPredicate {
     public enum Datatype {
         STRING,
         TIMESTAMP
@@ -26,11 +26,11 @@ public class FlightFilterPredicate {
      * @param datatype comparison datatype for the value
      * @param parameterName placeholder parameter name for this predicate value
      */
-    public FlightFilterPredicate(String key,
-                                 FlightFilterOp op,
-                                 Object value,
-                                 Datatype datatype,
-                                 String parameterName) {
+    FlightFilterPredicate(String key,
+                          FlightFilterOp op,
+                          Object value,
+                          Datatype datatype,
+                          String parameterName) {
         this.key = key;
         this.op = op;
         this.value = value;
@@ -70,7 +70,7 @@ public class FlightFilterPredicate {
      * @return the SQL predicate
      */
     String makeInputPredicateSql() {
-        return "(I.key = '" + key + "' AND I.value " + op.getSql() + ":" + parameterName + ")";
+        return "(I.key = '" + key + "' AND I.value" + op.getSql() + ":" + parameterName + ")";
     }
 
     void storeInputPredicateValue(NamedParameterPreparedStatement statement)
