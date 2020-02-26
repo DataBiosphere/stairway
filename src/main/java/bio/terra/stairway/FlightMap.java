@@ -3,11 +3,6 @@ package bio.terra.stairway;
 import bio.terra.stairway.exception.JsonConversionException;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.core.type.TypeReference;
-import com.fasterxml.jackson.databind.DeserializationFeature;
-import com.fasterxml.jackson.databind.ObjectMapper;
-import com.fasterxml.jackson.datatype.jdk8.Jdk8Module;
-import com.fasterxml.jackson.datatype.jsr310.JavaTimeModule;
-import com.fasterxml.jackson.module.paramnames.ParameterNamesModule;
 import org.apache.commons.lang3.builder.ToStringBuilder;
 import org.apache.commons.lang3.builder.ToStringStyle;
 
@@ -18,6 +13,8 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
+import static bio.terra.stairway.StairwayMapper.getObjectMapper;
+
 /**
  * FlightMap wraps a {@code HashMap<String, Object>}
  * It provides a subset of the HashMap methods. It localizes code that casts from Object to
@@ -25,7 +22,6 @@ import java.util.Map;
  */
 public class FlightMap {
     private Map<String, Object> map;
-    private ObjectMapper objectMapper;
 
     public FlightMap() {
         map = new HashMap<>();
@@ -118,23 +114,6 @@ public class FlightMap {
         }
     }
 
-    /**
-     * Build object mapper on use, since we only need it for cases where the map is being read to
-     * or written from the database.
-     */
-    private ObjectMapper getObjectMapper() {
-        if (objectMapper == null) {
-            objectMapper = new ObjectMapper()
-                .registerModule(new ParameterNamesModule())
-                .registerModule(new Jdk8Module())
-                .registerModule(new JavaTimeModule())
-                .configure(DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES, false)
-                    // TODO: replace with new method; the problem is we need to be promiscuous, because
-                    //  Stairway does not control what objects are serialized into the map.
-                .enableDefaultTyping(ObjectMapper.DefaultTyping.NON_FINAL);
-        }
-        return objectMapper;
-    }
 
     @Override
     public String toString() {

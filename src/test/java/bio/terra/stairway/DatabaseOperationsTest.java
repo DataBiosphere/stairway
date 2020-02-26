@@ -4,7 +4,6 @@ import org.hamcrest.CoreMatchers;
 import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
 
-import javax.sql.DataSource;
 import java.util.List;
 
 import static bio.terra.stairway.TestUtil.dubValue;
@@ -29,12 +28,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 public class DatabaseOperationsTest {
     @Test
     public void basicsTest() throws Exception {
-        DataSource dataSource = TestUtil.makeDataSource();
-        Migrate migrate = new Migrate();
-        migrate.initialize("stairway/db/changelog.xml", dataSource);
-
-        FlightDao flightDao = new FlightDao(dataSource, new DefaultExceptionSerializer());
-        flightDao.startClean();
+        FlightDao flightDao = TestUtil.setupFlightDao();
 
         FlightMap inputs = new FlightMap();
         inputs.put(ikey, intValue);
@@ -107,7 +101,7 @@ public class DatabaseOperationsTest {
         flightList = flightDao.recover();
         assertThat(flightList.size(), is(equalTo(0)));
 
-        List<FlightState> flightStateList = flightDao.getFlights(0, 99);
+        List<FlightState> flightStateList = flightDao.getFlights(0, 99, null);
         assertThat(flightStateList.size(), is(1));
         flightState = flightStateList.get(0);
         assertThat(flightState.getFlightId(), is(flightId));
