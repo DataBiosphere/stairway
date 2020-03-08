@@ -23,6 +23,9 @@ databaseChangeLog:
                   constraints:
                     nullable: false
               - column:
+                  name: input_parameters
+                  type: text
+              - column:
                   name: completed_time
                   type: timestamp
               - column:
@@ -33,8 +36,8 @@ databaseChangeLog:
                   type: text
                   remarks: contains FlightStatus enum values
               - column:
-                  name: serialized_exception
-                  remarks: some serialized form of the exception
+                  name: exception
+                  remarks: contains JSON-serialized Exception
                   type: text
 
         - createTable:
@@ -71,9 +74,9 @@ databaseChangeLog:
                   type: boolean
                   remarks: null = not done; true = success; false = failure
               - column:
-                  name: serialized_exception
+                  name: exception
                   type: text
-                  remarks: some serialized form of the exception
+                  remarks: contains JSON-serialized Exception
               - column:
                   name: status
                   type: text
@@ -82,27 +85,3 @@ databaseChangeLog:
             tableName: flightlog
             columnNames: flightid, log_time
             constraintName: pk_flightlog
-
-        - createTable:
-            tableName: flightinput
-            columns:
-              - column:
-                  name: flightid
-                  type: varchar(36)
-                  constraints:
-                    nullable: false
-              - column:
-                  name: key
-                  type: text
-                  constraints:
-                    nullable: false
-              - column:
-                  name: value
-                  type: text
-                  remarks: json with type information
-                  constraints:
-                    nullable: false
-        - addPrimaryKey:
-            tableName: flightinput
-            columnNames: flightid, key
-            constraintName: pk_flightinput
