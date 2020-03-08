@@ -35,8 +35,7 @@ public class RetryTest {
 
         String flightId = "successTest";
         stairway.submit(flightId, TestFlightRetry.class, inputParameters);
-        stairway.waitForFlight(flightId);
-        FlightState result = stairway.getFlightState(flightId);
+        FlightState result = stairway.waitForFlight(flightId, null, null);
         assertThat(result.getFlightStatus(), is(equalTo(FlightStatus.SUCCESS)));
         assertFalse(result.getException().isPresent());
     }
@@ -58,8 +57,7 @@ public class RetryTest {
         LocalDateTime startTime = LocalDateTime.now();
         String flightId = "failureTest";
         stairway.submit(flightId, TestFlightRetry.class, inputParameters);
-        stairway.waitForFlight(flightId);
-        FlightState result = stairway.getFlightState(flightId);
+        FlightState result = stairway.waitForFlight(flightId, 1, null);
         LocalDateTime endTime = LocalDateTime.now();
 
         LocalDateTime startRange = startTime.plus(Duration.ofSeconds(maxCount * intervalSeconds));
@@ -81,8 +79,7 @@ public class RetryTest {
 
         String flightId = "exponentialTest";
         stairway.submit(flightId, TestFlightRetry.class, inputParameters);
-        stairway.waitForFlight(flightId);
-        FlightState result = stairway.getFlightState(flightId);
+        FlightState result = stairway.waitForFlight(flightId, null, null);
         assertThat(result.getFlightStatus(), is(equalTo(FlightStatus.SUCCESS)));
         assertFalse(result.getException().isPresent());
     }
@@ -101,8 +98,7 @@ public class RetryTest {
         String flightId = "expOpTimeTest";
         stairway.submit(flightId, TestFlightRetry.class, inputParameters);
 
-        stairway.waitForFlight(flightId);
-        FlightState result = stairway.getFlightState(flightId);
+        FlightState result = stairway.waitForFlight(flightId, null, null);
         assertThat(result.getFlightStatus(), is(equalTo(FlightStatus.ERROR)));
         assertTrue(result.getException().isPresent());
     }
@@ -122,8 +118,7 @@ public class RetryTest {
         LocalDateTime startTime = LocalDateTime.now();
         String flightId = "expMaxTest";
         stairway.submit(flightId, TestFlightRetry.class, inputParameters);
-        stairway.waitForFlight(flightId);
-        FlightState result = stairway.getFlightState(flightId);
+        FlightState result = stairway.waitForFlight(flightId, null, null);
         LocalDateTime endTime = LocalDateTime.now();
 
         LocalDateTime startRange = startTime.plus(Duration.ofSeconds(14));
