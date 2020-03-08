@@ -3,7 +3,6 @@ package bio.terra.stairway;
 import bio.terra.stairway.exception.DatabaseOperationException;
 import bio.terra.stairway.exception.DatabaseSetupException;
 import bio.terra.stairway.exception.FlightException;
-import bio.terra.stairway.exception.FlightNotFoundException;
 import bio.terra.stairway.exception.MakeFlightException;
 import bio.terra.stairway.exception.MigrateException;
 import org.apache.commons.lang3.builder.EqualsBuilder;
@@ -17,11 +16,9 @@ import javax.sql.DataSource;
 import java.lang.reflect.Constructor;
 import java.lang.reflect.InvocationTargetException;
 import java.util.List;
-import java.util.concurrent.ConcurrentHashMap;
-import java.util.concurrent.ExecutionException;
 import java.util.concurrent.ExecutorService;
-import java.util.concurrent.FutureTask;
 import java.util.concurrent.ThreadPoolExecutor;
+import java.util.concurrent.TimeUnit;
 
 /**
  * Stairway is the object that drives execution of Flights. The class is constructed
@@ -43,27 +40,6 @@ import java.util.concurrent.ThreadPoolExecutor;
 public class Stairway {
     private Logger logger = LoggerFactory.getLogger("bio.terra.stairway");
 
-    // For each task we start, we make a task context. It lets us look up the results
-
-    static class TaskContext {
-        private FutureTask<FlightState> futureResult;
-        private Flight flight;
-
-        TaskContext(FutureTask<FlightState> futureResult, Flight flight) {
-            this.futureResult = futureResult;
-            this.flight = flight;
-        }
-
-        FutureTask<FlightState> getFutureResult() {
-            return futureResult;
-        }
-
-        Flight getFlight() {
-            return flight;
-        }
-    }
-
-    private ConcurrentHashMap<String, TaskContext> taskContextMap;
     private ExecutorService threadPool;
     private FlightDao flightDao;
     private Object applicationContext;
@@ -96,7 +72,6 @@ public class Stairway {
     public Stairway(ExecutorService threadPool, Object applicationContext, ExceptionSerializer exceptionSerializer) {
         this.threadPool = threadPool;
         this.applicationContext = applicationContext;
-        this.taskContextMap = new ConcurrentHashMap<>();
         this.exceptionSerializer = exceptionSerializer;
     }
 
@@ -163,15 +138,23 @@ public class Stairway {
     }
 
     /**
-     * Delete a flight - this removes the execution context and the database record of a flight.
-     * Note that this does allow deleting a flight that is not marked as done. We allow that
-     * in case the flight state gets corrupted somehow and needs forceable clean-up.
+     * Delete a flight - this removes the database record of a flight.
+     * Setting force delete to true allows deleting a flight that is not marked as done. We allow that
+     * in case the flight state gets corrupted somehow and needs manual cleanup.
+     * If force delete is false, and the flight is not done, we throw.
      *
      * @param flightId flight to delete
+     * @param forceDelete boolean to allow force deleting of flight database state, regardless of flight state
      * @throws DatabaseOperationException errors from removing the flight in memory and in database
      */
-    public void deleteFlight(String flightId) throws DatabaseOperationException {
-        releaseFlight(flightId);
+    public void deleteFlight(String flightId, boolean forceDelete) throws DatabaseOperationException {
+        if (!forceDelete) {
+            FlightState state = flightDao.getFlightState(flightId);
+            if (state.getFlightStatus() == FlightStatus.RUNNING) {
+                throw new DatabaseOperationException("Cannot delete an active flight");
+            }
+        }
+
         flightDao.delete(flightId);
     }
 
@@ -179,23 +162,32 @@ public class Stairway {
      * Wait for a flight to complete. When it completes, the flight is removed from the taskContextMap.
      *
      * @param flightId the flight to wait for
+     * @param pollSeconds sleep time for each poll cycle; if null, defaults to 10 seconds
+     * @param pollCycles number of times to poll; if null, we poll forever
      * @return flight state object
-     * @throws FlightException flight does not exist
+     * @throws DatabaseOperationException failure to get flight state
      */
-    public FlightState waitForFlight(String flightId) throws FlightException {
-        TaskContext taskContext = lookupFlight(flightId);
+    public FlightState waitForFlight(String flightId, Integer pollSeconds, Integer pollCycles)
+            throws DatabaseOperationException, FlightException {
+        int sleepSeconds = (pollSeconds == null) ? 10 : pollSeconds;
+        int pollCount = 0;
 
         try {
-            FlightState state = taskContext.getFutureResult().get();
-            releaseFlight(flightId);
-            return state;
+            while (pollCycles == null || pollCount < pollCycles) {
+                // loop getting flight state and sleeping
+                TimeUnit.SECONDS.sleep(sleepSeconds);
+                FlightState state = getFlightState(flightId);
+                if (!state.isActive()) {
+                    return state;
+                }
+                pollCount++;
+            }
         } catch (InterruptedException ex) {
             // Someone is shutting down the application
             Thread.currentThread().interrupt();
             throw new FlightException("Stairway was interrupted");
-        } catch (ExecutionException ex) {
-            throw new FlightException("Unexpected flight exception", ex);
         }
+        throw new FlightException("Flight did not complete in the allowed wait time");
     }
 
     /**
@@ -209,11 +201,7 @@ public class Stairway {
      * @throws DatabaseOperationException not found in the database or unexpected database issues
      */
     public FlightState getFlightState(String flightId) throws DatabaseOperationException {
-        FlightState flightState = flightDao.getFlightState(flightId);
-        if (flightState.getFlightStatus() != FlightStatus.RUNNING) {
-            releaseFlight(flightId);
-        }
-        return flightState;
+        return flightDao.getFlightState(flightId);
     }
 
     /**
@@ -238,24 +226,6 @@ public class Stairway {
     public List<FlightState> getFlights(int offset, int limit, FlightFilter filter)
             throws DatabaseOperationException {
         return flightDao.getFlights(offset, limit, filter);
-    }
-
-    private void releaseFlight(String flightId) {
-        TaskContext taskContext = taskContextMap.get(flightId);
-        if (taskContext != null) {
-            if (!taskContext.getFutureResult().isDone()) {
-                logger.warn("Removing flight context for in progress flight " + flightId);
-            }
-            taskContextMap.remove(flightId);
-        }
-    }
-
-    private TaskContext lookupFlight(String flightId) {
-        TaskContext taskContext = taskContextMap.get(flightId);
-        if (taskContext == null) {
-            throw new FlightNotFoundException("Flight '" + flightId + "' not found");
-        }
-        return taskContext;
     }
 
     /*
@@ -284,11 +254,8 @@ public class Stairway {
      * calls can resolve it.
      */
     private void launchFlight(Flight flight) {
-        // Give the flight the flightDao object so it can properly record its steps
+        // Give the flight the flightDao object so it can properly record its steps and be found
         flight.setFlightDao(flightDao);
-
-        // Build the task context to keep track of the running task
-        TaskContext taskContext = new TaskContext(new FutureTask<FlightState>(flight), flight);
 
         if (logger.isDebugEnabled()) {
             if (threadPool instanceof ThreadPoolExecutor) {
@@ -298,11 +265,7 @@ public class Stairway {
             }
         }
         logger.info("Launching flight " + flight.context().getFlightClassName());
-
-        threadPool.execute(taskContext.getFutureResult());
-
-        // Now that it is in the pool, hook it into the map so other calls can resolve it.
-        taskContextMap.put(flight.context().getFlightId(), taskContext);
+        threadPool.submit(flight);
     }
 
     /*
@@ -351,7 +314,6 @@ public class Stairway {
     @Override
     public String toString() {
         return new ToStringBuilder(this, ToStringStyle.JSON_STYLE)
-                .append("taskContextMap", taskContextMap)
                 .append("threadPool", threadPool)
                 .append("flightDao", flightDao)
                 .append("applicationContext", applicationContext)
@@ -368,7 +330,6 @@ public class Stairway {
 
         return new EqualsBuilder()
                 .append(logger, stairway.logger)
-                .append(taskContextMap, stairway.taskContextMap)
                 .append(threadPool, stairway.threadPool)
                 .append(flightDao, stairway.flightDao)
                 .append(applicationContext, stairway.applicationContext)
@@ -380,7 +341,6 @@ public class Stairway {
     public int hashCode() {
         return new HashCodeBuilder(17, 37)
                 .append(logger)
-                .append(taskContextMap)
                 .append(threadPool)
                 .append(flightDao)
                 .append(applicationContext)

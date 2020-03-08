@@ -50,14 +50,13 @@ public class ScenarioTest {
         logger.debug("Flight done: " + done);
 
         // Wait for done
-        stairway.waitForFlight(flightId);
-        FlightState result = stairway.getFlightState(flightId);
+        FlightState result = stairway.waitForFlight(flightId, null, null);
         assertThat(result.getFlightStatus(), CoreMatchers.is(FlightStatus.SUCCESS));
         assertFalse(result.getException().isPresent());
 
-        // Should be released
         try {
-            stairway.waitForFlight(flightId);
+            stairway.deleteFlight(flightId, false);
+            stairway.waitForFlight(flightId, null, null);
         } catch (FlightNotFoundException ex) {
             assertThat(ex.getMessage(), containsString(flightId));
         }
@@ -118,8 +117,7 @@ public class ScenarioTest {
             flightId, TestFlightUndo.class, inputParameters);
 
         // Wait for done
-        stairway.waitForFlight(flightId);
-        FlightState result = stairway.getFlightState(flightId);
+        FlightState result = stairway.waitForFlight(flightId, null, null);
         assertThat(result.getFlightStatus(), is(FlightStatus.ERROR));
         assertTrue(result.getException().isPresent());
         assertThat(result.getException().get().getMessage(), containsString("already exists"));

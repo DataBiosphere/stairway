@@ -80,4 +80,7 @@ public class FlightState {
         this.exception = exception;
     }
 
+    public boolean isActive() {
+        return (flightStatus == FlightStatus.RUNNING);
+    }
 }

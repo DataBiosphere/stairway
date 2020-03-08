@@ -88,7 +88,7 @@ public class RecoveryTest {
         stairway2.initialize(dataSource, false, false);
 
         // Wait for recovery to complete
-        stairway2.waitForFlight(flightId);
+        stairway2.waitForFlight(flightId, null, null);
         FlightState result = stairway2.getFlightState(flightId);
         assertThat(result.getFlightStatus(), is(equalTo(FlightStatus.SUCCESS)));
         assertTrue(result.getResultMap().isPresent());
@@ -126,7 +126,7 @@ public class RecoveryTest {
         stairway2.initialize(dataSource, false, false);
 
         // Wait for recovery to complete
-        stairway2.waitForFlight(flightId);
+        stairway2.waitForFlight(flightId, null, null);
         FlightState result = stairway2.getFlightState(flightId);
         assertThat(result.getFlightStatus(), is(equalTo(FlightStatus.ERROR)));
         assertTrue(result.getException().isPresent());
