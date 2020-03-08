@@ -157,6 +157,7 @@ public class Stairway {
         Flight flight = makeFlight(flightClass, inputParameters);
 
         flight.context().setFlightId(flightId);
+        flight.context().setStairway(this);
         flightDao.submit(flight.context());
         launchFlight(flight);
     }
@@ -271,6 +272,7 @@ public class Stairway {
         for (FlightContext flightContext : flightList) {
             Flight flight = makeFlightFromName(flightContext.getFlightClassName(), flightContext.getInputParameters());
             flightContext.nextStepIndex();
+            flightContext.setStairway(this);
             flight.setFlightContext(flightContext);
             launchFlight(flight);
         }
