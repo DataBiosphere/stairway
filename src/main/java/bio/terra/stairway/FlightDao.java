@@ -161,7 +161,7 @@ class FlightDao {
     }
 
     /**
-     * Record the flight state right before a step
+     * Record the flight state right after a step
      */
     void step(FlightContext flightContext) throws DatabaseOperationException {
         final String sqlInsertFlightLog =
@@ -331,13 +331,14 @@ class FlightDao {
         }
     }
 
-    /**
+    /*
      * Find one unowned flight, claim ownership, and return its flight context
+     * Returns null if the flight is not in the right state to be resumed.
      */
     FlightContext resume(String stairwayId, String flightId) throws DatabaseOperationException {
         final String sqlUnownedFlight = "SELECT class_name " +
                 " FROM " + FLIGHT_TABLE +
-                " WHERE (status = 'WAITING' OR status = 'READY') AND stairway_id = NULL AND flightid = :flightid";
+                " WHERE (status = 'WAITING' OR status = 'READY') AND stairway_id IS NULL AND flightid = :flightid";
 
         final String sqlTakeOwnership = "UPDATE " + FLIGHT_TABLE +
                 " SET status = 'RUNNING'," +
@@ -365,10 +366,13 @@ class FlightDao {
                 }
             }
 
-            takeOwnershipStatement.setString("flightid", flightId);
-            takeOwnershipStatement.setString("stairwayid", stairwayId);
-            takeOwnershipStatement.getPreparedStatement().executeUpdate();
+            if (flightContext != null) {
+                takeOwnershipStatement.setString("flightid", flightId);
+                takeOwnershipStatement.setString("stairwayid", stairwayId);
+                takeOwnershipStatement.getPreparedStatement().executeUpdate();
+            }
 
+            connection.commit();
             return flightContext;
 
         } catch (SQLException ex) {
@@ -483,7 +487,7 @@ class FlightDao {
      * @return FlightState for the flight
      */
     FlightState getFlightState(String flightId) throws DatabaseOperationException {
-        final String sqlOneFlight = "SELECT flightid, submit_time, " +
+        final String sqlOneFlight = "SELECT stairway_id, flightid, submit_time, " +
             " completed_time, output_parameters, status, serialized_exception" +
             " FROM " + FLIGHT_TABLE +
             " WHERE flightid = :flightid";
@@ -609,12 +613,14 @@ class FlightDao {
             flightState.setFlightId(flightId);
             flightState.setFlightStatus(FlightStatus.valueOf(rs.getString("status")));
             flightState.setSubmitted(rs.getTimestamp("submit_time").toInstant());
-
+            flightState.setStairwayId(rs.getString("stairway_id"));
             List<FlightInput> flightInput = retrieveInputParameters(connection, flightId);
             flightState.setInputParameters(new FlightMap(flightInput));
 
-            if (flightState.getFlightStatus() != FlightStatus.RUNNING) {
-                // If the optional flight data is present, then we fill it in
+            // If the flight is in one of the complete states, then we retrieve the completion data
+            if (flightState.getFlightStatus() == FlightStatus.SUCCESS ||
+                    flightState.getFlightStatus() == FlightStatus.ERROR ||
+                    flightState.getFlightStatus() == FlightStatus.FATAL) {
                 flightState.setCompleted(rs.getTimestamp("completed_time").toInstant());
                 flightState.setException(exceptionSerializer.deserialize(rs.getString("serialized_exception")));
                 String outputParamsJson = rs.getString("output_parameters");

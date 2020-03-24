@@ -289,7 +289,18 @@ public class Stairway {
         return flightDao.getFlights(offset, limit, filter);
     }
 
-    String getStairwayId() {
+
+    /**
+     * @return name of this stairway instance
+     */
+    public String getStairwayName() {
+        return stairwayName;
+    }
+
+    /**
+     * @return id of this stairway instance
+     */
+    public String getStairwayId() {
         return stairwayId;
     }
 

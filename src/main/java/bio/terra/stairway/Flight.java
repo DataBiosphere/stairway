@@ -208,6 +208,12 @@ public class Flight implements Callable<FlightState> {
                     result = currentStep.step.undoStep(context());
                 }
 
+            } catch (InterruptedException ex) {
+                // Interrupted exception - we assume this means that the thread pool is shutting down and forcibly
+                // stopping all threads. We treat this as a STOP.
+                Thread.currentThread().interrupt();
+                result = new StepResult(StepStatus.STEP_RESULT_STOP);
+
             } catch (Exception ex) {
                 // The purpose of this catch is to relieve steps of implementing their own repetitive try-catch
                 // simply to turn exceptions into StepResults.
@@ -224,6 +230,12 @@ public class Flight implements Callable<FlightState> {
 
             switch (result.getStepStatus()) {
                 case STEP_RESULT_SUCCESS:
+                    if (context().getStairway().isQuietingDown()) {
+                        // If we are quieting down, we force a stop
+                        result = new StepResult(StepStatus.STEP_RESULT_STOP, null);
+                    }
+                    return result;
+
                 case STEP_RESULT_FAILURE_FATAL:
                 case STEP_RESULT_STOP:
                 case STEP_RESULT_YIELD:

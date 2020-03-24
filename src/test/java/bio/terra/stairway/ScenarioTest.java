@@ -3,7 +3,6 @@ package bio.terra.stairway;
 
 import bio.terra.stairway.exception.FlightNotFoundException;
 import bio.terra.stairway.exception.StairwayException;
-import org.hamcrest.CoreMatchers;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
@@ -13,11 +12,15 @@ import org.slf4j.LoggerFactory;
 import java.io.File;
 import java.io.PrintWriter;
 import java.util.UUID;
+import java.util.concurrent.TimeUnit;
 
 import static org.hamcrest.CoreMatchers.containsString;
+import static org.hamcrest.CoreMatchers.equalTo;
 import static org.hamcrest.CoreMatchers.is;
 import static org.hamcrest.MatcherAssert.assertThat;
 import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 @Tag("unit")
@@ -51,7 +54,7 @@ public class ScenarioTest {
 
         // Wait for done
         FlightState result = stairway.waitForFlight(flightId, null, null);
-        assertThat(result.getFlightStatus(), CoreMatchers.is(FlightStatus.SUCCESS));
+        assertThat(result.getFlightStatus(), equalTo(FlightStatus.SUCCESS));
         assertFalse(result.getException().isPresent());
 
         try {
@@ -83,7 +86,7 @@ public class ScenarioTest {
 
         // Handle results
         FlightState result = stairway.getFlightState(flightId);
-        assertThat(result.getFlightStatus(), is(FlightStatus.ERROR));
+        assertThat(result.getFlightStatus(), equalTo(FlightStatus.ERROR));
         assertTrue(result.getException().isPresent());
 
         // The error text thrown by TestStepExistence
@@ -129,6 +132,52 @@ public class ScenarioTest {
         // We expect the existent filename to still be there
         file = new File(existingFilename);
         assertTrue(file.exists());
+    }
+
+    @Test
+    public void testQuietDown() throws Exception {
+        String inResult = "quieted down and woke up";
+        FlightMap inputParameters = new FlightMap();
+        inputParameters.put(MapKey.CONTROLLER_VALUE, 1);
+        inputParameters.put(MapKey.RESULT, inResult);
+
+        TestStopController.setControl(0);
+        String flightId = stairway.createFlightId();
+
+        stairway.submit(flightId, TestFlightQuietDown.class, inputParameters);
+        // Allow time for the flight thread to go to sleep
+        TimeUnit.SECONDS.sleep(5);
+
+        // Quiet down - don't wait long; we want control so we can unblock the thread!
+        boolean quietYet = stairway.quietDown(1, TimeUnit.SECONDS);
+        assertFalse(quietYet, "Not quiet yet");
+
+        // Wake up the thread; it should exit into READY state
+        TestStopController.setControl(1);
+        // Allow time for the flight thread to wake up and exit
+        TimeUnit.SECONDS.sleep(5);
+
+        FlightState state = stairway.getFlightState(flightId);
+        assertThat("State is ready", state.getFlightStatus(), equalTo(FlightStatus.READY));
+        assertNull(state.getStairwayId(), "Flight is unowned");
+
+        String stairwayName = stairway.getStairwayName();
+
+        stairway.terminate();
+        stairway = null;
+
+        stairway = TestUtil.setupContinuingStairway(stairwayName);
+        boolean resumedFlight = stairway.resume(flightId);
+        assertTrue(resumedFlight, "successfully resumed the flight");
+        stairway.waitForFlight(flightId, null, null);
+
+        state = stairway.getFlightState(flightId);
+        assertThat("State is success", state.getFlightStatus(), equalTo(FlightStatus.SUCCESS));
+
+        FlightMap resultMap = state.getResultMap().orElse(null);
+        assertNotNull(resultMap, "result map is present");
+        String outResult = resultMap.get(MapKey.RESULT, String.class);
+        assertThat("result set properly", outResult, equalTo(inResult));
     }
 
     private String makeExistingFile() throws Exception {

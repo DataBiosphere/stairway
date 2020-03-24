@@ -41,10 +41,19 @@ public final class TestUtil {
     }
 
     static Stairway setupStairway() throws Exception {
+        String stairwayName = "test_" + ShortUUID.get();
+        return makeStairway(stairwayName, true, true);
+    }
+
+    static Stairway setupContinuingStairway(String stairwayName) throws Exception {
+        return makeStairway(stairwayName, false, false);
+    }
+
+    private static Stairway makeStairway(String stairwayName, boolean forceCleanStart, boolean migrateUpgrade) throws Exception {
         DataSource dataSource = makeDataSource();
         ExecutorService executorService = Executors.newFixedThreadPool(2);
-        Stairway stairway = new Stairway(executorService, null);
-        stairway.initialize(dataSource, true, true);
+        Stairway stairway = new Stairway(executorService, null, null, stairwayName);
+        stairway.initialize(dataSource, forceCleanStart, migrateUpgrade);
         return stairway;
     }
 
