@@ -52,14 +52,10 @@ public final class TestUtil {
         return stairway.getFlightState(flightId).getFlightStatus() != FlightStatus.RUNNING;
     }
 
-    static FlightDao setupFlightDao() throws Exception {
+    static Stairway setupDummyStairway() throws Exception {
         DataSource dataSource = makeDataSource();
-        Migrate migrate = new Migrate();
-        migrate.initialize("stairway/db/changelog.xml", dataSource);
-
-        FlightDao flightDao = new FlightDao(dataSource, new DefaultExceptionSerializer());
-        flightDao.startClean();
-
-        return flightDao;
+        Stairway stairway = new Stairway(null, null);
+        stairway.initialize(dataSource, true, true);
+        return stairway;
     }
 }

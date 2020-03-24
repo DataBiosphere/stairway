@@ -1,6 +1,7 @@
 package bio.terra.stairway;
 
 import bio.terra.stairway.exception.DatabaseOperationException;
+import bio.terra.stairway.exception.FlightException;
 import bio.terra.stairway.exception.RetryException;
 import bio.terra.stairway.exception.StairwayExecutionException;
 import org.apache.commons.lang3.builder.ToStringBuilder;
@@ -76,11 +77,11 @@ public class Flight implements Callable<FlightState> {
      * Call may be called for a flight that has been interrupted and is being recovered
      * so we may be headed either direction.
      */
-    public FlightState call() throws DatabaseOperationException {
+    public FlightState call() throws DatabaseOperationException, FlightException {
         logger.debug("Executing flight class: " + context().getFlightClassName() + " id: " + context().getFlightId());
         FlightStatus flightStatus = fly();
         context().setFlightStatus(flightStatus);
-        flightDao.complete(context());
+        flightDao.exit(context());
         return flightDao.getFlightState(context().getFlightId());
     }
 
@@ -94,6 +95,12 @@ public class Flight implements Callable<FlightState> {
             if (context().isDoing()) {
                 StepResult doResult = runSteps();
                 if (doResult.isSuccess()) {
+                    if (doResult.getStepStatus() == StepStatus.STEP_RESULT_STOP) {
+                        return FlightStatus.READY;
+                    }
+                    if (doResult.getStepStatus() == StepStatus.STEP_RESULT_YIELD) {
+                        return FlightStatus.WAITING;
+                    }
                     return FlightStatus.SUCCESS;
                 }
 
@@ -154,9 +161,30 @@ public class Flight implements Callable<FlightState> {
                 return result;
             }
 
+            // Record the step state
             flightDao.step(context());
 
-            context().nextStepIndex();
+            switch (result.getStepStatus()) {
+                case STEP_RESULT_SUCCESS:
+                    // Run the next step (if any)
+                    context().nextStepIndex();
+                    break;
+
+                case STEP_RESULT_RERUN:
+                    // Rerun the same step
+                    break;
+
+                case STEP_RESULT_YIELD:
+                case STEP_RESULT_STOP:
+                    // Stop executing
+                    return result;
+
+                case STEP_RESULT_FAILURE_RETRY:
+                case STEP_RESULT_FAILURE_FATAL:
+                default:
+                    // unreachable
+                    break;
+            }
         }
         return result;
     }
@@ -197,9 +225,17 @@ public class Flight implements Callable<FlightState> {
             switch (result.getStepStatus()) {
                 case STEP_RESULT_SUCCESS:
                 case STEP_RESULT_FAILURE_FATAL:
+                case STEP_RESULT_STOP:
+                case STEP_RESULT_YIELD:
                     return result;
 
                 case STEP_RESULT_FAILURE_RETRY:
+                    if (context().getStairway().isQuietingDown()) {
+                        logger.info("Quieting down: not retrying flight id: " + context().getFlightId() +
+                                " step: " + context().getStepIndex() +
+                                " direction: " + (context().isDoing() ? "doing" : "undoing"));
+                        return result;
+                    }
                     logger.info("Retrying flight id: " + context().getFlightId() +
                         " step: " + context().getStepIndex() +
                         " direction: " + (context().isDoing() ? "doing" : "undoing"));

@@ -19,23 +19,10 @@ import java.util.List;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.ThreadPoolExecutor;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicBoolean;
 
 /**
- * Stairway is the object that drives execution of Flights. The class is constructed
- * with inputs that allow the caller to specify the thread pool, the flightDao source, and the
- * table name stem to use.
- *
- * Each Stairway runs, logs, and recovers independently.
- *
- * There are two techniques you can use to wait for a flight. One is polling by calling getFlightState. That
- * reads the flight state from the stairway flightDao so will report correct state for as long as the flight
- * lives in the flightDao. (Since we haven't implemented pruning, that means forever.) If you poll in this way,
- * then the in-memory resources are released on the first call to getFlightState that reports the flight has
- * completed in some way.
- *
- * The other technique is to poll the flight future using the isDone() method or block waiting for the
- * flight to complete using the waitForFlight() method. In this case, the in-memory resources are freed
- * when either method detects that the flight is done.
+ * Stairway is the object that drives execution of Flights.
  */
 public class Stairway {
     private Logger logger = LoggerFactory.getLogger("bio.terra.stairway");
@@ -44,6 +31,9 @@ public class Stairway {
     private FlightDao flightDao;
     private Object applicationContext;
     private ExceptionSerializer exceptionSerializer;
+    private String stairwayName;
+    private String stairwayId;
+    private AtomicBoolean quietingDown; // flights test this and force yield if true
 
     /**
      * We do initialization in two steps. The constructor does the first step of constructing the object
@@ -55,10 +45,11 @@ public class Stairway {
      *
      * @param threadPool a thread pool must be provided. The caller chooses the type of pool to use.
      * @param applicationContext an object passed through to flights; otherwise unused by Stairway
-     * Note: the default exceptionSerializer is used in this form of the constructor.
+     * Note: the default exceptionSerializer is used in this form of the constructor and the
+     * stairwayId is generated.
      */
     public Stairway(ExecutorService threadPool, Object applicationContext) {
-        this(threadPool, applicationContext, new DefaultExceptionSerializer());
+        this(threadPool, applicationContext, new DefaultExceptionSerializer(), ShortUUID.get());
     }
 
     /**
@@ -68,11 +59,20 @@ public class Stairway {
      * @param threadPool a thread pool must be provided. The caller chooses the type of pool to use.
      * @param applicationContext an object passed through to flights; otherwise unused by Stairway
      * @param exceptionSerializer implementation of ExceptionSerializer interface used for exception serde.
+     *                            If null, the Stairway default exception serializer is used.
+     * @param stairwayName a unique name for this Stairway instance. In a Kubernetes environment, this
+     *                   might be derived from the pod name.
      */
-    public Stairway(ExecutorService threadPool, Object applicationContext, ExceptionSerializer exceptionSerializer) {
+    public Stairway(ExecutorService threadPool,
+                    Object applicationContext,
+                    ExceptionSerializer exceptionSerializer,
+                    String stairwayName) {
         this.threadPool = threadPool;
         this.applicationContext = applicationContext;
-        this.exceptionSerializer = exceptionSerializer;
+        this.exceptionSerializer =
+                (exceptionSerializer == null) ? new DefaultExceptionSerializer() : exceptionSerializer;
+        this.stairwayName = stairwayName;
+        this.quietingDown = new AtomicBoolean();
     }
 
     /**
@@ -93,11 +93,43 @@ public class Stairway {
         }
 
         this.flightDao = new FlightDao(dataSource, exceptionSerializer);
+
         if (forceCleanStart) {
+            // If cleaning, set the stairway id after cleaning (or it gets cleaned!)
             flightDao.startClean();
+            stairwayId = flightDao.findOrCreateStairwayInstance(stairwayName);
         } else {
+            stairwayId = flightDao.findOrCreateStairwayInstance(stairwayName);
             recoverFlights();
         }
+    }
+
+    /**
+     * Graceful shutdown: instruct stairway to stop executing flights.
+     * When running flights hit a step boundary they will yield. No new flights are
+     * able to start. Then this thread waits for termination of the thread pool;
+     * basically, just exposing the awaitTermination parameters.
+     * @param waitTimeout time, in some units to wait before timing out
+     * @param unit the time unit of waitTimeout.
+     * @return true if we quieted; false if we were interrupted or timed out before quieting down
+     */
+    public boolean quietDown(long waitTimeout, TimeUnit unit) {
+        quietingDown.set(true);
+        threadPool.shutdown();
+        try {
+            return threadPool.awaitTermination(waitTimeout, unit);
+        } catch (InterruptedException ex) {
+            Thread.currentThread().interrupt();
+            return false;
+        }
+    }
+
+    /**
+     * Not-so-graceful shutdown: shutdown the pool which will cause an InterruptedException on all of
+     * the flights. That _should_ cause the flights to rapidly terminate and get set to unowned.
+     */
+    public void terminate() {
+        threadPool.shutdownNow();
     }
 
     /**
@@ -125,6 +157,9 @@ public class Stairway {
     public void submit(String flightId,
                        Class<? extends Flight> flightClass,
                        FlightMap inputParameters) throws DatabaseOperationException {
+        if (isQuietingDown()) {
+            throw new MakeFlightException("Stairway is shutting down and cannot accept a new flight");
+        }
 
         if (flightClass == null || inputParameters == null) {
             throw new MakeFlightException("Must supply non-null flightClass and inputParameters to submit");
@@ -135,6 +170,30 @@ public class Stairway {
         flight.context().setStairway(this);
         flightDao.submit(flight.context());
         launchFlight(flight);
+    }
+
+    /**
+     * Try to resume a flight. If the flight is unowned and either in WAITING or READY state, then
+     * this Stairway takes ownership and executes the rest of the flight. There can be race conditions
+     * with other Stairway's on resume. It is not an error if the flight is not resumed by this
+     * Stairway.
+     *
+     * @param flightId the flight to try to resume
+     * @return true if this Stairway owns and is executing the flight; false if ownership could not be claimed
+     * @throws DatabaseOperationException failure during flight database operations
+     */
+    public boolean resume(String flightId) throws DatabaseOperationException {
+        if (isQuietingDown()) {
+            throw new MakeFlightException("Stairway is shutting down and cannot resume a flight");
+        }
+
+        FlightContext flightContext = flightDao.resume(stairwayId, flightId);
+        if (flightContext == null) {
+            return false;
+        }
+
+        resumeOneFlight(flightContext);
+        return true;
     }
 
     /**
@@ -159,14 +218,16 @@ public class Stairway {
     }
 
     /**
-     * Wait for a flight to complete. When it completes, the flight is removed from the taskContextMap.
+     * Wait for a flight to complete
      *
      * @param flightId the flight to wait for
      * @param pollSeconds sleep time for each poll cycle; if null, defaults to 10 seconds
      * @param pollCycles number of times to poll; if null, we poll forever
      * @return flight state object
      * @throws DatabaseOperationException failure to get flight state
+     * @throws FlightException if interrupted or polling interval expired
      */
+    @Deprecated
     public FlightState waitForFlight(String flightId, Integer pollSeconds, Integer pollCycles)
             throws DatabaseOperationException, FlightException {
         int sleepSeconds = (pollSeconds == null) ? 10 : pollSeconds;
@@ -228,7 +289,20 @@ public class Stairway {
         return flightDao.getFlights(offset, limit, filter);
     }
 
-    /*
+    String getStairwayId() {
+        return stairwayId;
+    }
+
+    boolean isQuietingDown() {
+        return quietingDown.get();
+    }
+
+    // Exposed for unit testing
+    FlightDao getFlightDao() {
+        return flightDao;
+    }
+
+    /**
      * Find any incomplete flights and recover them. We overwrite the flight context of this flight
      * with the recovered flight context. The normal constructor path needs to give the input parameters
      * to the flight subclass. This is a case where we don't really want to have the Flight object set up
@@ -236,16 +310,22 @@ public class Stairway {
      *
      * The flightlog records the last operation performed; so we need to set the execution point to the next
      * step index.
+     *
+     * @throws DatabaseOperationException on database errors
      */
     private void recoverFlights() throws DatabaseOperationException {
-        List<FlightContext> flightList = flightDao.recover();
+        List<FlightContext> flightList = flightDao.recover(stairwayId);
         for (FlightContext flightContext : flightList) {
-            Flight flight = makeFlightFromName(flightContext.getFlightClassName(), flightContext.getInputParameters());
-            flightContext.nextStepIndex();
-            flightContext.setStairway(this);
-            flight.setFlightContext(flightContext);
-            launchFlight(flight);
+            resumeOneFlight(flightContext);
         }
+    }
+
+    private void resumeOneFlight(FlightContext flightContext) {
+        Flight flight = makeFlightFromName(flightContext.getFlightClassName(), flightContext.getInputParameters());
+        flightContext.nextStepIndex();
+        flightContext.setStairway(this);
+        flight.setFlightContext(flightContext);
+        launchFlight(flight);
     }
 
     /*

@@ -1,0 +1,28 @@
+databaseChangeLog:
+  - changeSet:
+      id: stairwaybase
+      author: dd
+      changes:
+        - addColumn:
+            tableName: flight
+            columns:
+              - column:
+                  name: stairway_id
+                  type: text
+                  remarks: identifier for this Stairway instance
+
+        - createTable:
+            tableName: stairwayinstance
+            columns:
+              - column:
+                  name: stairway_name
+                  type: text
+                  remarks: externally set name of the stairway instance
+                  constraints:
+                    primaryKey: true
+                    nullable: false
+              - column:
+                  name: stairway_id
+                  type: text
+                  remarks: internal-to-stairway id of the instance
+
