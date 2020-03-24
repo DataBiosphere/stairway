@@ -180,6 +180,72 @@ public class ScenarioTest {
         assertThat("result set properly", outResult, equalTo(inResult));
     }
 
+    @Test
+    public void testYield() throws Exception {
+        String inResult = "yielded and merged";
+        FlightMap inputParameters = new FlightMap();
+        inputParameters.put(MapKey.RESULT, inResult);
+
+        String flightId = stairway.createFlightId();
+
+        stairway.submit(flightId, TestFlightYield.class, inputParameters);
+        // Allow time for the flight thread to start up and yield
+        TimeUnit.SECONDS.sleep(5);
+
+        FlightState state = stairway.getFlightState(flightId);
+        assertThat("State is waiting", state.getFlightStatus(), equalTo(FlightStatus.WAITING));
+        assertNull(state.getStairwayId(), "Flight is unowned");
+
+        boolean resumedFlight = stairway.resume(flightId);
+        assertTrue(resumedFlight, "successfully resumed the flight");
+        stairway.waitForFlight(flightId, null, null);
+
+        state = stairway.getFlightState(flightId);
+        assertThat("State is success", state.getFlightStatus(), equalTo(FlightStatus.SUCCESS));
+
+        FlightMap resultMap = state.getResultMap().orElse(null);
+        assertNotNull(resultMap, "result map is present");
+        String outResult = resultMap.get(MapKey.RESULT, String.class);
+        assertThat("result set properly", outResult, equalTo(inResult));
+    }
+
+    @Test
+    public void testTerminate() throws Exception {
+        String inResult = "terminated cleanly";
+        FlightMap inputParameters = new FlightMap();
+        inputParameters.put(MapKey.CONTROLLER_VALUE, 1);
+        inputParameters.put(MapKey.RESULT, inResult);
+
+        TestStopController.setControl(0);
+        String flightId = stairway.createFlightId();
+
+        stairway.submit(flightId, TestFlightQuietDown.class, inputParameters);
+        // Allow time for the flight thread to go to sleep
+        TimeUnit.SECONDS.sleep(5);
+
+        String stairwayName = stairway.getStairwayName();
+        stairway.terminate();
+        stairway = null;
+
+        stairway = TestUtil.setupContinuingStairway(stairwayName);
+        FlightState state = stairway.getFlightState(flightId);
+        assertThat("State is ready", state.getFlightStatus(), equalTo(FlightStatus.READY));
+        assertNull(state.getStairwayId(), "Flight is unowned");
+
+        boolean resumedFlight = stairway.resume(flightId);
+        assertTrue(resumedFlight, "successfully resumed the flight");
+        TestStopController.setControl(1); // wake it up
+        stairway.waitForFlight(flightId, null, null);
+
+        state = stairway.getFlightState(flightId);
+        assertThat("State is success", state.getFlightStatus(), equalTo(FlightStatus.SUCCESS));
+
+        FlightMap resultMap = state.getResultMap().orElse(null);
+        assertNotNull(resultMap, "result map is present");
+        String outResult = resultMap.get(MapKey.RESULT, String.class);
+        assertThat("result set properly", outResult, equalTo(inResult));
+    }
+
     private String makeExistingFile() throws Exception {
         // Generate a filename and create the file
         String existingFilename = makeFilename();
