@@ -333,7 +333,9 @@ public class Stairway {
 
     private void resumeOneFlight(FlightContext flightContext) {
         Flight flight = makeFlightFromName(flightContext.getFlightClassName(), flightContext.getInputParameters());
-        flightContext.nextStepIndex();
+        if (!flightContext.isRerun()) {
+            flightContext.nextStepIndex();
+        }
         flightContext.setStairway(this);
         flight.setFlightContext(flightContext);
         launchFlight(flight);

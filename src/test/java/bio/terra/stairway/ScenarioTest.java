@@ -18,6 +18,7 @@ import static org.hamcrest.CoreMatchers.containsString;
 import static org.hamcrest.CoreMatchers.equalTo;
 import static org.hamcrest.CoreMatchers.is;
 import static org.hamcrest.MatcherAssert.assertThat;
+import static org.hamcrest.Matchers.lessThan;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertNull;
@@ -244,6 +245,97 @@ public class ScenarioTest {
         assertNotNull(resultMap, "result map is present");
         String outResult = resultMap.get(MapKey.RESULT, String.class);
         assertThat("result set properly", outResult, equalTo(inResult));
+    }
+
+    @Test
+    public void testRerunSimple() throws Exception {
+        String inResult = "rerun is simple";
+        FlightMap inputParameters = new FlightMap();
+        int counterEnd = 5;
+        inputParameters.put(MapKey.COUNTER_START, 0);
+        inputParameters.put(MapKey.COUNTER_END, counterEnd);
+        inputParameters.put(MapKey.RESULT, inResult);
+
+        String flightId = stairway.createFlightId();
+        stairway.submit(flightId, TestFlightRerun.class, inputParameters);
+        FlightState state = stairway.waitForFlight(flightId, null, null);
+        assertThat("State is success", state.getFlightStatus(), equalTo(FlightStatus.SUCCESS));
+        FlightMap resultMap = state.getResultMap().orElse(null);
+        assertNotNull(resultMap, "result map is present");
+        String outResult = resultMap.get(MapKey.RESULT, String.class);
+        assertThat("result set properly", outResult, equalTo(inResult));
+        Integer counter = resultMap.get(MapKey.COUNTER, Integer.class);
+        assertThat("counter is counterend", counter, equalTo(counterEnd));
+    }
+
+    @Test
+    public void testRerunTerminate() throws Exception {
+        String inResult = "rerun interrupted";
+        FlightMap inputParameters = new FlightMap();
+        int counterEnd = 5;
+        inputParameters.put(MapKey.COUNTER_START, 0);
+        inputParameters.put(MapKey.COUNTER_END, counterEnd);
+        inputParameters.put(MapKey.COUNTER_STOP, 3);
+        inputParameters.put(MapKey.RESULT, inResult);
+
+        TestStopController.setControl(0); // have the flight sleep at COUNTER_STOP
+        String flightId = stairway.createFlightId();
+        stairway.submit(flightId, TestFlightRerun.class, inputParameters);
+        // Allow time for the flight thread to go to sleep
+        TimeUnit.SECONDS.sleep(5);
+
+        String stairwayName = stairway.getStairwayName();
+        stairway.terminate();
+        stairway = null;
+
+        stairway = TestUtil.setupContinuingStairway(stairwayName);
+        FlightState state = stairway.getFlightState(flightId);
+        assertThat("State is ready", state.getFlightStatus(), equalTo(FlightStatus.READY));
+        assertNull(state.getStairwayId(), "Flight is unowned");
+
+        TestStopController.setControl(1); // prevent the flight from re-sleeping
+        boolean resumedFlight = stairway.resume(flightId);
+        assertTrue(resumedFlight, "successfully resumed the flight");
+        stairway.waitForFlight(flightId, null, null);
+
+        state = stairway.getFlightState(flightId);
+        assertThat("State is success", state.getFlightStatus(), equalTo(FlightStatus.SUCCESS));
+        FlightMap resultMap = state.getResultMap().orElse(null);
+        assertNotNull(resultMap, "result map is present");
+        String outResult = resultMap.get(MapKey.RESULT, String.class);
+        assertThat("result set properly", outResult, equalTo(inResult));
+        Integer counter = resultMap.get(MapKey.COUNTER, Integer.class);
+        assertThat("counter is counterend", counter, equalTo(counterEnd));
+    }
+
+    @Test
+    public void testRerunUndo() throws Exception {
+        String inResult = "rerun is undoable";
+        int counterStart = 0;
+        int counterEnd = 5;
+
+        for (int stopCounter = 0; stopCounter < counterEnd; stopCounter++) {
+            logger.debug("TestRerunUndo - stop at " + stopCounter);
+            FlightMap inputParameters = new FlightMap();
+            inputParameters.put(MapKey.COUNTER_START, counterStart);
+            inputParameters.put(MapKey.COUNTER_END, counterEnd);
+            inputParameters.put(MapKey.RESULT, inResult);
+            inputParameters.put(MapKey.COUNTER_STOP, stopCounter);
+            String flightId = stairway.createFlightId();
+            stairway.submit(flightId, TestFlightRerunUndo.class, inputParameters);
+            FlightState state = stairway.waitForFlight(flightId, null, null);
+            assertThat("State is error", state.getFlightStatus(), equalTo(FlightStatus.ERROR));
+            FlightMap resultMap = state.getResultMap().orElse(null);
+            assertNotNull(resultMap, "result map is present");
+            String outResult = resultMap.get(MapKey.RESULT, String.class);
+            assertNull(outResult, "result is not present");
+            Integer counter = resultMap.get(MapKey.COUNTER, Integer.class);
+            if (counter == null) {
+                assertThat("counter stop is zero", stopCounter, equalTo(counterStart));
+            } else {
+                assertThat("counter is counterstart", counter, lessThan(counterStart));
+            }
+        }
     }
 
     private String makeExistingFile() throws Exception {

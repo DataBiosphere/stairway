@@ -161,22 +161,29 @@ public class Flight implements Callable<FlightState> {
                 return result;
             }
 
-            // Record the step state
-            flightDao.step(context());
-
             switch (result.getStepStatus()) {
                 case STEP_RESULT_SUCCESS:
-                    // Run the next step (if any)
+                    // Finished a step; run the next one
+                    context().setRerun(false);
+                    flightDao.step(context());
                     context().nextStepIndex();
                     break;
 
                 case STEP_RESULT_RERUN:
                     // Rerun the same step
+                    context().setRerun(true);
+                    flightDao.step(context());
                     break;
 
                 case STEP_RESULT_YIELD:
+                    // Finished a step; yield execution
+                    context().setRerun(false);
+                    flightDao.step(context());
+                    return result;
+
                 case STEP_RESULT_STOP:
-                    // Stop executing
+                    // Stop executing - leave rerun setting as is; we'll need to pick up where we left off
+                    flightDao.step(context());
                     return result;
 
                 case STEP_RESULT_FAILURE_RETRY:

@@ -11,6 +11,14 @@ databaseChangeLog:
                   type: text
                   remarks: identifier for this Stairway instance
 
+        - addColumn:
+            tableName: flightlog
+            columns:
+              - column:
+                  name: rerun
+                  type: boolean
+                  remarks: true if rerun of the current step is requested by the step
+
         - createTable:
             tableName: stairwayinstance
             columns:

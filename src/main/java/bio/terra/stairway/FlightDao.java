@@ -162,13 +162,14 @@ class FlightDao {
 
     /**
      * Record the flight state right after a step
+     * Mark if we are re-running the step
      */
     void step(FlightContext flightContext) throws DatabaseOperationException {
         final String sqlInsertFlightLog =
             "INSERT INTO " + FLIGHT_LOG_TABLE +
-                "(flightid, log_time, working_parameters, step_index, doing," +
+                "(flightid, log_time, working_parameters, step_index, rerun, doing," +
                 " succeeded, serialized_exception, status)" +
-                " VALUES (:flightid, CURRENT_TIMESTAMP, :working_map, :step_index, :doing," +
+                " VALUES (:flightid, CURRENT_TIMESTAMP, :working_map, :step_index, :rerun, :doing," +
                 " :succeeded, :serialized_exception, :status)";
 
         String serializedException =
@@ -181,6 +182,7 @@ class FlightDao {
             statement.setString("flightid", flightContext.getFlightId());
             statement.setString("working_map", flightContext.getWorkingMap().toJson());
             statement.setInt("step_index", flightContext.getStepIndex());
+            statement.setBoolean("rerun", flightContext.isRerun());
             statement.setBoolean("doing", flightContext.isDoing());
             statement.setBoolean("succeeded", flightContext.getResult().isSuccess());
             statement.setString("serialized_exception", serializedException);
@@ -388,7 +390,7 @@ class FlightDao {
             " FROM " + FLIGHT_TABLE +
             " WHERE status = 'RUNNING' AND stairway_id = :stairwayid";
 
-        final String sqlLastFlightLog = "SELECT working_parameters, step_index, doing," +
+        final String sqlLastFlightLog = "SELECT working_parameters, step_index, doing, rerun," +
             " succeeded, serialized_exception, status" +
             " FROM " + FLIGHT_LOG_TABLE +
             " WHERE flightid = :flightid AND log_time = " +
@@ -398,9 +400,7 @@ class FlightDao {
 
         try (Connection connection = dataSource.getConnection();
              NamedParameterPreparedStatement activeFlightsStatement =
-                 new NamedParameterPreparedStatement(connection, sqlActiveFlights);
-             NamedParameterPreparedStatement lastFlightLogStatement =
-                 new NamedParameterPreparedStatement(connection, sqlLastFlightLog)) {
+                 new NamedParameterPreparedStatement(connection, sqlActiveFlights)) {
 
             startTransaction(connection);
             activeFlightsStatement.setString("stairwayid", stairwayId);
@@ -438,7 +438,7 @@ class FlightDao {
     private void fillFlightContexts(Connection connection, List<FlightContext> flightContextList)
             throws DatabaseOperationException {
 
-        final String sqlLastFlightLog = "SELECT working_parameters, step_index, doing," +
+        final String sqlLastFlightLog = "SELECT working_parameters, step_index, doing, rerun," +
                 " succeeded, serialized_exception, status" +
                 " FROM " + FLIGHT_LOG_TABLE +
                 " WHERE flightid = :flightid AND log_time = " +
@@ -467,6 +467,7 @@ class FlightDao {
                         flightContext.getWorkingMap().fromJson(rsflight.getString("working_parameters"));
 
                         flightContext.setStepIndex(rsflight.getInt("step_index"));
+                        flightContext.setRerun(rsflight.getBoolean("rerun"));
                         flightContext.setDoing(rsflight.getBoolean("doing"));
                         flightContext.setResult(stepResult);
                         FlightStatus flightStatus = FlightStatus.valueOf(rsflight.getString("status"));
