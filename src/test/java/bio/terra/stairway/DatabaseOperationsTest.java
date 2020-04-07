@@ -28,9 +28,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 public class DatabaseOperationsTest {
     @Test
     public void basicsTest() throws Exception {
-        Stairway stairway = TestUtil.setupDummyStairway();
-        String stairwayId = stairway.getStairwayId();
-        FlightDao flightDao = stairway.getFlightDao();
+        FlightDao flightDao = TestUtil.setupFlightDao();
 
         FlightMap inputs = new FlightMap();
         inputs.put(ikey, intValue);
@@ -39,12 +37,11 @@ public class DatabaseOperationsTest {
 
         FlightContext flightContext = new FlightContext(inputs, "notArealClass");
         flightContext.setFlightId(flightId);
-        flightContext.setStairway(stairway);
 
         flightDao.submit(flightContext);
 
         // Use recover to retrieve the internal state of the flight
-        List<FlightContext> flightList = flightDao.recover(stairwayId);
+        List<FlightContext> flightList = flightDao.recover();
         assertThat(flightList.size(), is(equalTo(1)));
         FlightContext recoveredFlight = flightList.get(0);
 
@@ -80,7 +77,7 @@ public class DatabaseOperationsTest {
 
         flightDao.step(flightContext);
 
-        flightList = flightDao.recover(stairwayId);
+        flightList = flightDao.recover();
         assertThat(flightList.size(), is(equalTo(1)));
         recoveredFlight = flightList.get(0);
         assertThat(recoveredFlight.getStepIndex(), is(equalTo(2)));
@@ -99,9 +96,9 @@ public class DatabaseOperationsTest {
 
         flightContext.setFlightStatus(FlightStatus.ERROR);
 
-        flightDao.exit(flightContext);
+        flightDao.complete(flightContext);
 
-        flightList = flightDao.recover(stairwayId);
+        flightList = flightDao.recover();
         assertThat(flightList.size(), is(equalTo(0)));
 
         List<FlightState> flightStateList = flightDao.getFlights(0, 99, null);

@@ -20,13 +20,11 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 @Tag("unit")
 public class GetFlightsTest {
 
-    private Stairway stairway;
     private FlightDao flightDao;
 
     @BeforeEach
     public void setup() throws Exception {
-        stairway = TestUtil.setupDummyStairway();
-        flightDao = stairway.getFlightDao();
+        flightDao = TestUtil.setupFlightDao();
     }
 
     @Test
@@ -126,9 +124,9 @@ public class GetFlightsTest {
     }
 
     private FlightState makeFlight(String flightId,
-                                   FlightStatus status,
-                                   String className,
-                                   Object[] inputs) throws Exception {
+                                    FlightStatus status,
+                                    String className,
+                                    Object[] inputs) throws Exception {
 
         FlightMap inputParams = new FlightMap();
         int inputIndex = 0;
@@ -141,17 +139,35 @@ public class GetFlightsTest {
 
         FlightContext flightContext = new FlightContext(inputParams, className);
         flightContext.setFlightId(flightId);
-        flightContext.setStairway(stairway);
 
         flightDao.submit(flightContext);
 
         // If status isn't "RUNNING" then we set the status and mark the flight complete
         if (status != FlightStatus.RUNNING) {
             flightContext.setFlightStatus(status);
-            flightDao.exit(flightContext);
+            flightDao.complete(flightContext);
         }
 
         return flightDao.getFlightState(flightId);
     }
+
+
+/*
+        Instant submit = now();
+        Instant complete = now();
+
+        String form2Sql =
+
+        // Test filter code generation - form 2
+        FlightFilter filter = new FlightFilter()
+                .addFilterCompletedTime(FlightFilterOp.GREATER_THAN, submit)
+                .addFilterFlightClass(FlightFilterOp.EQUAL, TestFlight.class)
+                .addFilterFlightStatus(FlightFilterOp.EQUAL, FlightStatus.RUNNING)
+                .addFilterSubmitTime(FlightFilterOp.LESS_THAN, complete)
+                .addFilterInputParameter("email", FlightFilterOp.EQUAL, "ddtest@gmail.com");
+
+        String sql = filter.makeSql();
+        assertThat(inputSql, equalTo("(I.key = 'afield' AND I.value != :p1)"));
+*/
 
 }

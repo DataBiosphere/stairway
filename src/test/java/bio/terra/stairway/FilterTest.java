@@ -71,7 +71,7 @@ public class FilterTest {
     // query forms 1, 2, and 3 with and without flight filters
     @Test
     public void filterForm1NoFilterTest() throws Exception {
-        String expect = "SELECT F.flightid, F.stairway_id, F.submit_time, F.completed_time," +
+        String expect = "SELECT F.flightid, F.submit_time, F.completed_time," +
                 " F.output_parameters, F.status, F.serialized_exception" +
                 " FROM flight F" +
                 " ORDER BY submit_time LIMIT :limit OFFSET :offset";
@@ -83,7 +83,7 @@ public class FilterTest {
 
     @Test
     public void filterForm1WithFilterTest() throws Exception {
-        String expect = "SELECT F.flightid, F.stairway_id, F.submit_time, F.completed_time," +
+        String expect = "SELECT F.flightid, F.submit_time, F.completed_time," +
                 " F.output_parameters, F.status, F.serialized_exception" +
                 " FROM flight F WHERE" +
                 " F.completed_time > :ff1 AND F.class_name = :ff2 AND F.status = :ff3 AND F.submit_time < :ff4" +
@@ -102,7 +102,7 @@ public class FilterTest {
 
     @Test
     public void filterForm2NoFilterTest() throws Exception {
-        String expect = "SELECT F.flightid, F.stairway_id, F.submit_time, F.completed_time," +
+        String expect = "SELECT F.flightid, F.submit_time, F.completed_time," +
                 " F.output_parameters, F.status, F.serialized_exception" +
                 " FROM flight F INNER JOIN flightinput I" +
                 " ON F.flightid = I.flightid" +
@@ -118,7 +118,7 @@ public class FilterTest {
 
     @Test
     public void filterForm2WithFilterTest() throws Exception {
-        String expect = "SELECT F.flightid, F.stairway_id, F.submit_time, F.completed_time," +
+        String expect = "SELECT F.flightid, F.submit_time, F.completed_time," +
                 " F.output_parameters, F.status, F.serialized_exception" +
                 " FROM flight F INNER JOIN flightinput I" +
                 " ON F.flightid = I.flightid" +
@@ -136,7 +136,7 @@ public class FilterTest {
 
     @Test
     public void filterForm3NoFilterTest() throws Exception {
-        String expect = "SELECT F.flightid, F.stairway_id, F.submit_time, F.completed_time," +
+        String expect = "SELECT F.flightid, F.submit_time, F.completed_time," +
                 " F.output_parameters, F.status, F.serialized_exception" +
                 " FROM flight F INNER JOIN " +
                 "(SELECT flightid, COUNT(*) AS matchCount FROM flightinput I" +
@@ -157,7 +157,7 @@ public class FilterTest {
 
     @Test
     public void filterForm3WithFilterTest() throws Exception {
-        String expect = "SELECT F.flightid, F.stairway_id, F.submit_time, F.completed_time," +
+        String expect = "SELECT F.flightid, F.submit_time, F.completed_time," +
                 " F.output_parameters, F.status, F.serialized_exception" +
                 " FROM flight F INNER JOIN " +
                 "(SELECT flightid, COUNT(*) AS matchCount FROM flightinput I" +
