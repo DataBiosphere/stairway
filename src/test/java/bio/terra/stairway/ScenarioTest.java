@@ -3,7 +3,6 @@ package bio.terra.stairway;
 
 import bio.terra.stairway.exception.FlightNotFoundException;
 import bio.terra.stairway.exception.StairwayException;
-import org.hamcrest.CoreMatchers;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
@@ -13,11 +12,16 @@ import org.slf4j.LoggerFactory;
 import java.io.File;
 import java.io.PrintWriter;
 import java.util.UUID;
+import java.util.concurrent.TimeUnit;
 
 import static org.hamcrest.CoreMatchers.containsString;
+import static org.hamcrest.CoreMatchers.equalTo;
 import static org.hamcrest.CoreMatchers.is;
 import static org.hamcrest.MatcherAssert.assertThat;
+import static org.hamcrest.Matchers.lessThan;
 import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 @Tag("unit")
@@ -51,7 +55,7 @@ public class ScenarioTest {
 
         // Wait for done
         FlightState result = stairway.waitForFlight(flightId, null, null);
-        assertThat(result.getFlightStatus(), CoreMatchers.is(FlightStatus.SUCCESS));
+        assertThat(result.getFlightStatus(), equalTo(FlightStatus.SUCCESS));
         assertFalse(result.getException().isPresent());
 
         try {
@@ -83,7 +87,7 @@ public class ScenarioTest {
 
         // Handle results
         FlightState result = stairway.getFlightState(flightId);
-        assertThat(result.getFlightStatus(), is(FlightStatus.ERROR));
+        assertThat(result.getFlightStatus(), equalTo(FlightStatus.ERROR));
         assertTrue(result.getException().isPresent());
 
         // The error text thrown by TestStepExistence
@@ -129,6 +133,209 @@ public class ScenarioTest {
         // We expect the existent filename to still be there
         file = new File(existingFilename);
         assertTrue(file.exists());
+    }
+
+    @Test
+    public void testQuietDown() throws Exception {
+        String inResult = "quieted down and woke up";
+        FlightMap inputParameters = new FlightMap();
+        inputParameters.put(MapKey.CONTROLLER_VALUE, 1);
+        inputParameters.put(MapKey.RESULT, inResult);
+
+        TestStopController.setControl(0);
+        String flightId = stairway.createFlightId();
+
+        stairway.submit(flightId, TestFlightQuietDown.class, inputParameters);
+        // Allow time for the flight thread to go to sleep
+        TimeUnit.SECONDS.sleep(5);
+
+        // Quiet down - don't wait long; we want control so we can unblock the thread!
+        boolean quietYet = stairway.quietDown(1, TimeUnit.SECONDS);
+        assertFalse(quietYet, "Not quiet yet");
+
+        // Wake up the thread; it should exit into READY state
+        TestStopController.setControl(1);
+        // Allow time for the flight thread to wake up and exit
+        TimeUnit.SECONDS.sleep(5);
+
+        FlightState state = stairway.getFlightState(flightId);
+        assertThat("State is ready", state.getFlightStatus(), equalTo(FlightStatus.READY));
+        assertNull(state.getStairwayId(), "Flight is unowned");
+
+        String stairwayName = stairway.getStairwayName();
+
+        stairway.terminate();
+        stairway = null;
+
+        stairway = TestUtil.setupContinuingStairway(stairwayName);
+        boolean resumedFlight = stairway.resume(flightId);
+        assertTrue(resumedFlight, "successfully resumed the flight");
+        stairway.waitForFlight(flightId, null, null);
+
+        state = stairway.getFlightState(flightId);
+        assertThat("State is success", state.getFlightStatus(), equalTo(FlightStatus.SUCCESS));
+
+        FlightMap resultMap = state.getResultMap().orElse(null);
+        assertNotNull(resultMap, "result map is present");
+        String outResult = resultMap.get(MapKey.RESULT, String.class);
+        assertThat("result set properly", outResult, equalTo(inResult));
+    }
+
+    @Test
+    public void testYield() throws Exception {
+        String inResult = "yielded and merged";
+        FlightMap inputParameters = new FlightMap();
+        inputParameters.put(MapKey.RESULT, inResult);
+
+        String flightId = stairway.createFlightId();
+
+        stairway.submit(flightId, TestFlightYield.class, inputParameters);
+        // Allow time for the flight thread to start up and yield
+        TimeUnit.SECONDS.sleep(5);
+
+        FlightState state = stairway.getFlightState(flightId);
+        assertThat("State is waiting", state.getFlightStatus(), equalTo(FlightStatus.WAITING));
+        assertNull(state.getStairwayId(), "Flight is unowned");
+
+        boolean resumedFlight = stairway.resume(flightId);
+        assertTrue(resumedFlight, "successfully resumed the flight");
+        stairway.waitForFlight(flightId, null, null);
+
+        state = stairway.getFlightState(flightId);
+        assertThat("State is success", state.getFlightStatus(), equalTo(FlightStatus.SUCCESS));
+
+        FlightMap resultMap = state.getResultMap().orElse(null);
+        assertNotNull(resultMap, "result map is present");
+        String outResult = resultMap.get(MapKey.RESULT, String.class);
+        assertThat("result set properly", outResult, equalTo(inResult));
+    }
+
+    @Test
+    public void testTerminate() throws Exception {
+        String inResult = "terminated cleanly";
+        FlightMap inputParameters = new FlightMap();
+        inputParameters.put(MapKey.CONTROLLER_VALUE, 1);
+        inputParameters.put(MapKey.RESULT, inResult);
+
+        TestStopController.setControl(0);
+        String flightId = stairway.createFlightId();
+
+        stairway.submit(flightId, TestFlightQuietDown.class, inputParameters);
+        // Allow time for the flight thread to go to sleep
+        TimeUnit.SECONDS.sleep(5);
+
+        String stairwayName = stairway.getStairwayName();
+        stairway.terminate();
+        stairway = null;
+
+        stairway = TestUtil.setupContinuingStairway(stairwayName);
+        FlightState state = stairway.getFlightState(flightId);
+        assertThat("State is ready", state.getFlightStatus(), equalTo(FlightStatus.READY));
+        assertNull(state.getStairwayId(), "Flight is unowned");
+
+        boolean resumedFlight = stairway.resume(flightId);
+        assertTrue(resumedFlight, "successfully resumed the flight");
+        TestStopController.setControl(1); // wake it up
+        stairway.waitForFlight(flightId, null, null);
+
+        state = stairway.getFlightState(flightId);
+        assertThat("State is success", state.getFlightStatus(), equalTo(FlightStatus.SUCCESS));
+
+        FlightMap resultMap = state.getResultMap().orElse(null);
+        assertNotNull(resultMap, "result map is present");
+        String outResult = resultMap.get(MapKey.RESULT, String.class);
+        assertThat("result set properly", outResult, equalTo(inResult));
+    }
+
+    @Test
+    public void testRerunSimple() throws Exception {
+        String inResult = "rerun is simple";
+        FlightMap inputParameters = new FlightMap();
+        int counterEnd = 5;
+        inputParameters.put(MapKey.COUNTER_START, 0);
+        inputParameters.put(MapKey.COUNTER_END, counterEnd);
+        inputParameters.put(MapKey.RESULT, inResult);
+
+        String flightId = stairway.createFlightId();
+        stairway.submit(flightId, TestFlightRerun.class, inputParameters);
+        FlightState state = stairway.waitForFlight(flightId, null, null);
+        assertThat("State is success", state.getFlightStatus(), equalTo(FlightStatus.SUCCESS));
+        FlightMap resultMap = state.getResultMap().orElse(null);
+        assertNotNull(resultMap, "result map is present");
+        String outResult = resultMap.get(MapKey.RESULT, String.class);
+        assertThat("result set properly", outResult, equalTo(inResult));
+        Integer counter = resultMap.get(MapKey.COUNTER, Integer.class);
+        assertThat("counter is counterend", counter, equalTo(counterEnd));
+    }
+
+    @Test
+    public void testRerunTerminate() throws Exception {
+        String inResult = "rerun interrupted";
+        FlightMap inputParameters = new FlightMap();
+        int counterEnd = 5;
+        inputParameters.put(MapKey.COUNTER_START, 0);
+        inputParameters.put(MapKey.COUNTER_END, counterEnd);
+        inputParameters.put(MapKey.COUNTER_STOP, 3);
+        inputParameters.put(MapKey.RESULT, inResult);
+
+        TestStopController.setControl(0); // have the flight sleep at COUNTER_STOP
+        String flightId = stairway.createFlightId();
+        stairway.submit(flightId, TestFlightRerun.class, inputParameters);
+        // Allow time for the flight thread to go to sleep
+        TimeUnit.SECONDS.sleep(5);
+
+        String stairwayName = stairway.getStairwayName();
+        stairway.terminate();
+        stairway = null;
+
+        stairway = TestUtil.setupContinuingStairway(stairwayName);
+        FlightState state = stairway.getFlightState(flightId);
+        assertThat("State is ready", state.getFlightStatus(), equalTo(FlightStatus.READY));
+        assertNull(state.getStairwayId(), "Flight is unowned");
+
+        TestStopController.setControl(1); // prevent the flight from re-sleeping
+        boolean resumedFlight = stairway.resume(flightId);
+        assertTrue(resumedFlight, "successfully resumed the flight");
+        stairway.waitForFlight(flightId, null, null);
+
+        state = stairway.getFlightState(flightId);
+        assertThat("State is success", state.getFlightStatus(), equalTo(FlightStatus.SUCCESS));
+        FlightMap resultMap = state.getResultMap().orElse(null);
+        assertNotNull(resultMap, "result map is present");
+        String outResult = resultMap.get(MapKey.RESULT, String.class);
+        assertThat("result set properly", outResult, equalTo(inResult));
+        Integer counter = resultMap.get(MapKey.COUNTER, Integer.class);
+        assertThat("counter is counterend", counter, equalTo(counterEnd));
+    }
+
+    @Test
+    public void testRerunUndo() throws Exception {
+        String inResult = "rerun is undoable";
+        int counterStart = 0;
+        int counterEnd = 5;
+
+        for (int stopCounter = 0; stopCounter < counterEnd; stopCounter++) {
+            logger.debug("TestRerunUndo - stop at " + stopCounter);
+            FlightMap inputParameters = new FlightMap();
+            inputParameters.put(MapKey.COUNTER_START, counterStart);
+            inputParameters.put(MapKey.COUNTER_END, counterEnd);
+            inputParameters.put(MapKey.RESULT, inResult);
+            inputParameters.put(MapKey.COUNTER_STOP, stopCounter);
+            String flightId = stairway.createFlightId();
+            stairway.submit(flightId, TestFlightRerunUndo.class, inputParameters);
+            FlightState state = stairway.waitForFlight(flightId, null, null);
+            assertThat("State is error", state.getFlightStatus(), equalTo(FlightStatus.ERROR));
+            FlightMap resultMap = state.getResultMap().orElse(null);
+            assertNotNull(resultMap, "result map is present");
+            String outResult = resultMap.get(MapKey.RESULT, String.class);
+            assertNull(outResult, "result is not present");
+            Integer counter = resultMap.get(MapKey.COUNTER, Integer.class);
+            if (counter == null) {
+                assertThat("counter stop is zero", stopCounter, equalTo(counterStart));
+            } else {
+                assertThat("counter is counterstart", counter, lessThan(counterStart));
+            }
+        }
     }
 
     private String makeExistingFile() throws Exception {

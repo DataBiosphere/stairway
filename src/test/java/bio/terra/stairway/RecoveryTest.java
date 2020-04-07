@@ -61,7 +61,7 @@ public class RecoveryTest {
     @Test
     public void successTest() throws Exception {
         // Start with a clean and shiny database environment.
-        Stairway stairway1 = new Stairway(executorService, null);
+        Stairway stairway1 = new Stairway(executorService, null, null, "recoverySuccessTest");
         stairway1.initialize(dataSource, true, true);
 
         FlightMap inputs = new FlightMap();
@@ -74,17 +74,13 @@ public class RecoveryTest {
         stairway1.submit(flightId, TestFlightRecovery.class, inputs);
 
         // Allow time for the flight thread to go to sleep
-        try {
-            TimeUnit.SECONDS.sleep(5);
-        } catch (InterruptedException ex) {
-            Thread.currentThread().interrupt();
-        }
+        TimeUnit.SECONDS.sleep(5);
 
         assertThat(TestUtil.isDone(stairway1, flightId), is(equalTo(false)));
 
         // Simulate a restart with a new thread pool and stairway. Set control so this one does not sleep
         TestStopController.setControl(1);
-        Stairway stairway2 = new Stairway(executorService, null);
+        Stairway stairway2 = new Stairway(executorService, null, null, "recoverySuccessTest");
         stairway2.initialize(dataSource, false, false);
 
         // Wait for recovery to complete
@@ -99,7 +95,7 @@ public class RecoveryTest {
     @Test
     public void undoTest() throws Exception {
         // Start with a clean and shiny database environment.
-        Stairway stairway1 = new Stairway(executorService, null);
+        Stairway stairway1 = new Stairway(executorService, null, null, "recoverySuccessTest");
         stairway1.initialize(dataSource, true, true);
 
         FlightMap inputs = new FlightMap();
@@ -112,21 +108,17 @@ public class RecoveryTest {
         stairway1.submit(flightId, TestFlightRecoveryUndo.class, inputs);
 
         // Allow time for the flight thread to go to sleep
-        try {
-            TimeUnit.SECONDS.sleep(5);
-        } catch (InterruptedException ex) {
-            Thread.currentThread().interrupt();
-        }
+        TimeUnit.SECONDS.sleep(5);
 
         assertThat(stairway1.getFlightState(flightId), not(equalTo(FlightStatus.RUNNING)));
 
         // Simulate a restart with a new thread pool and stairway. Reset control so this one does not sleep
         TestStopController.setControl(1);
-        Stairway stairway2 = new Stairway(executorService, null);
+        Stairway stairway2 = new Stairway(executorService, null, null, "recoverySuccessTest");
         stairway2.initialize(dataSource, false, false);
 
         // Wait for recovery to complete
-        stairway2.waitForFlight(flightId, null, null);
+        stairway2.waitForFlight(flightId, 5, 10);
         FlightState result = stairway2.getFlightState(flightId);
         assertThat(result.getFlightStatus(), is(equalTo(FlightStatus.ERROR)));
         assertTrue(result.getException().isPresent());
