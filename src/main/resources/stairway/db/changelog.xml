@@ -4,5 +4,4 @@
     <include file="changesets/20190801_subjectid.yaml" relativeToChangelogFile="true"/>
     <include file="changesets/20191110_fix_exceptions.yaml" relativeToChangelogFile="true"/>
     <include file="changesets/20200211_library.yaml" relativeToChangelogFile="true"/>
-    <include file="changesets/20200310_scale.yaml" relativeToChangelogFile="true"/>
 </databaseChangeLog>

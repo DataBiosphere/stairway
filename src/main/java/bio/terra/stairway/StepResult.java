@@ -54,10 +54,7 @@ public class StepResult {
     }
 
     public boolean isSuccess() {
-        return (stepStatus == StepStatus.STEP_RESULT_SUCCESS ||
-                stepStatus == StepStatus.STEP_RESULT_RERUN ||
-                stepStatus == StepStatus.STEP_RESULT_STOP ||
-                stepStatus == StepStatus.STEP_RESULT_YIELD);
+        return (stepStatus == StepStatus.STEP_RESULT_SUCCESS);
     }
 
     @Override

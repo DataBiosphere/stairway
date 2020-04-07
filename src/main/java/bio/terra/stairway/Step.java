@@ -26,18 +26,16 @@ public interface Step {
      *
      * @param context The sequencer context
      * @return step result object
-     * @throws InterruptedException when the thread pool is being shut down
-     * @throws RetryException may through retry exception, causing the Flight machinery to run the
+     * @throws RetryException - may through retry exception, causing the Flight machinery to run the
      * RetryRule associated with the step.
      */
-    StepResult doStep(FlightContext context) throws InterruptedException, RetryException;
+    StepResult doStep(FlightContext context) throws RetryException;
 
     /**
      * Called by the sequencer when running "backward" on the failure/rollback path
      *
      * @param context The sequencer context
      * @return step result object
-     * @throws InterruptedException when the thread pool is being shut down
      */
-    StepResult undoStep(FlightContext context) throws InterruptedException;
+    StepResult undoStep(FlightContext context);
 }
