@@ -84,7 +84,7 @@ public class Flight implements Callable<FlightState> {
             context().setFlightStatus(flightStatus);
             flightDao.exit(context());
             return flightDao.getFlightState(context().getFlightId());
-        } catch (Exception ex){
+        } catch (Exception ex) {
             // This is really bad news
             logger.error("Flight failed with unexpected exception: " + ex.toString());
             throw ex;
