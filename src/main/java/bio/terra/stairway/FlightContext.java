@@ -129,6 +129,10 @@ public class FlightContext {
         }
     }
 
+    public String prettyStepState() {
+        return "flight id: " + flightId + " step: " + stepIndex + " direction: " + (doing ? "doing" : "undoing");
+    }
+
     @Override
     public String toString() {
         return new ToStringBuilder(this, ToStringStyle.JSON_STYLE)

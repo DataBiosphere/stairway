@@ -29,6 +29,14 @@ import java.util.List;
  * May want to split this into an interface and an implementation. This implementation
  * has only been tested on Postgres. It may work on other databases, but who knows?
  * <p>
+ * The practice with transaction code is:
+ * <ul>
+ *     <li>Always explicitly start the transaction. That ensures that all transactions are using the
+ *     serializable isolation level.</li>
+ *     <li>Always explicitly declare read only vs write transactions</li>
+ *     <li>Always explicitly commit the transaction. That is not needed when using the resource try,
+ *     but it is useful documentation to see the point where we expect the transaction to be complete.</li>
+ * </ul>
  */
 class FlightDao {
     static String FLIGHT_TABLE = "flight";
@@ -56,9 +64,9 @@ class FlightDao {
 
         try (Connection connection = dataSource.getConnection();
              Statement statement = connection.createStatement()) {
-
+            startTransaction(connection);
             statement.executeUpdate(sqlTruncateTables);
-
+            commitTransaction(connection);
         } catch (SQLException ex) {
             throw new DatabaseSetupException("Failed to truncate database tables", ex);
         }
@@ -83,17 +91,16 @@ class FlightDao {
 
             final String sqlStairwayInstanceCreate =
                     "INSERT INTO " + STAIRWAY_INSTANCE_TABLE + " (stairway_id, stairway_name)" +
-                            " VALUES (:stairwayid, :stairwayname)";
+                            " VALUES (:stairwayId, :stairwayName)";
             try (NamedParameterPreparedStatement statement =
                          new NamedParameterPreparedStatement(connection, sqlStairwayInstanceCreate)) {
                 stairwayId = ShortUUID.get();
 
-                statement.setString("stairwayname", stairwayName);
-                statement.setString("stairwayid", stairwayId);
+                statement.setString("stairwayName", stairwayName);
+                statement.setString("stairwayId", stairwayId);
                 statement.getPreparedStatement().executeUpdate();
 
-                connection.commit();
-
+                commitTransaction(connection);
                 return stairwayId;
             }
         } catch (SQLException ex) {
@@ -105,12 +112,12 @@ class FlightDao {
     private String lookupStairwayInstanceQuery(Connection connection, String stairwayName) throws DatabaseOperationException {
         final String sqlStairwayInstance = "SELECT stairway_id" +
                 " FROM " + STAIRWAY_INSTANCE_TABLE +
-                " WHERE stairway_name = :stairwayname";
+                " WHERE stairway_name = :stairwayName";
 
         try (NamedParameterPreparedStatement instanceStatement =
                      new NamedParameterPreparedStatement(connection, sqlStairwayInstance)) {
 
-            instanceStatement.setString("stairwayname", stairwayName);
+            instanceStatement.setString("stairwayName", stairwayName);
 
             try (ResultSet rs = instanceStatement.getPreparedStatement().executeQuery()) {
                 List<String> stairwayIdList = new ArrayList<>();
@@ -139,22 +146,22 @@ class FlightDao {
         final String sqlInsertFlight =
             "INSERT INTO " + FLIGHT_TABLE +
                 " (flightId, submit_time, class_name, status, stairway_id)" +
-                "VALUES (:flightid, CURRENT_TIMESTAMP, :class_name, :status, :stairwayid)";
+                "VALUES (:flightId, CURRENT_TIMESTAMP, :className, :status, :stairwayId)";
 
         try (Connection connection = dataSource.getConnection();
              NamedParameterPreparedStatement statement =
                  new NamedParameterPreparedStatement(connection, sqlInsertFlight)) {
 
             startTransaction(connection);
-            statement.setString("flightid", flightContext.getFlightId());
-            statement.setString("class_name", flightContext.getFlightClassName());
+            statement.setString("flightId", flightContext.getFlightId());
+            statement.setString("className", flightContext.getFlightClassName());
             statement.setString("status", flightContext.getFlightStatus().name());
-            statement.setString("stairwayid", flightContext.getStairway().getStairwayId());
+            statement.setString("stairwayId", flightContext.getStairway().getStairwayId());
             statement.getPreparedStatement().executeUpdate();
 
             storeInputParameters(connection, flightContext.getFlightId(), flightContext.getInputParameters());
 
-            connection.commit(); // commit transaction
+            commitTransaction(connection);
         } catch (SQLException ex) {
             throw new DatabaseOperationException("Failed to create database tables", ex);
         }
@@ -169,8 +176,8 @@ class FlightDao {
             "INSERT INTO " + FLIGHT_LOG_TABLE +
                 "(flightid, log_time, working_parameters, step_index, rerun, doing," +
                 " succeeded, serialized_exception, status)" +
-                " VALUES (:flightid, CURRENT_TIMESTAMP, :working_map, :step_index, :rerun, :doing," +
-                " :succeeded, :serialized_exception, :status)";
+                " VALUES (:flightId, CURRENT_TIMESTAMP, :workingMap, :stepIndex, :rerun, :doing," +
+                " :succeeded, :serializedException, :status)";
 
         String serializedException =
             exceptionSerializer.serialize(flightContext.getResult().getException().orElse(null));
@@ -178,17 +185,17 @@ class FlightDao {
         try (Connection connection = dataSource.getConnection();
              NamedParameterPreparedStatement statement =
                  new NamedParameterPreparedStatement(connection, sqlInsertFlightLog)) {
-
-            statement.setString("flightid", flightContext.getFlightId());
-            statement.setString("working_map", flightContext.getWorkingMap().toJson());
-            statement.setInt("step_index", flightContext.getStepIndex());
+            startTransaction(connection);
+            statement.setString("flightId", flightContext.getFlightId());
+            statement.setString("workingMap", flightContext.getWorkingMap().toJson());
+            statement.setInt("stepIndex", flightContext.getStepIndex());
             statement.setBoolean("rerun", flightContext.isRerun());
             statement.setBoolean("doing", flightContext.isDoing());
             statement.setBoolean("succeeded", flightContext.getResult().isSuccess());
-            statement.setString("serialized_exception", serializedException);
+            statement.setString("serializedException", serializedException);
             statement.setString("status", flightContext.getFlightStatus().name());
             statement.getPreparedStatement().executeUpdate();
-
+            commitTransaction(connection);
         } catch (SQLException ex) {
             throw new DatabaseOperationException("Failed to log step", ex);
         }
@@ -236,15 +243,16 @@ class FlightDao {
                 "UPDATE " + FLIGHT_TABLE +
                         " SET status = :status," +
                         " stairway_id = NULL" +
-                        " WHERE flightid = :flightid AND status = 'RUNNING'";
+                        " WHERE flightid = :flightId AND status = 'RUNNING'";
 
         try (Connection connection = dataSource.getConnection();
              NamedParameterPreparedStatement statement =
                      new NamedParameterPreparedStatement(connection, sqlUpdateFlight)) {
-
+            startTransaction(connection);
             statement.setString("status", flightContext.getFlightStatus().name());
-            statement.setString("flightid", flightContext.getFlightId());
+            statement.setString("flightId", flightContext.getFlightId());
             statement.getPreparedStatement().executeUpdate();
+            commitTransaction(connection);
         } catch (SQLException ex) {
             throw new DatabaseOperationException("Failed to complete flight", ex);
         }
@@ -261,14 +269,14 @@ class FlightDao {
         final String sqlUpdateFlight =
                 "UPDATE " + FLIGHT_TABLE +
                         " SET completed_time = CURRENT_TIMESTAMP," +
-                        " output_parameters = :output_parameters," +
+                        " output_parameters = :outputParameters," +
                         " status = :status," +
-                        " serialized_exception = :serialized_exception," +
+                        " serialized_exception = :serializedException," +
                         " stairway_id = NULL" +
-                        " WHERE flightid = :flightid AND status = 'RUNNING'";
+                        " WHERE flightid = :flightId AND status = 'RUNNING'";
 
         // The delete is harmless if it has been done before. We just won't find anything.
-        final String sqlDeleteFlightLog = "DELETE FROM " + FLIGHT_LOG_TABLE + " WHERE flightid = :flightid";
+        final String sqlDeleteFlightLog = "DELETE FROM " + FLIGHT_LOG_TABLE + " WHERE flightid = :flightId";
 
         String serializedException =
             exceptionSerializer.serialize(flightContext.getResult().getException().orElse(null));
@@ -281,16 +289,16 @@ class FlightDao {
 
             startTransaction(connection);
 
-            statement.setString("output_parameters", flightContext.getWorkingMap().toJson());
+            statement.setString("outputParameters", flightContext.getWorkingMap().toJson());
             statement.setString("status", flightContext.getFlightStatus().name());
-            statement.setString("serialized_exception", serializedException);
-            statement.setString("flightid", flightContext.getFlightId());
+            statement.setString("serializedException", serializedException);
+            statement.setString("flightId", flightContext.getFlightId());
             statement.getPreparedStatement().executeUpdate();
 
-            deleteStatement.setString("flightid", flightContext.getFlightId());
+            deleteStatement.setString("flightId", flightContext.getFlightId());
             deleteStatement.getPreparedStatement().executeUpdate();
 
-            connection.commit();
+            commitTransaction(connection);
 
         } catch (SQLException ex) {
             throw new DatabaseOperationException("Failed to complete flight", ex);
@@ -303,9 +311,9 @@ class FlightDao {
      * @throws DatabaseOperationException on any database error
      */
     void delete(String flightId) throws DatabaseOperationException {
-        final String sqlDeleteFlightLog = "DELETE FROM " + FLIGHT_LOG_TABLE + " WHERE flightid = :flightid";
-        final String sqlDeleteFlight = "DELETE FROM " + FLIGHT_TABLE + " WHERE flightid = :flightid";
-        final String sqlDeleteFlightInput = "DELETE FROM " + FLIGHT_INPUT_TABLE + " WHERE flightid = :flightid";
+        final String sqlDeleteFlightLog = "DELETE FROM " + FLIGHT_LOG_TABLE + " WHERE flightid = :flightId";
+        final String sqlDeleteFlight = "DELETE FROM " + FLIGHT_TABLE + " WHERE flightid = :flightId";
+        final String sqlDeleteFlightInput = "DELETE FROM " + FLIGHT_INPUT_TABLE + " WHERE flightid = :flightId";
 
         try (Connection connection = dataSource.getConnection();
              NamedParameterPreparedStatement deleteFlightStatement =
@@ -317,16 +325,16 @@ class FlightDao {
 
             startTransaction(connection);
 
-            deleteFlightStatement.setString("flightid", flightId);
+            deleteFlightStatement.setString("flightId", flightId);
             deleteFlightStatement.getPreparedStatement().executeUpdate();
 
-            deleteInputStatement.setString("flightid", flightId);
+            deleteInputStatement.setString("flightId", flightId);
             deleteInputStatement.getPreparedStatement().executeUpdate();
 
-            deleteLogStatement.setString("flightid", flightId);
+            deleteLogStatement.setString("flightId", flightId);
             deleteLogStatement.getPreparedStatement().executeUpdate();
 
-            connection.commit();
+            commitTransaction(connection);
 
         } catch (SQLException ex) {
             throw new DatabaseOperationException("Failed to delete flight", ex);
@@ -340,12 +348,12 @@ class FlightDao {
     FlightContext resume(String stairwayId, String flightId) throws DatabaseOperationException {
         final String sqlUnownedFlight = "SELECT class_name " +
                 " FROM " + FLIGHT_TABLE +
-                " WHERE (status = 'WAITING' OR status = 'READY') AND stairway_id IS NULL AND flightid = :flightid";
+                " WHERE (status = 'WAITING' OR status = 'READY') AND stairway_id IS NULL AND flightid = :flightId";
 
         final String sqlTakeOwnership = "UPDATE " + FLIGHT_TABLE +
                 " SET status = 'RUNNING'," +
-                " stairway_id = :stairwayid" +
-                " WHERE flightid = :flightid";
+                " stairway_id = :stairwayId" +
+                " WHERE flightid = :flightId";
 
         try (Connection connection = dataSource.getConnection();
              NamedParameterPreparedStatement unownedFlightStatement =
@@ -355,7 +363,7 @@ class FlightDao {
 
             startTransaction(connection);
 
-            unownedFlightStatement.setString("flightid", flightId);
+            unownedFlightStatement.setString("flightId", flightId);
             FlightContext flightContext = null;
             try (ResultSet rs = unownedFlightStatement.getPreparedStatement().executeQuery()) {
                 if (rs.next()) {
@@ -369,12 +377,12 @@ class FlightDao {
             }
 
             if (flightContext != null) {
-                takeOwnershipStatement.setString("flightid", flightId);
-                takeOwnershipStatement.setString("stairwayid", stairwayId);
+                takeOwnershipStatement.setString("flightId", flightId);
+                takeOwnershipStatement.setString("stairwayId", stairwayId);
                 takeOwnershipStatement.getPreparedStatement().executeUpdate();
             }
 
-            connection.commit();
+            commitTransaction(connection);
             return flightContext;
 
         } catch (SQLException ex) {
@@ -388,13 +396,7 @@ class FlightDao {
     List<FlightContext> recover(String stairwayId) throws DatabaseOperationException {
         final String sqlActiveFlights = "SELECT flightid, class_name " +
             " FROM " + FLIGHT_TABLE +
-            " WHERE status = 'RUNNING' AND stairway_id = :stairwayid";
-
-        final String sqlLastFlightLog = "SELECT working_parameters, step_index, doing, rerun," +
-            " succeeded, serialized_exception, status" +
-            " FROM " + FLIGHT_LOG_TABLE +
-            " WHERE flightid = :flightid AND log_time = " +
-            " (SELECT MAX(log_time) FROM " + FLIGHT_LOG_TABLE + " WHERE flightid = :flightid2)";
+            " WHERE status = 'RUNNING' AND stairway_id = :stairwayId";
 
         List<FlightContext> activeFlights = new LinkedList<>();
 
@@ -402,8 +404,8 @@ class FlightDao {
              NamedParameterPreparedStatement activeFlightsStatement =
                  new NamedParameterPreparedStatement(connection, sqlActiveFlights)) {
 
-            startTransaction(connection);
-            activeFlightsStatement.setString("stairwayid", stairwayId);
+            startReadOnlyTransaction(connection);
+            activeFlightsStatement.setString("stairwayId", stairwayId);
 
             try (ResultSet rs = activeFlightsStatement.getPreparedStatement().executeQuery()) {
                 while (rs.next()) {
@@ -418,7 +420,7 @@ class FlightDao {
 
             fillFlightContexts(connection, activeFlights);
 
-            connection.commit(); // The transaction is read-only, so commit is not needed, but feels cleaner...
+            commitTransaction(connection);
         } catch (SQLException ex) {
             throw new DatabaseOperationException("Failed to get active flight list", ex);
         }
@@ -441,15 +443,15 @@ class FlightDao {
         final String sqlLastFlightLog = "SELECT working_parameters, step_index, doing, rerun," +
                 " succeeded, serialized_exception, status" +
                 " FROM " + FLIGHT_LOG_TABLE +
-                " WHERE flightid = :flightid AND log_time = " +
-                " (SELECT MAX(log_time) FROM " + FLIGHT_LOG_TABLE + " WHERE flightid = :flightid2)";
+                " WHERE flightid = :flightId AND log_time = " +
+                " (SELECT MAX(log_time) FROM " + FLIGHT_LOG_TABLE + " WHERE flightid = :flightId2)";
 
         try (NamedParameterPreparedStatement lastFlightLogStatement =
                      new NamedParameterPreparedStatement(connection, sqlLastFlightLog)) {
 
             for (FlightContext flightContext : flightContextList) {
-                lastFlightLogStatement.setString("flightid", flightContext.getFlightId());
-                lastFlightLogStatement.setString("flightid2", flightContext.getFlightId());
+                lastFlightLogStatement.setString("flightId", flightContext.getFlightId());
+                lastFlightLogStatement.setString("flightId2", flightContext.getFlightId());
 
                 try (ResultSet rsflight = lastFlightLogStatement.getPreparedStatement().executeQuery()) {
                     // There may not be any log entries for a given flight. That happens if we fail after
@@ -480,7 +482,6 @@ class FlightDao {
         }
     }
 
-
     /**
      * Return flight state for a single flight
      *
@@ -491,13 +492,14 @@ class FlightDao {
         final String sqlOneFlight = "SELECT stairway_id, flightid, submit_time, " +
             " completed_time, output_parameters, status, serialized_exception" +
             " FROM " + FLIGHT_TABLE +
-            " WHERE flightid = :flightid";
+            " WHERE flightid = :flightId";
 
         try (Connection connection = dataSource.getConnection();
              NamedParameterPreparedStatement oneFlightStatement =
                  new NamedParameterPreparedStatement(connection, sqlOneFlight)) {
 
-            oneFlightStatement.setString("flightid", flightId);
+            startReadOnlyTransaction(connection);
+            oneFlightStatement.setString("flightId", flightId);
 
             try (ResultSet rs = oneFlightStatement.getPreparedStatement().executeQuery()) {
                 List<FlightState> flightStateList = makeFlightStateList(connection, rs);
@@ -507,6 +509,7 @@ class FlightDao {
                 if (flightStateList.size() > 1) {
                     throw new DatabaseOperationException("Multiple flights with the same id?!");
                 }
+                commitTransaction(connection);
                 return flightStateList.get(0);
             }
 
@@ -583,7 +586,7 @@ class FlightDao {
         try (Connection connection = dataSource.getConnection();
              NamedParameterPreparedStatement flightRangeStatement =
                  new NamedParameterPreparedStatement(connection, sql)) {
-            startTransaction(connection);
+            startReadOnlyTransaction(connection);
 
             filter.storePredicateValues(flightRangeStatement);
 
@@ -642,12 +645,12 @@ class FlightDao {
         List<FlightInput> inputList = inputParameters.makeFlightInputList();
 
         final String sqlInsertInput =
-                "INSERT INTO " + FLIGHT_INPUT_TABLE + " (flightId, key, value) VALUES (:flightid, :key, :value)";
+                "INSERT INTO " + FLIGHT_INPUT_TABLE + " (flightId, key, value) VALUES (:flightId, :key, :value)";
 
         try (NamedParameterPreparedStatement statement =
                      new NamedParameterPreparedStatement(connection, sqlInsertInput)) {
 
-            statement.setString("flightid", flightId);
+            statement.setString("flightId", flightId);
 
             for (FlightInput input : inputList) {
                 statement.setString("key", input.getKey());
@@ -663,13 +666,13 @@ class FlightDao {
     private List<FlightInput> retrieveInputParameters(Connection connection, String flightId)
             throws DatabaseOperationException {
         final String sqlSelectInput =
-                "SELECT flightId, key, value FROM " + FLIGHT_INPUT_TABLE + " WHERE flightId = :flightid";
+                "SELECT flightId, key, value FROM " + FLIGHT_INPUT_TABLE + " WHERE flightId = :flightId";
 
         List<FlightInput> inputList = new ArrayList<>();
 
         try (NamedParameterPreparedStatement statement =
                      new NamedParameterPreparedStatement(connection, sqlSelectInput)) {
-            statement.setString("flightid", flightId);
+            statement.setString("flightId", flightId);
 
             try (ResultSet rs = statement.getPreparedStatement().executeQuery()) {
                 while (rs.next()) {
@@ -687,7 +690,17 @@ class FlightDao {
     private void startTransaction(Connection connection) throws SQLException {
         connection.setAutoCommit(false);
         connection.setTransactionIsolation(Connection.TRANSACTION_SERIALIZABLE);
+        connection.setReadOnly(false);
     }
 
+    private void startReadOnlyTransaction(Connection connection) throws SQLException {
+        connection.setAutoCommit(false);
+        connection.setTransactionIsolation(Connection.TRANSACTION_READ_COMMITTED);
+        connection.setReadOnly(true);
+    }
+
+    private void commitTransaction(Connection connection) throws SQLException {
+        connection.commit();
+    }
 
 }

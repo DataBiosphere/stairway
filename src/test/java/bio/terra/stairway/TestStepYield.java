@@ -8,7 +8,7 @@ public class TestStepYield implements Step {
 
     @Override
     public StepResult doStep(FlightContext context) throws InterruptedException {
-        return new StepResult(StepStatus.STEP_RESULT_YIELD);
+        return new StepResult(StepStatus.STEP_RESULT_WAIT);
     }
 
     @Override

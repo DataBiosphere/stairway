@@ -182,8 +182,8 @@ public class ScenarioTest {
     }
 
     @Test
-    public void testYield() throws Exception {
-        String inResult = "yielded and merged";
+    public void testWait() throws Exception {
+        String inResult = "wait and merged";
         FlightMap inputParameters = new FlightMap();
         inputParameters.put(MapKey.RESULT, inResult);
 
