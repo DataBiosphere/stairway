@@ -41,10 +41,19 @@ public final class TestUtil {
     }
 
     static Stairway setupStairway() throws Exception {
+        String stairwayName = "test_" + ShortUUID.get();
+        return makeStairway(stairwayName, true, true);
+    }
+
+    static Stairway setupContinuingStairway(String stairwayName) throws Exception {
+        return makeStairway(stairwayName, false, false);
+    }
+
+    private static Stairway makeStairway(String stairwayName, boolean forceCleanStart, boolean migrateUpgrade) throws Exception {
         DataSource dataSource = makeDataSource();
         ExecutorService executorService = Executors.newFixedThreadPool(2);
-        Stairway stairway = new Stairway(executorService, null);
-        stairway.initialize(dataSource, true, true);
+        Stairway stairway = new Stairway(executorService, null, null, stairwayName);
+        stairway.initialize(dataSource, forceCleanStart, migrateUpgrade);
         return stairway;
     }
 
@@ -52,14 +61,10 @@ public final class TestUtil {
         return stairway.getFlightState(flightId).getFlightStatus() != FlightStatus.RUNNING;
     }
 
-    static FlightDao setupFlightDao() throws Exception {
+    static Stairway setupDummyStairway() throws Exception {
         DataSource dataSource = makeDataSource();
-        Migrate migrate = new Migrate();
-        migrate.initialize("stairway/db/changelog.xml", dataSource);
-
-        FlightDao flightDao = new FlightDao(dataSource, new DefaultExceptionSerializer());
-        flightDao.startClean();
-
-        return flightDao;
+        Stairway stairway = new Stairway(null, null);
+        stairway.initialize(dataSource, true, true);
+        return stairway;
     }
 }

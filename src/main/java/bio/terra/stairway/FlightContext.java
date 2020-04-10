@@ -14,6 +14,7 @@ public class FlightContext {
     private FlightMap inputParameters; // allows for reconstructing the flight; set unmodifiable
     private FlightMap workingMap; // open-ended state used by the steps
     private int stepIndex; // what step we are on
+    private boolean rerun; // true - rerun the current step
     private boolean doing; // true - executing do's; false - executing undo's
     private StepResult result; // current step status
     private FlightStatus flightStatus; // Status: RUNNING while the flight is running; SUCCESS/FAILED when it completes
@@ -69,6 +70,14 @@ public class FlightContext {
         this.flightStatus = flightStatus;
     }
 
+    public boolean isRerun() {
+        return rerun;
+    }
+
+    public void setRerun(boolean rerun) {
+        this.rerun = rerun;
+    }
+
     public boolean isDoing() {
         return doing;
     }
@@ -118,6 +127,10 @@ public class FlightContext {
         } else {
             return (stepIndex >= 0);
         }
+    }
+
+    public String prettyStepState() {
+        return "flight id: " + flightId + " step: " + stepIndex + " direction: " + (doing ? "doing" : "undoing");
     }
 
     @Override

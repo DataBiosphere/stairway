@@ -185,7 +185,7 @@ public class FlightFilter {
         StringBuilder sb = new StringBuilder();
 
         // All forms start with the same select list
-        sb.append("SELECT F.flightid, F.submit_time, F.completed_time,")
+        sb.append("SELECT F.flightid, F.stairway_id, F.submit_time, F.completed_time,")
                 .append(" F.output_parameters, F.status, F.serialized_exception")
                 .append(" FROM ");
 

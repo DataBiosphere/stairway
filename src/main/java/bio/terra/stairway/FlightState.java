@@ -15,6 +15,7 @@ public class FlightState {
     private Instant completed;
     private FlightMap resultMap;  // filled in when flightStatus is SUCCESS
     private Exception exception;  // filled in when flightStatus is ERROR or FATAL
+    private String stairwayId;
 
     public FlightState() {
     }
@@ -78,6 +79,14 @@ public class FlightState {
 
     public void setException(Exception exception) {
         this.exception = exception;
+    }
+
+    public String getStairwayId() {
+        return stairwayId;
+    }
+
+    public void setStairwayId(String stairwayId) {
+        this.stairwayId = stairwayId;
     }
 
     public boolean isActive() {
