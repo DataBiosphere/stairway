@@ -85,7 +85,7 @@ public class Stairway {
      * @throws MigrateException migration failures
      */
     public void initialize(DataSource dataSource, boolean forceCleanStart, boolean migrateUpgrade)
-        throws DatabaseSetupException, DatabaseOperationException, MigrateException {
+        throws DatabaseSetupException, DatabaseOperationException, MigrateException, InterruptedException {
 
         if (migrateUpgrade) {
             Migrate migrate = new Migrate();
@@ -119,7 +119,7 @@ public class Stairway {
         try {
             return threadPool.awaitTermination(waitTimeout, unit);
         } catch (InterruptedException ex) {
-            Thread.currentThread().interrupt();
+            Thread.interrupted();
             return false;
         }
     }
@@ -128,8 +128,19 @@ public class Stairway {
      * Not-so-graceful shutdown: shutdown the pool which will cause an InterruptedException on all of
      * the flights. That _should_ cause the flights to rapidly terminate and get set to unowned.
      */
-    public void terminate() {
-        threadPool.shutdownNow();
+    public void terminate() throws InterruptedException {
+        List<Runnable> neverStartedFlights = threadPool.shutdownNow();
+        for (Runnable flightRunnable : neverStartedFlights) {
+            Flight flight = (Flight) flightRunnable;
+            try {
+                logger.info("Setting never-started flight ready: " + flight.context().getFlightId());
+                flight.context().setFlightStatus(FlightStatus.READY);
+                flightDao.exit(flight.context());
+            } catch (DatabaseOperationException | FlightException ex) {
+                // Not much to do on termination
+                logger.warn("Unable to exit never-started flight: " + flight);
+            }
+        }
     }
 
     /**
@@ -156,7 +167,7 @@ public class Stairway {
      */
     public void submit(String flightId,
                        Class<? extends Flight> flightClass,
-                       FlightMap inputParameters) throws DatabaseOperationException {
+                       FlightMap inputParameters) throws DatabaseOperationException, InterruptedException {
         if (isQuietingDown()) {
             throw new MakeFlightException("Stairway is shutting down and cannot accept a new flight");
         }
@@ -182,7 +193,7 @@ public class Stairway {
      * @return true if this Stairway owns and is executing the flight; false if ownership could not be claimed
      * @throws DatabaseOperationException failure during flight database operations
      */
-    public boolean resume(String flightId) throws DatabaseOperationException {
+    public boolean resume(String flightId) throws DatabaseOperationException, InterruptedException {
         if (isQuietingDown()) {
             throw new MakeFlightException("Stairway is shutting down and cannot resume a flight");
         }
@@ -206,7 +217,9 @@ public class Stairway {
      * @param forceDelete boolean to allow force deleting of flight database state, regardless of flight state
      * @throws DatabaseOperationException errors from removing the flight in memory and in database
      */
-    public void deleteFlight(String flightId, boolean forceDelete) throws DatabaseOperationException {
+    public void deleteFlight(String flightId, boolean forceDelete)
+            throws DatabaseOperationException, InterruptedException {
+
         if (!forceDelete) {
             FlightState state = flightDao.getFlightState(flightId);
             if (state.getFlightStatus() == FlightStatus.RUNNING) {
@@ -229,24 +242,18 @@ public class Stairway {
      */
     @Deprecated
     public FlightState waitForFlight(String flightId, Integer pollSeconds, Integer pollCycles)
-            throws DatabaseOperationException, FlightException {
+            throws DatabaseOperationException, FlightException, InterruptedException {
         int sleepSeconds = (pollSeconds == null) ? 10 : pollSeconds;
         int pollCount = 0;
 
-        try {
-            while (pollCycles == null || pollCount < pollCycles) {
-                // loop getting flight state and sleeping
-                TimeUnit.SECONDS.sleep(sleepSeconds);
-                FlightState state = getFlightState(flightId);
-                if (!state.isActive()) {
-                    return state;
-                }
-                pollCount++;
+        while (pollCycles == null || pollCount < pollCycles) {
+            // loop getting flight state and sleeping
+            TimeUnit.SECONDS.sleep(sleepSeconds);
+            FlightState state = getFlightState(flightId);
+            if (!state.isActive()) {
+                return state;
             }
-        } catch (InterruptedException ex) {
-            // Someone is shutting down the application
-            Thread.currentThread().interrupt();
-            throw new FlightException("Stairway was interrupted");
+            pollCount++;
         }
         throw new FlightException("Flight did not complete in the allowed wait time");
     }
@@ -261,7 +268,7 @@ public class Stairway {
      * @return FlightState state of the flight
      * @throws DatabaseOperationException not found in the database or unexpected database issues
      */
-    public FlightState getFlightState(String flightId) throws DatabaseOperationException {
+    public FlightState getFlightState(String flightId) throws DatabaseOperationException, InterruptedException {
         return flightDao.getFlightState(flightId);
     }
 
@@ -285,7 +292,7 @@ public class Stairway {
      * @throws DatabaseOperationException unexpected database errors
      */
     public List<FlightState> getFlights(int offset, int limit, FlightFilter filter)
-            throws DatabaseOperationException {
+            throws DatabaseOperationException, InterruptedException {
         return flightDao.getFlights(offset, limit, filter);
     }
 
@@ -324,7 +331,7 @@ public class Stairway {
      *
      * @throws DatabaseOperationException on database errors
      */
-    private void recoverFlights() throws DatabaseOperationException {
+    private void recoverFlights() throws DatabaseOperationException, InterruptedException {
         List<FlightContext> flightList = flightDao.recover(stairwayId);
         for (FlightContext flightContext : flightList) {
             resumeOneFlight(flightContext);

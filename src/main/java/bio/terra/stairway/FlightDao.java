@@ -5,6 +5,8 @@ import bio.terra.stairway.exception.DatabaseSetupException;
 import bio.terra.stairway.exception.FlightException;
 import bio.terra.stairway.exception.FlightFilterException;
 import bio.terra.stairway.exception.FlightNotFoundException;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import javax.sql.DataSource;
 import java.sql.Connection;
@@ -15,6 +17,8 @@ import java.util.ArrayList;
 import java.util.Collections;
 import java.util.LinkedList;
 import java.util.List;
+import java.util.concurrent.ThreadLocalRandom;
+import java.util.concurrent.TimeUnit;
 
 /**
  * The general layout of the stairway database tables is:
@@ -39,6 +43,8 @@ import java.util.List;
  * </ul>
  */
 class FlightDao {
+    private static final Logger logger = LoggerFactory.getLogger(FlightDao.class);
+
     static String FLIGHT_TABLE = "flight";
     static String FLIGHT_LOG_TABLE = "flightlog";
     static String FLIGHT_INPUT_TABLE = "flightinput";
@@ -80,7 +86,9 @@ class FlightDao {
      * @return short UUID for this stairway instance
      * @throws DatabaseOperationException on database errors
      */
-    String findOrCreateStairwayInstance(String stairwayName) throws DatabaseOperationException {
+    String findOrCreateStairwayInstance(String stairwayName)
+            throws DatabaseSetupException, DatabaseOperationException {
+
         try (Connection connection = dataSource.getConnection()) {
             startTransaction(connection);
 
@@ -104,12 +112,12 @@ class FlightDao {
                 return stairwayId;
             }
         } catch (SQLException ex) {
-            throw new DatabaseOperationException("Stairway instance find/create failed", ex);
+            throw new DatabaseSetupException("Stairway instance find/create failed", ex);
         }
-
     }
 
-    private String lookupStairwayInstanceQuery(Connection connection, String stairwayName) throws DatabaseOperationException {
+    private String lookupStairwayInstanceQuery(Connection connection, String stairwayName)
+            throws SQLException, DatabaseOperationException {
         final String sqlStairwayInstance = "SELECT stairway_id" +
                 " FROM " + STAIRWAY_INSTANCE_TABLE +
                 " WHERE stairway_name = :stairwayName";
@@ -134,15 +142,13 @@ class FlightDao {
                 return stairwayIdList.get(0);
             }
 
-        } catch (SQLException ex) {
-            throw new DatabaseOperationException("Stairway instance lookup failed", ex);
         }
     }
 
     /**
      * Record a new flight
      */
-    void submit(FlightContext flightContext) throws DatabaseOperationException {
+    void submit(FlightContext flightContext) throws DatabaseOperationException, InterruptedException {
         final String sqlInsertFlight =
             "INSERT INTO " + FLIGHT_TABLE +
                 " (flightId, submit_time, class_name, status, stairway_id)" +
@@ -163,7 +169,7 @@ class FlightDao {
 
             commitTransaction(connection);
         } catch (SQLException ex) {
-            throw new DatabaseOperationException("Failed to create database tables", ex);
+            handleSqlException("Failed to create database tables", ex);
         }
     }
 
@@ -171,7 +177,7 @@ class FlightDao {
      * Record the flight state right after a step
      * Mark if we are re-running the step
      */
-    void step(FlightContext flightContext) throws DatabaseOperationException {
+    void step(FlightContext flightContext) throws DatabaseOperationException, InterruptedException {
         final String sqlInsertFlightLog =
             "INSERT INTO " + FLIGHT_LOG_TABLE +
                 "(flightid, log_time, working_parameters, step_index, rerun, doing," +
@@ -197,7 +203,7 @@ class FlightDao {
             statement.getPreparedStatement().executeUpdate();
             commitTransaction(connection);
         } catch (SQLException ex) {
-            throw new DatabaseOperationException("Failed to log step", ex);
+            handleSqlException("Failed to log step", ex);
         }
     }
 
@@ -213,7 +219,7 @@ class FlightDao {
      * @throws DatabaseOperationException on database errors
      * @throws FlightException on invalid flight state
      */
-    void exit(FlightContext flightContext) throws DatabaseOperationException, FlightException {
+    void exit(FlightContext flightContext) throws DatabaseOperationException, FlightException, InterruptedException {
         switch (flightContext.getFlightStatus()) {
             case SUCCESS:
             case ERROR:
@@ -238,23 +244,33 @@ class FlightDao {
      * @param flightContext context object for the flight
      * @throws DatabaseOperationException on database errors
      */
-    private void disown(FlightContext flightContext) throws DatabaseOperationException {
+    private void disown(FlightContext flightContext) throws DatabaseOperationException, InterruptedException {
         final String sqlUpdateFlight =
                 "UPDATE " + FLIGHT_TABLE +
                         " SET status = :status," +
                         " stairway_id = NULL" +
                         " WHERE flightid = :flightId AND status = 'RUNNING'";
 
-        try (Connection connection = dataSource.getConnection();
-             NamedParameterPreparedStatement statement =
-                     new NamedParameterPreparedStatement(connection, sqlUpdateFlight)) {
-            startTransaction(connection);
-            statement.setString("status", flightContext.getFlightStatus().name());
-            statement.setString("flightId", flightContext.getFlightId());
-            statement.getPreparedStatement().executeUpdate();
-            commitTransaction(connection);
-        } catch (SQLException ex) {
-            throw new DatabaseOperationException("Failed to complete flight", ex);
+
+        for (int retry = 0; retry < 5; retry++) {
+            try (Connection connection = dataSource.getConnection();
+                 NamedParameterPreparedStatement statement =
+                         new NamedParameterPreparedStatement(connection, sqlUpdateFlight)) {
+                startTransaction(connection);
+                statement.setString("status", flightContext.getFlightStatus().name());
+                statement.setString("flightId", flightContext.getFlightId());
+                statement.getPreparedStatement().executeUpdate();
+                commitTransaction(connection);
+                break;
+            } catch (SQLException ex) {
+                if (!retrySqlException(ex)) {
+                    throw new DatabaseOperationException("Failed to disown flight: " + flightContext.getFlightId(), ex);
+                }
+            }
+            // Smear the retries out
+            int sleepMS = ThreadLocalRandom.current().nextInt(250, 751);
+            TimeUnit.MILLISECONDS.sleep(sleepMS);
+            logger.info("Retrying disown flight: " + flightContext.getFlightId());
         }
     }
 
@@ -264,7 +280,7 @@ class FlightDao {
      *
      * If the flight is all done, we remove the detailed step data from the log table.
      */
-    private void complete(FlightContext flightContext) throws DatabaseOperationException {
+    private void complete(FlightContext flightContext) throws DatabaseOperationException, InterruptedException {
         // Make the update idempotent; that is, only do it if the status is RUNNING
         final String sqlUpdateFlight =
                 "UPDATE " + FLIGHT_TABLE +
@@ -281,27 +297,35 @@ class FlightDao {
         String serializedException =
             exceptionSerializer.serialize(flightContext.getResult().getException().orElse(null));
 
-        try (Connection connection = dataSource.getConnection();
-             NamedParameterPreparedStatement statement =
-                 new NamedParameterPreparedStatement(connection, sqlUpdateFlight);
-             NamedParameterPreparedStatement deleteStatement =
-                 new NamedParameterPreparedStatement(connection, sqlDeleteFlightLog)) {
+        for (int retry = 0; retry < 5; retry++) {
+            try (Connection connection = dataSource.getConnection();
+                 NamedParameterPreparedStatement statement =
+                         new NamedParameterPreparedStatement(connection, sqlUpdateFlight);
+                 NamedParameterPreparedStatement deleteStatement =
+                         new NamedParameterPreparedStatement(connection, sqlDeleteFlightLog)) {
 
-            startTransaction(connection);
+                startTransaction(connection);
 
-            statement.setString("outputParameters", flightContext.getWorkingMap().toJson());
-            statement.setString("status", flightContext.getFlightStatus().name());
-            statement.setString("serializedException", serializedException);
-            statement.setString("flightId", flightContext.getFlightId());
-            statement.getPreparedStatement().executeUpdate();
+                statement.setString("outputParameters", flightContext.getWorkingMap().toJson());
+                statement.setString("status", flightContext.getFlightStatus().name());
+                statement.setString("serializedException", serializedException);
+                statement.setString("flightId", flightContext.getFlightId());
+                statement.getPreparedStatement().executeUpdate();
 
-            deleteStatement.setString("flightId", flightContext.getFlightId());
-            deleteStatement.getPreparedStatement().executeUpdate();
+                deleteStatement.setString("flightId", flightContext.getFlightId());
+                deleteStatement.getPreparedStatement().executeUpdate();
 
-            commitTransaction(connection);
-
-        } catch (SQLException ex) {
-            throw new DatabaseOperationException("Failed to complete flight", ex);
+                commitTransaction(connection);
+                break;
+            } catch (SQLException ex) {
+                if (!retrySqlException(ex)) {
+                    throw new DatabaseOperationException("Failed to complete flight: " + flightContext.getFlightId(), ex);
+                }
+            }
+            // Smear the retries out
+            int sleepMS = ThreadLocalRandom.current().nextInt(250, 751);
+            TimeUnit.MILLISECONDS.sleep(sleepMS);
+            logger.info("Retrying complete flight: " + flightContext.getFlightId());
         }
     }
 
@@ -310,7 +334,7 @@ class FlightDao {
      * @param flightId flight to remove
      * @throws DatabaseOperationException on any database error
      */
-    void delete(String flightId) throws DatabaseOperationException {
+    void delete(String flightId) throws DatabaseOperationException, InterruptedException {
         final String sqlDeleteFlightLog = "DELETE FROM " + FLIGHT_LOG_TABLE + " WHERE flightid = :flightId";
         final String sqlDeleteFlight = "DELETE FROM " + FLIGHT_TABLE + " WHERE flightid = :flightId";
         final String sqlDeleteFlightInput = "DELETE FROM " + FLIGHT_INPUT_TABLE + " WHERE flightid = :flightId";
@@ -337,7 +361,7 @@ class FlightDao {
             commitTransaction(connection);
 
         } catch (SQLException ex) {
-            throw new DatabaseOperationException("Failed to delete flight", ex);
+            handleSqlException("Failed to delete flight", ex);
         }
     }
 
@@ -345,7 +369,7 @@ class FlightDao {
      * Find one unowned flight, claim ownership, and return its flight context
      * Returns null if the flight is not in the right state to be resumed.
      */
-    FlightContext resume(String stairwayId, String flightId) throws DatabaseOperationException {
+    FlightContext resume(String stairwayId, String flightId) throws DatabaseOperationException, InterruptedException {
         final String sqlUnownedFlight = "SELECT class_name " +
                 " FROM " + FLIGHT_TABLE +
                 " WHERE (status = 'WAITING' OR status = 'READY') AND stairway_id IS NULL AND flightid = :flightId";
@@ -386,14 +410,15 @@ class FlightDao {
             return flightContext;
 
         } catch (SQLException ex) {
-            throw new DatabaseOperationException("Failed to get flight", ex);
+            handleSqlException("Failed to get flight", ex);
+            return null;
         }
     }
 
     /**
      * Find all active flights owned by this stairway and return their flight contexts
      */
-    List<FlightContext> recover(String stairwayId) throws DatabaseOperationException {
+    List<FlightContext> recover(String stairwayId) throws DatabaseOperationException, InterruptedException {
         final String sqlActiveFlights = "SELECT flightid, class_name " +
             " FROM " + FLIGHT_TABLE +
             " WHERE status = 'RUNNING' AND stairway_id = :stairwayId";
@@ -422,7 +447,7 @@ class FlightDao {
 
             commitTransaction(connection);
         } catch (SQLException ex) {
-            throw new DatabaseOperationException("Failed to get active flight list", ex);
+            handleSqlException("Failed to get active flight list", ex);
         }
 
         return activeFlights;
@@ -438,7 +463,7 @@ class FlightDao {
      * @throws DatabaseOperationException on database errors
      */
     private void fillFlightContexts(Connection connection, List<FlightContext> flightContextList)
-            throws DatabaseOperationException {
+            throws DatabaseOperationException, InterruptedException {
 
         final String sqlLastFlightLog = "SELECT working_parameters, step_index, doing, rerun," +
                 " succeeded, serialized_exception, status" +
@@ -478,7 +503,7 @@ class FlightDao {
                 }
             }
         } catch (SQLException ex) {
-            throw new DatabaseOperationException("Failed to get flight log data", ex);
+            handleSqlException("Failed to get flight log data", ex);
         }
     }
 
@@ -488,7 +513,7 @@ class FlightDao {
      * @param flightId flight to get
      * @return FlightState for the flight
      */
-    FlightState getFlightState(String flightId) throws DatabaseOperationException {
+    FlightState getFlightState(String flightId) throws DatabaseOperationException, InterruptedException {
         final String sqlOneFlight = "SELECT stairway_id, flightid, submit_time, " +
             " completed_time, output_parameters, status, serialized_exception" +
             " FROM " + FLIGHT_TABLE +
@@ -514,7 +539,8 @@ class FlightDao {
             }
 
         } catch (SQLException ex) {
-            throw new DatabaseOperationException("Failed to get flight", ex);
+            handleSqlException("Failed to get flight", ex);
+            return null;
         }
     }
 
@@ -577,7 +603,7 @@ class FlightDao {
      * @throws DatabaseOperationException on all database issues
      */
     List<FlightState> getFlights(int offset, int limit, FlightFilter inFilter)
-            throws DatabaseOperationException {
+            throws DatabaseOperationException, InterruptedException {
 
         // Make an empty filter if one is not provided
         FlightFilter filter = (inFilter != null) ? inFilter : new FlightFilter();
@@ -600,13 +626,16 @@ class FlightDao {
 
             connection.commit();
             return flightStateList;
-        } catch (SQLException | FlightFilterException ex) {
+        } catch (SQLException ex) {
+            handleSqlException("Failed to get flights", ex);
+            return null;
+        } catch (FlightFilterException ex) {
             throw new DatabaseOperationException("Failed to get flights", ex);
         }
     }
 
     private List<FlightState> makeFlightStateList(Connection connection, ResultSet rs)
-            throws SQLException, DatabaseOperationException {
+            throws SQLException, DatabaseOperationException, InterruptedException {
         List<FlightState> flightStateList = new ArrayList<>();
 
         while (rs.next()) {
@@ -641,7 +670,8 @@ class FlightDao {
         return flightStateList;
     }
 
-    private void storeInputParameters(Connection connection, String flightId, FlightMap inputParameters) throws DatabaseOperationException {
+    private void storeInputParameters(Connection connection, String flightId, FlightMap inputParameters)
+            throws DatabaseOperationException, InterruptedException {
         List<FlightInput> inputList = inputParameters.makeFlightInputList();
 
         final String sqlInsertInput =
@@ -659,12 +689,12 @@ class FlightDao {
             }
 
         } catch (SQLException ex) {
-            throw new DatabaseOperationException("Failed to insert input", ex);
+            handleSqlException("Failed to insert input", ex);
         }
     }
 
     private List<FlightInput> retrieveInputParameters(Connection connection, String flightId)
-            throws DatabaseOperationException {
+            throws DatabaseOperationException, InterruptedException {
         final String sqlSelectInput =
                 "SELECT flightId, key, value FROM " + FLIGHT_INPUT_TABLE + " WHERE flightId = :flightId";
 
@@ -681,7 +711,7 @@ class FlightDao {
                 }
             }
         } catch (SQLException ex) {
-            throw new DatabaseOperationException("Failed to select input", ex);
+            handleSqlException("Failed to select input", ex);
         }
 
         return inputList;
@@ -702,5 +732,33 @@ class FlightDao {
     private void commitTransaction(Connection connection) throws SQLException {
         connection.commit();
     }
+
+    private void handleSqlException(String message, SQLException ex)
+            throws InterruptedException, DatabaseOperationException {
+
+        if (ex.getCause() instanceof InterruptedException) {
+            logger.warn("Flight DAO operation interrupted: " + message, ex);
+            String causeText = (ex.getCause() == null) ? "unknown cause" : ex.getCause().toString();
+            throw new InterruptedException(causeText);
+        }
+        logger.error("Flight DAO operation error: " + message, ex);
+        throw new DatabaseOperationException(message, ex);
+    }
+
+    private boolean retrySqlException(SQLException ex)  {
+        final String ss = ex.getSQLState();
+        if (ss.equals("40001") || ss.equals("40P01")) {
+            // Serialization or deadlock
+            logger.info("Caught SQL serialization error - retrying");
+            return true;
+        }
+        if (ss.startsWith("08") || ss.startsWith("53")) {
+            // Connection or resource issue
+            logger.info("Caught SQL connection or resource error - retrying");
+            return true;
+        }
+        return false;
+    }
+
 
 }
