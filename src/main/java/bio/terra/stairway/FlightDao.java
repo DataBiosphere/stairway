@@ -239,6 +239,16 @@ class FlightDao {
         }
     }
 
+    private static final int RETRIES = 20;
+    private static final int WAIT_MIN = 250;
+    private static final int WAIT_MAX = 1000;
+
+    private void retryWait(String logTag, String flightId) throws InterruptedException {
+        int sleepMS = ThreadLocalRandom.current().nextInt(250, 751);
+        TimeUnit.MILLISECONDS.sleep(sleepMS);
+        logger.info(logTag + " - retrying flight: " + flightId);
+    }
+
     /**
      * Record that a flight is paused and no longer owned by this Stairway instance
      * @param flightContext context object for the flight
@@ -252,7 +262,7 @@ class FlightDao {
                         " WHERE flightid = :flightId AND status = 'RUNNING'";
 
 
-        for (int retry = 0; retry < 5; retry++) {
+        for (int retry = 0; retry < RETRIES; retry++) {
             try (Connection connection = dataSource.getConnection();
                  NamedParameterPreparedStatement statement =
                          new NamedParameterPreparedStatement(connection, sqlUpdateFlight)) {
@@ -267,10 +277,7 @@ class FlightDao {
                     throw new DatabaseOperationException("Failed to disown flight: " + flightContext.getFlightId(), ex);
                 }
             }
-            // Smear the retries out
-            int sleepMS = ThreadLocalRandom.current().nextInt(250, 751);
-            TimeUnit.MILLISECONDS.sleep(sleepMS);
-            logger.info("Retrying disown flight: " + flightContext.getFlightId());
+            retryWait("disown", flightContext.getFlightId());
         }
     }
 
@@ -297,7 +304,7 @@ class FlightDao {
         String serializedException =
             exceptionSerializer.serialize(flightContext.getResult().getException().orElse(null));
 
-        for (int retry = 0; retry < 5; retry++) {
+        for (int retry = 0; retry < RETRIES; retry++) {
             try (Connection connection = dataSource.getConnection();
                  NamedParameterPreparedStatement statement =
                          new NamedParameterPreparedStatement(connection, sqlUpdateFlight);
@@ -322,10 +329,7 @@ class FlightDao {
                     throw new DatabaseOperationException("Failed to complete flight: " + flightContext.getFlightId(), ex);
                 }
             }
-            // Smear the retries out
-            int sleepMS = ThreadLocalRandom.current().nextInt(250, 751);
-            TimeUnit.MILLISECONDS.sleep(sleepMS);
-            logger.info("Retrying complete flight: " + flightContext.getFlightId());
+            retryWait("complete", flightContext.getFlightId());
         }
     }
 

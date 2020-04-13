@@ -49,7 +49,9 @@ public final class TestUtil {
         return makeStairway(stairwayName, false, false);
     }
 
-    private static Stairway makeStairway(String stairwayName, boolean forceCleanStart, boolean migrateUpgrade) throws Exception {
+    private static Stairway makeStairway(String stairwayName, boolean forceCleanStart, boolean migrateUpgrade)
+            throws Exception {
+
         DataSource dataSource = makeDataSource();
         ExecutorService executorService = Executors.newFixedThreadPool(2);
         Stairway stairway = new Stairway(executorService, null, null, stairwayName);
@@ -57,7 +59,7 @@ public final class TestUtil {
         return stairway;
     }
 
-    static boolean isDone(Stairway stairway, String flightId) throws StairwayException {
+    static boolean isDone(Stairway stairway, String flightId) throws StairwayException, InterruptedException{
         return stairway.getFlightState(flightId).getFlightStatus() != FlightStatus.RUNNING;
     }
 

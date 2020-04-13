@@ -1,7 +1,6 @@
 package bio.terra.stairway;
 
 
-import bio.terra.stairway.exception.StairwayException;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
@@ -10,8 +9,8 @@ import java.time.Duration;
 import java.time.LocalDateTime;
 
 import static org.hamcrest.CoreMatchers.is;
-import static org.hamcrest.Matchers.equalTo;
 import static org.hamcrest.MatcherAssert.assertThat;
+import static org.hamcrest.Matchers.equalTo;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
@@ -25,7 +24,7 @@ public class RetryTest {
     }
 
     @Test
-    public void fixedSuccessTest() throws StairwayException {
+    public void fixedSuccessTest() throws Exception {
         // Fixed interval where maxCount > failCount should succeed
         FlightMap inputParameters = new FlightMap();
         inputParameters.put("retryType", "fixed");
@@ -41,7 +40,7 @@ public class RetryTest {
     }
 
     @Test
-    public void fixedFailureTest() throws StairwayException {
+    public void fixedFailureTest() throws Exception {
         // Fixed interval where maxCount =< failCount should fail
         int intervalSeconds = 2;
         int maxCount = 3;
@@ -68,7 +67,7 @@ public class RetryTest {
     }
 
     @Test
-    public void exponentialSuccessTest() throws StairwayException {
+    public void exponentialSuccessTest() throws Exception {
         // Exponential with generous limits
         FlightMap inputParameters = new FlightMap();
         inputParameters.put("retryType", "exponential");
@@ -85,7 +84,7 @@ public class RetryTest {
     }
 
     @Test
-    public void exponentialOpTimeFailureTest() throws StairwayException {
+    public void exponentialOpTimeFailureTest() throws Exception {
         // Should fail by running out of operation time
         // Should go 2 + 4 + 8 + 16 - well over 10
         FlightMap inputParameters = new FlightMap();
@@ -104,7 +103,7 @@ public class RetryTest {
     }
 
     @Test
-    public void exponentialMaxIntervalSuccessTest() throws StairwayException {
+    public void exponentialMaxIntervalSuccessTest() throws Exception {
         // Should succeed in 4 tries. The time should be capped by
         // the maxInterval of 4. That is,
         // 2 + 4 + 4 + 4 = 14 should be less than 2 + 4 + 8 + 16 = 30
