@@ -133,6 +133,11 @@ public class FlightContext {
         return "flight id: " + flightId + " step: " + stepIndex + " direction: " + (doing ? "doing" : "undoing");
     }
 
+    public String flightDesc() {
+        return "class: " + getFlightClassName() +
+                " stairway: " + (getStairway() == null ? "<null>" : getStairway().getStairwayName()) +
+                " flightid: " + getFlightId();
+    }
     @Override
     public String toString() {
         return new ToStringBuilder(this, ToStringStyle.JSON_STYLE)

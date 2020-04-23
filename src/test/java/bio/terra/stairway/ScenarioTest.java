@@ -2,7 +2,6 @@ package bio.terra.stairway;
 
 
 import bio.terra.stairway.exception.FlightNotFoundException;
-import bio.terra.stairway.exception.StairwayException;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
@@ -35,7 +34,7 @@ public class ScenarioTest {
     }
 
     @Test
-    public void simpleTest() throws StairwayException {
+    public void simpleTest() throws Exception {
         // Generate a unique filename
         String filename = makeFilename();
         logger.debug("Filename: " + filename);
@@ -164,7 +163,7 @@ public class ScenarioTest {
 
         String stairwayName = stairway.getStairwayName();
 
-        stairway.terminate();
+        stairway.terminate(10, TimeUnit.SECONDS);
         stairway = null;
 
         stairway = TestUtil.setupContinuingStairway(stairwayName);
@@ -225,7 +224,7 @@ public class ScenarioTest {
         TimeUnit.SECONDS.sleep(5);
 
         String stairwayName = stairway.getStairwayName();
-        stairway.terminate();
+        stairway.terminate(10, TimeUnit.SECONDS);
         stairway = null;
 
         stairway = TestUtil.setupContinuingStairway(stairwayName);
@@ -285,7 +284,7 @@ public class ScenarioTest {
         TimeUnit.SECONDS.sleep(5);
 
         String stairwayName = stairway.getStairwayName();
-        stairway.terminate();
+        stairway.terminate(10, TimeUnit.SECONDS);
         stairway = null;
 
         stairway = TestUtil.setupContinuingStairway(stairwayName);

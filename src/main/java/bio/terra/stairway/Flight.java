@@ -13,6 +13,8 @@ import java.util.LinkedList;
 import java.util.List;
 import java.util.concurrent.Callable;
 
+import static bio.terra.stairway.FlightStatus.READY;
+
 /**
  * Manage the atomic execution of a series of Steps
  * This base class has the mechanisms for executing the series of steps.
@@ -77,13 +79,30 @@ public class Flight implements Callable<FlightState> {
      * Call may be called for a flight that has been interrupted and is being recovered
      * so we may be headed either direction.
      */
-    public FlightState call() throws DatabaseOperationException, FlightException {
+    public FlightState call() throws DatabaseOperationException, FlightException, InterruptedException {
         try {
+            if (context().getStairway().isQuietingDown()) {
+                logger.info("Disowning flight starting during quietDown: " + context().getFlightId());
+                context().setFlightStatus(READY);
+                flightDao.exit(context());
+                return null;
+            }
             logger.debug("Executing: " + context().toString());
             FlightStatus flightStatus = fly();
             context().setFlightStatus(flightStatus);
             flightDao.exit(context());
             return flightDao.getFlightState(context().getFlightId());
+        } catch (InterruptedException ex) {
+            // Shutdown - try disowning the flight
+            logger.warn("Flight interrupted: " + context().getFlightId());
+            Thread.interrupted(); // clear the interrupt flag so we can process the exit
+            context().setFlightStatus(READY);
+            try {
+                flightDao.exit(context());
+            } catch (Exception exitex) {
+                logger.error("Failed to mark interrupted flight as ready: " + context().getFlightId(), exitex);
+            }
+            return null;
         } catch (Exception ex) {
             // This is really bad news
             logger.error("Flight failed with unexpected exception: " + ex.toString());
@@ -94,7 +113,7 @@ public class Flight implements Callable<FlightState> {
     /**
      * Perform the flight, until we do all steps, undo to the beginning, or declare a dismal failure.
      */
-    private FlightStatus fly() {
+    private FlightStatus fly() throws InterruptedException {
         try {
             // Part 1 - running forward (doing). We either succeed or we record the failure and
             // fall through to running backward (undoing)
@@ -102,7 +121,7 @@ public class Flight implements Callable<FlightState> {
                 StepResult doResult = runSteps();
                 if (doResult.isSuccess()) {
                     if (doResult.getStepStatus() == StepStatus.STEP_RESULT_STOP) {
-                        return FlightStatus.READY;
+                        return READY;
                     }
                     if (doResult.getStepStatus() == StepStatus.STEP_RESULT_WAIT) {
                         return FlightStatus.WAITING;
@@ -134,9 +153,6 @@ public class Flight implements Callable<FlightState> {
             // Dismal failure - undo failed!
             context().setResult(undoResult);
 
-        } catch (InterruptedException ex) {
-            Thread.currentThread().interrupt();
-            context().setResult(new StepResult(StepStatus.STEP_RESULT_FAILURE_FATAL, ex));
         } catch (Exception ex) {
             logger.error("Unhandled flight exception", ex);
             context().setResult(new StepResult(StepStatus.STEP_RESULT_FAILURE_FATAL, ex));
@@ -222,7 +238,7 @@ public class Flight implements Callable<FlightState> {
             } catch (InterruptedException ex) {
                 // Interrupted exception - we assume this means that the thread pool is shutting down and forcibly
                 // stopping all threads. We treat this as a STOP.
-                Thread.currentThread().interrupt();
+                Thread.interrupted(); // clear the interrupt flag so we can process the step stop
                 result = new StepResult(StepStatus.STEP_RESULT_STOP);
 
             } catch (Exception ex) {
