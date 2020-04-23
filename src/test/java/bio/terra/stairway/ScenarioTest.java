@@ -163,7 +163,7 @@ public class ScenarioTest {
 
         String stairwayName = stairway.getStairwayName();
 
-        stairway.terminate();
+        stairway.terminate(10, TimeUnit.SECONDS);
         stairway = null;
 
         stairway = TestUtil.setupContinuingStairway(stairwayName);
@@ -224,7 +224,7 @@ public class ScenarioTest {
         TimeUnit.SECONDS.sleep(5);
 
         String stairwayName = stairway.getStairwayName();
-        stairway.terminate();
+        stairway.terminate(10, TimeUnit.SECONDS);
         stairway = null;
 
         stairway = TestUtil.setupContinuingStairway(stairwayName);
@@ -284,7 +284,7 @@ public class ScenarioTest {
         TimeUnit.SECONDS.sleep(5);
 
         String stairwayName = stairway.getStairwayName();
-        stairway.terminate();
+        stairway.terminate(10, TimeUnit.SECONDS);
         stairway = null;
 
         stairway = TestUtil.setupContinuingStairway(stairwayName);

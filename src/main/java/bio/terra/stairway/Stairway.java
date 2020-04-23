@@ -25,15 +25,15 @@ import java.util.concurrent.atomic.AtomicBoolean;
  * Stairway is the object that drives execution of Flights.
  */
 public class Stairway {
-    private Logger logger = LoggerFactory.getLogger("bio.terra.stairway");
+    private final Logger logger = LoggerFactory.getLogger("bio.terra.stairway");
 
-    private ExecutorService threadPool;
+    private final ExecutorService threadPool;
     private FlightDao flightDao;
-    private Object applicationContext;
-    private ExceptionSerializer exceptionSerializer;
-    private String stairwayName;
+    private final Object applicationContext;
+    private final ExceptionSerializer exceptionSerializer;
+    private final String stairwayName;
     private String stairwayId;
-    private AtomicBoolean quietingDown; // flights test this and force yield if true
+    private final AtomicBoolean quietingDown; // flights test this and force yield if true
 
     /**
      * We do initialization in two steps. The constructor does the first step of constructing the object
@@ -125,7 +125,6 @@ public class Stairway {
         try {
             return threadPool.awaitTermination(waitTimeout, unit);
         } catch (InterruptedException ex) {
-            Thread.interrupted();
             return false;
         }
     }
@@ -142,16 +141,15 @@ public class Stairway {
         for (Runnable flightRunnable : neverStartedFlights) {
             Flight flight = (Flight) flightRunnable;
             try {
-                logger.info("Setting never-started flight ready: " + flight.context().getFlightId());
+                logger.info("Requeue never-started flight: " + flight.context().flightDesc());
                 flight.context().setFlightStatus(FlightStatus.READY);
                 flightDao.exit(flight.context());
             } catch (DatabaseOperationException | FlightException ex) {
                 // Not much to do on termination
-                logger.warn("Unable to exit never-started flight: " + flight);
+                logger.warn("Unable to requeue never-started flight: " + flight.context().flightDesc(), ex);
             }
         }
         return threadPool.awaitTermination(waitTimeout, unit);
-
     }
 
     /**
@@ -381,7 +379,7 @@ public class Stairway {
                         " active from pool of " + tpe.getPoolSize());
             }
         }
-        logger.info("Launching flight " + flight.context().getFlightClassName());
+        logger.info("Launching flight " + flight.context().flightDesc());
         threadPool.submit(flight);
     }
 
@@ -451,6 +449,9 @@ public class Stairway {
                 .append(flightDao, stairway.flightDao)
                 .append(applicationContext, stairway.applicationContext)
                 .append(exceptionSerializer, stairway.exceptionSerializer)
+                .append(stairwayName, stairway.stairwayName)
+                .append(stairwayId, stairway.stairwayId)
+                .append(quietingDown, stairway.quietingDown)
                 .isEquals();
     }
 
@@ -462,6 +463,9 @@ public class Stairway {
                 .append(flightDao)
                 .append(applicationContext)
                 .append(exceptionSerializer)
+                .append(stairwayName)
+                .append(stairwayId)
+                .append(quietingDown)
                 .toHashCode();
     }
 }

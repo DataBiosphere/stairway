@@ -45,10 +45,11 @@ import java.util.concurrent.TimeUnit;
 class FlightDao {
     private static final Logger logger = LoggerFactory.getLogger(FlightDao.class);
 
-    static String FLIGHT_TABLE = "flight";
-    static String FLIGHT_LOG_TABLE = "flightlog";
-    static String FLIGHT_INPUT_TABLE = "flightinput";
-    static String STAIRWAY_INSTANCE_TABLE = "stairwayinstance";
+    static final String FLIGHT_TABLE = "flight";
+    static final String FLIGHT_LOG_TABLE = "flightlog";
+    static final String FLIGHT_INPUT_TABLE = "flightinput";
+    static final String STAIRWAY_INSTANCE_TABLE = "stairwayinstance";
+    private static final String UNKNOWN = "<unknown>";
 
     private final DataSource dataSource;
     private final ExceptionSerializer exceptionSerializer;
@@ -169,7 +170,7 @@ class FlightDao {
 
             commitTransaction(connection);
         } catch (SQLException ex) {
-            handleSqlException("Failed to create database tables", ex);
+            handleSqlException("Failed to create database tables", ex, flightContext);
         }
     }
 
@@ -203,7 +204,7 @@ class FlightDao {
             statement.getPreparedStatement().executeUpdate();
             commitTransaction(connection);
         } catch (SQLException ex) {
-            handleSqlException("Failed to log step", ex);
+            handleSqlException("Failed to log step", ex, flightContext);
         }
     }
 
@@ -239,12 +240,12 @@ class FlightDao {
         }
     }
 
-    private static final int RETRIES = 20;
+    private static final int SERIALIZATION_RETRIES = 20;
     private static final int WAIT_MIN = 250;
     private static final int WAIT_MAX = 1000;
 
     private void retryWait(String logTag, String flightId) throws InterruptedException {
-        int sleepMS = ThreadLocalRandom.current().nextInt(250, 751);
+        int sleepMS = ThreadLocalRandom.current().nextInt(WAIT_MIN, WAIT_MAX);
         TimeUnit.MILLISECONDS.sleep(sleepMS);
         logger.info(logTag + " - retrying flight: " + flightId);
     }
@@ -262,7 +263,7 @@ class FlightDao {
                         " WHERE flightid = :flightId AND status = 'RUNNING'";
 
 
-        for (int retry = 0; retry < RETRIES; retry++) {
+        for (int retry = 0; retry < SERIALIZATION_RETRIES; retry++) {
             try (Connection connection = dataSource.getConnection();
                  NamedParameterPreparedStatement statement =
                          new NamedParameterPreparedStatement(connection, sqlUpdateFlight)) {
@@ -304,7 +305,7 @@ class FlightDao {
         String serializedException =
             exceptionSerializer.serialize(flightContext.getResult().getException().orElse(null));
 
-        for (int retry = 0; retry < RETRIES; retry++) {
+        for (int retry = 0; retry < SERIALIZATION_RETRIES; retry++) {
             try (Connection connection = dataSource.getConnection();
                  NamedParameterPreparedStatement statement =
                          new NamedParameterPreparedStatement(connection, sqlUpdateFlight);
@@ -365,7 +366,7 @@ class FlightDao {
             commitTransaction(connection);
 
         } catch (SQLException ex) {
-            handleSqlException("Failed to delete flight", ex);
+            handleSqlException("Failed to delete flight", ex, UNKNOWN, flightId);
         }
     }
 
@@ -414,7 +415,7 @@ class FlightDao {
             return flightContext;
 
         } catch (SQLException ex) {
-            handleSqlException("Failed to get flight", ex);
+            handleSqlException("Failed to get flight", ex, stairwayId, flightId);
             return null;
         }
     }
@@ -451,7 +452,7 @@ class FlightDao {
 
             commitTransaction(connection);
         } catch (SQLException ex) {
-            handleSqlException("Failed to get active flight list", ex);
+            handleSqlException("Failed to get active flight list", ex, stairwayId, UNKNOWN);
         }
 
         return activeFlights;
@@ -543,7 +544,7 @@ class FlightDao {
             }
 
         } catch (SQLException ex) {
-            handleSqlException("Failed to get flight", ex);
+            handleSqlException("Failed to get flight", ex, UNKNOWN, flightId);
             return null;
         }
     }
@@ -693,7 +694,7 @@ class FlightDao {
             }
 
         } catch (SQLException ex) {
-            handleSqlException("Failed to insert input", ex);
+            handleSqlException("Failed to insert input", ex, UNKNOWN, flightId);
         }
     }
 
@@ -715,7 +716,7 @@ class FlightDao {
                 }
             }
         } catch (SQLException ex) {
-            handleSqlException("Failed to select input", ex);
+            handleSqlException("Failed to select input", ex, UNKNOWN, flightId);
         }
 
         return inputList;
@@ -739,26 +740,44 @@ class FlightDao {
 
     private void handleSqlException(String message, SQLException ex)
             throws InterruptedException, DatabaseOperationException {
+        handleSqlException(message, ex, UNKNOWN, UNKNOWN);
+    }
+
+    private void handleSqlException(String message, SQLException ex, FlightContext context)
+            throws InterruptedException, DatabaseOperationException {
+        handleSqlException(message, ex, context.getStairway().getStairwayId(), context.getFlightId());
+    }
+
+    private void handleSqlException(String message, SQLException ex, String stairwayId, String flightId)
+            throws InterruptedException, DatabaseOperationException {
 
         if (ex.getCause() instanceof InterruptedException) {
-            logger.warn("Flight DAO operation interrupted: " + message, ex);
+            logger.warn("Operation interrupted - stairwayId: " + stairwayId +
+                    " flightId: " + flightId + "message: " + message, ex);
             String causeText = (ex.getCause() == null) ? "unknown cause" : ex.getCause().toString();
             throw new InterruptedException(causeText);
         }
-        logger.error("Flight DAO operation error: " + message, ex);
+        logger.warn("Operation error - stairwayId: " + stairwayId +
+                " flightId: " + flightId + "message: " + message, ex);
         throw new DatabaseOperationException(message, ex);
     }
 
+    private static final String PSQL_SERIALIZATION_FAILURE = "40001";
+    private static final String PSQL_DEADLOCK_DETECTED = "40P01";
+    private static final String PSQL_CONNECTION_ISSUE_PREFIX = "08";
+    private static final String PSQL_RESOURCE_ISSUE_PREFIX = "53";
+
     private boolean retrySqlException(SQLException ex)  {
         final String ss = ex.getSQLState();
-        if (ss.equals("40001") || ss.equals("40P01")) {
+
+        if (ss.equals(PSQL_SERIALIZATION_FAILURE) || ss.equals(PSQL_DEADLOCK_DETECTED)) {
             // Serialization or deadlock
-            logger.info("Caught SQL serialization error - retrying");
+            logger.info("Caught SQL serialization error (" + ss + ") - retrying");
             return true;
         }
-        if (ss.startsWith("08") || ss.startsWith("53")) {
+        if (ss.startsWith(PSQL_CONNECTION_ISSUE_PREFIX) || ss.startsWith(PSQL_RESOURCE_ISSUE_PREFIX)) {
             // Connection or resource issue
-            logger.info("Caught SQL connection or resource error - retrying");
+            logger.info("Caught SQL connection or resource error (" + ss + ") - retrying");
             return true;
         }
         return false;
