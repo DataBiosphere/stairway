@@ -1,0 +1,18 @@
+databaseChangeLog:
+  - changeSet:
+      id: stairway_doing_control
+      author: dd
+      changes:
+        - dropColumn:
+            tableName: flightlog
+            columns:
+              - column:
+                  name: doing
+                  type: boolean
+        - addColumn:
+            tableName: flightlog
+            columns:
+              - column:
+                  name: direction
+                  type: text
+                  remarks: enum of DO, UNDO, SWITCH
