@@ -13,12 +13,12 @@ public class TestStepIncrement implements Step {
 
 
         Integer value = workingMap.get("value", Integer.class);
-        logger.debug("TestStepIncrement - do - start value is: " + value);
-
         if (value == null) {
             // Value hasn't been set yet, so we set it to initial value
             value = inputs.get("initialValue", Integer.class);
         }
+        logger.debug("TestStepIncrement - do - start value is: " + value);
+
         value++;
         workingMap.put("value", value);
         logger.debug("TestStepIncrement - do - end value is: " + value);

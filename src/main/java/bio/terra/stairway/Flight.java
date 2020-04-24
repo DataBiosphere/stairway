@@ -1,7 +1,6 @@
 package bio.terra.stairway;
 
 import bio.terra.stairway.exception.DatabaseOperationException;
-import bio.terra.stairway.exception.FlightException;
 import bio.terra.stairway.exception.RetryException;
 import bio.terra.stairway.exception.StairwayExecutionException;
 import org.apache.commons.lang3.builder.ToStringBuilder;
@@ -11,7 +10,9 @@ import org.slf4j.LoggerFactory;
 
 import java.util.LinkedList;
 import java.util.List;
-import java.util.concurrent.Callable;
+
+import static bio.terra.stairway.FlightStatus.READY;
+import static bio.terra.stairway.FlightStatus.WAITING;
 
 import static bio.terra.stairway.FlightStatus.READY;
 
@@ -21,11 +22,8 @@ import static bio.terra.stairway.FlightStatus.READY;
  *
  *  In order for the flight to be re-created on recovery, the construction and
  *  configuration have to result in the same flight given the same input.
- *
- *  ISSUE: handling InterruptedException - is there anything that the Flight level should do
- *  for handling this?
  */
-public class Flight implements Callable<FlightState> {
+public class Flight implements Runnable {
     static class StepRetry {
         private Step step;
         private RetryRule retryRule;
@@ -57,10 +55,6 @@ public class Flight implements Callable<FlightState> {
         return applicationContext;
     }
 
-    public void setFlightDao(FlightDao flightDao) {
-        this.flightDao = flightDao;
-    }
-
     public void setFlightContext(FlightContext flightContext) {
         this.flightContext = flightContext;
     }
@@ -76,37 +70,40 @@ public class Flight implements Callable<FlightState> {
     }
 
     /**
-     * Call may be called for a flight that has been interrupted and is being recovered
-     * so we may be headed either direction.
+     * Execute the flight starting whereever the flight context says we are.
+     * We may be headed either direction.
      */
-    public FlightState call() throws DatabaseOperationException, FlightException, InterruptedException {
+    public void run() {
         try {
+            // We use flightDao all over the place, so we put it in a private to avoid passing it through all of
+            // the method argument lists.
+            flightDao = context().getStairway().getFlightDao();
+
             if (context().getStairway().isQuietingDown()) {
                 logger.info("Disowning flight starting during quietDown: " + context().getFlightId());
-                context().setFlightStatus(READY);
-                flightDao.exit(context());
-                return null;
+                flightExit(READY);
+                return;
             }
+
             logger.debug("Executing: " + context().toString());
             FlightStatus flightStatus = fly();
-            context().setFlightStatus(flightStatus);
-            flightDao.exit(context());
-            return flightDao.getFlightState(context().getFlightId());
+            flightExit(flightStatus);
         } catch (InterruptedException ex) {
             // Shutdown - try disowning the flight
             logger.warn("Flight interrupted: " + context().getFlightId());
-            Thread.interrupted(); // clear the interrupt flag so we can process the exit
-            context().setFlightStatus(READY);
-            try {
-                flightDao.exit(context());
-            } catch (Exception exitex) {
-                logger.error("Failed to mark interrupted flight as ready: " + context().getFlightId(), exitex);
-            }
-            return null;
+            Thread.interrupted();
+            flightExit(READY);
         } catch (Exception ex) {
-            // This is really bad news
-            logger.error("Flight failed with unexpected exception: " + ex.toString());
-            throw ex;
+            logger.error("Flight failed with exception", ex);
+        }
+    }
+
+    private void flightExit(FlightStatus flightStatus) {
+        try {
+            context().setFlightStatus(flightStatus);
+            context().getStairway().exitFlight(context());
+        } catch (Exception ex) {
+            logger.error("Failed to exit flight cleanly", ex);
         }
     }
 
@@ -124,7 +121,7 @@ public class Flight implements Callable<FlightState> {
                         return READY;
                     }
                     if (doResult.getStepStatus() == StepStatus.STEP_RESULT_WAIT) {
-                        return FlightStatus.WAITING;
+                        return WAITING;
                     }
                     return FlightStatus.SUCCESS;
                 }
@@ -132,7 +129,7 @@ public class Flight implements Callable<FlightState> {
                 // Remember the failure from the do; that is what we want to return
                 // after undo completes
                 context().setResult(doResult);
-                context().setDoing(false);
+                context().setDirection(Direction.SWITCH);
 
                 // Record the step failure and direction change in the database
                 flightDao.step(context());
@@ -183,6 +180,11 @@ public class Flight implements Callable<FlightState> {
                 return result;
             }
 
+            // If we SWITCHed from do to undo, make the direction UNDO
+            if (context().getDirection() == Direction.SWITCH) {
+                context().setDirection(Direction.UNDO);
+            }
+
             switch (result.getStepStatus()) {
                 case STEP_RESULT_SUCCESS:
                     // Finished a step; run the next one
@@ -211,7 +213,7 @@ public class Flight implements Callable<FlightState> {
                 case STEP_RESULT_FAILURE_RETRY:
                 case STEP_RESULT_FAILURE_FATAL:
                 default:
-                    throw new StairwayExecutionException("Unexected step status: " + result.getStepStatus());
+                    throw new StairwayExecutionException("Unexpected step status: " + result.getStepStatus());
             }
         }
         return result;
@@ -238,7 +240,6 @@ public class Flight implements Callable<FlightState> {
             } catch (InterruptedException ex) {
                 // Interrupted exception - we assume this means that the thread pool is shutting down and forcibly
                 // stopping all threads. We treat this as a STOP.
-                Thread.interrupted(); // clear the interrupt flag so we can process the step stop
                 result = new StepResult(StepStatus.STEP_RESULT_STOP);
 
             } catch (Exception ex) {

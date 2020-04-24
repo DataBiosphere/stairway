@@ -5,6 +5,8 @@ import bio.terra.stairway.exception.DatabaseSetupException;
 import bio.terra.stairway.exception.FlightException;
 import bio.terra.stairway.exception.MakeFlightException;
 import bio.terra.stairway.exception.MigrateException;
+import bio.terra.stairway.exception.QueueException;
+import bio.terra.stairway.exception.StairwayExecutionException;
 import org.apache.commons.lang3.builder.EqualsBuilder;
 import org.apache.commons.lang3.builder.HashCodeBuilder;
 import org.apache.commons.lang3.builder.ToStringBuilder;
@@ -13,10 +15,12 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import javax.sql.DataSource;
+import java.io.IOException;
 import java.lang.reflect.Constructor;
 import java.lang.reflect.InvocationTargetException;
 import java.util.List;
-import java.util.concurrent.ExecutorService;
+import java.util.UUID;
+import java.util.concurrent.LinkedBlockingQueue;
 import java.util.concurrent.ThreadPoolExecutor;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
@@ -25,15 +29,127 @@ import java.util.concurrent.atomic.AtomicBoolean;
  * Stairway is the object that drives execution of Flights.
  */
 public class Stairway {
-    private final Logger logger = LoggerFactory.getLogger("bio.terra.stairway");
+    private static final Logger logger = LoggerFactory.getLogger("bio.terra.stairway");
+    private static final int DEFAULT_MAX_PARALLEL_FLIGHTS = 20;
+    private static final int DEFAULT_MAX_QUEUED_FLIGHTS = 10;
 
-    private final ExecutorService threadPool;
-    private FlightDao flightDao;
+    // Constructor parameters
     private final Object applicationContext;
     private final ExceptionSerializer exceptionSerializer;
     private final String stairwayName;
+    private final String stairwayClusterName;
+    private final String projectId;
+    private final int maxParallelFlights;
+    private final int maxQueuedFlights;
+    private boolean workQueueEnabled;
+
+    // Initialized state
+    private ThreadPoolExecutor threadPool;
     private String stairwayId;
-    private final AtomicBoolean quietingDown; // flights test this and force yield if true
+    private AtomicBoolean quietingDown; // flights test this and force yield if true
+    private FlightDao flightDao;
+    private Queue workQueue;
+    private WorkQueueListener workQueueListener;
+    private Thread workQueueListenerThread;
+
+    public static class Builder {
+        private Integer maxParallelFlights;
+        private Integer maxQueuedFlights;
+        private Object applicationContext;
+        private ExceptionSerializer exceptionSerializer;
+        private String stairwayName;
+        private String stairwayClusterName;
+        private String projectId;
+
+        /**
+         * Determines the size of the thread pool used for running Stairway flights.
+         * Default is DEFAULT_MAX_PARALLEL_FLIGHTS (20 at this moment)
+         * @param maxParallelFlights maximum parallel flights to run
+         * @return this
+         */
+        public Builder maxParallelFlights(int maxParallelFlights) {
+            this.maxParallelFlights = maxParallelFlights;
+            return this;
+        }
+
+        /**
+         * If we are running a cluster work queue, then this parameter determines the number of flights we allow
+         * to queue locally. If the queue depth is, larger than this max, then we stop taking work off
+         * of the work queue and we add new submitted flights to the cluster work queue.
+         * Default is DEFAULT_MAX_QUEUED_FLIGHTS (10 at this moment)
+         * @param maxQueuedFlights maximum flights to queue in our local thread pool
+         * @return this
+         */
+        public Builder maxQueuedFlights(int maxQueuedFlights) {
+            this.maxQueuedFlights = maxQueuedFlights;
+            return this;
+        }
+
+        /**
+         * @param applicationContext application context passed along to Flight constructors. Default is null.
+         * @return this
+         */
+        public Builder applicationContext(Object applicationContext) {
+            this.applicationContext = applicationContext;
+            return this;
+        }
+
+        /**
+         * @param exceptionSerializer Application-specific exception serializer. Default is
+         *                            the Stairway exception serializer
+         * @return this
+         */
+        public Builder exceptionSerializer(ExceptionSerializer exceptionSerializer) {
+            this.exceptionSerializer = exceptionSerializer;
+            return this;
+        }
+
+        /**
+         * @param stairwayName Unique name of this Stairway instance. Used to identify which Stairway owns which flight.
+         *                     Default is "stairway" + random UUID
+         * @return this
+         */
+        public Builder stairwayName(String stairwayName) {
+            this.stairwayName = stairwayName;
+            return this;
+        }
+
+        /**
+         * Unique name of the cluster in which this instance runs. If this Stairway runs in a cluster of
+         * Stairway instances, then this must be supplied or they will not work together. This is used
+         * to find/create the shared Stairway work queue.
+         * Default is "stairwaycluster" + random UUID
+         * @param stairwayClusterName Stairway cluster name
+         * @return this
+         */
+        public Builder stairwayClusterName(String stairwayClusterName) {
+            this.stairwayClusterName = stairwayClusterName;
+            return this;
+        }
+
+        /**
+         *
+         * @param projectId Google projectId to create the Stairway work queue. If not present, no queuing will
+         *                  be done.
+         * @return this
+         */
+        public Builder projectId(String projectId) {
+            this.projectId = projectId;
+            return this;
+        }
+
+        /**
+         * Construct a Stairway instance based on the builder inputs
+         * @return Stairway
+         */
+        public Stairway build() {
+            return new Stairway(this);
+        }
+    }
+
+    public static Stairway.Builder newBuilder() {
+        return new Stairway.Builder();
+    }
 
     /**
      * We do initialization in two steps. The constructor does the first step of constructing the object
@@ -42,51 +158,53 @@ public class Stairway {
      *
      * The second step is the 'initialize' call (below) that sets up the flightDao and performs
      * any recovery needed.
-     *
-     * @param threadPool a thread pool must be provided. The caller chooses the type of pool to use.
-     * @param applicationContext an object passed through to flights; otherwise unused by Stairway
-     * Note: the default exceptionSerializer is used in this form of the constructor and the
-     * stairwayId is generated.
+     * @param builder Builder input
      */
-    public Stairway(ExecutorService threadPool, Object applicationContext) {
-        this(threadPool, applicationContext, new DefaultExceptionSerializer(), ShortUUID.get());
-    }
+    public Stairway(Stairway.Builder builder) {
+        this.maxParallelFlights = (builder.maxParallelFlights == null) ?
+                DEFAULT_MAX_PARALLEL_FLIGHTS :
+                builder.maxParallelFlights;
 
-    /**
-     * Alternate form of the Stairway constructor that allows the client to provide their own exception
-     * serializer class.
-     *
-     * @param threadPool a thread pool must be provided. The caller chooses the type of pool to use.
-     * @param applicationContext an object passed through to flights; otherwise unused by Stairway
-     * @param exceptionSerializer implementation of ExceptionSerializer interface used for exception serde.
-     *                            If null, the Stairway default exception serializer is used.
-     * @param stairwayName a unique name for this Stairway instance. In a Kubernetes environment, this
-     *                   might be derived from the pod name.
-     */
-    public Stairway(ExecutorService threadPool,
-                    Object applicationContext,
-                    ExceptionSerializer exceptionSerializer,
-                    String stairwayName) {
-        this.threadPool = threadPool;
-        this.applicationContext = applicationContext;
-        this.exceptionSerializer =
-                (exceptionSerializer == null) ? new DefaultExceptionSerializer() : exceptionSerializer;
-        this.stairwayName = stairwayName;
+        this.maxQueuedFlights = (builder.maxQueuedFlights == null) ?
+                DEFAULT_MAX_QUEUED_FLIGHTS :
+                builder.maxQueuedFlights;
+
+        this.exceptionSerializer = (builder.exceptionSerializer == null) ?
+                new DefaultExceptionSerializer() :
+                builder.exceptionSerializer;
+
+        this.stairwayName = (builder.stairwayName == null) ?
+                "stairway" + UUID.randomUUID().toString() :
+                builder.stairwayName;
+
+        this.stairwayClusterName = (builder.stairwayClusterName == null) ?
+                "stairwaycluster" + UUID.randomUUID().toString() :
+                builder.stairwayClusterName;
+
+        this.applicationContext = builder.applicationContext;
+        this.projectId = builder.projectId;
+        this.workQueueEnabled = (projectId != null);
         this.quietingDown = new AtomicBoolean();
     }
 
     /**
      * Second step of initialization
      * @param dataSource database to be used to store Stairway data
-     * @param forceCleanStart true will drop any existing stairway data. Otherwise existing flights are recovered.
+     * @param forceCleanStart true will drop any existing stairway data and purge the work queue.
+     *                        Otherwise existing flights are recovered.
      * @param migrateUpgrade true will run the migrate to upgrade the database
      * @throws DatabaseSetupException failed to clean the database on startup
      * @throws DatabaseOperationException failures to perform recovery
      * @throws MigrateException migration failures
      * @throws InterruptedException on shutdown during recovery
+     * @throws QueueException queue and queue listener setup
      */
-    public void initialize(DataSource dataSource, boolean forceCleanStart, boolean migrateUpgrade)
-        throws DatabaseSetupException, DatabaseOperationException, MigrateException, InterruptedException {
+    public void initialize(DataSource dataSource, boolean forceCleanStart, boolean migrateUpgrade) throws
+            DatabaseSetupException,
+            DatabaseOperationException,
+            MigrateException,
+            QueueException,
+            InterruptedException {
 
         // Clear quietingDown on initialization. In production, we expect that once we are quieted
         // the process is shut down. However, if the Stairway object is reused, like in unit tests,
@@ -100,14 +218,66 @@ public class Stairway {
 
         this.flightDao = new FlightDao(dataSource, exceptionSerializer);
 
+        createThreadPool();
+        setupWorkQueue();
+
         if (forceCleanStart) {
             // If cleaning, set the stairway id after cleaning (or it gets cleaned!)
             flightDao.startClean();
             stairwayId = flightDao.findOrCreateStairwayInstance(stairwayName);
+            if (workQueue != null) {
+                workQueue.purgeQueue();
+            }
         } else {
             stairwayId = flightDao.findOrCreateStairwayInstance(stairwayName);
             recoverFlights();
         }
+        startWorkQueueListener();
+    }
+
+    private void createThreadPool() {
+        threadPool = new ThreadPoolExecutor(maxParallelFlights, maxParallelFlights,
+                        0L, TimeUnit.MILLISECONDS,
+                        new LinkedBlockingQueue<Runnable>());
+    }
+
+    private void setupWorkQueue() throws QueueException {
+        if (!workQueueEnabled) {
+            return; // no work queue for you!
+        }
+
+        String topicId = stairwayClusterName + "-workqueue";
+        String subscriptionId = stairwayClusterName + "-workqueue-sub";
+
+        try {
+            workQueue = new Queue(this, projectId, topicId, subscriptionId);
+        } catch (IOException ex) {
+            throw new QueueException("Failed to create work queue", ex);
+        }
+    }
+
+    private void startWorkQueueListener() throws QueueException {
+        if (!workQueueEnabled) {
+            return;
+        }
+        workQueueListener = new WorkQueueListener(this, maxQueuedFlights, workQueue);
+        workQueueListenerThread = new Thread(workQueueListener);
+        workQueueListenerThread.start();
+    }
+
+    private void terminateWorkQueueListener(long workQueueWaitSeconds) {
+        if (!workQueueEnabled) {
+            return;
+        }
+        // workQueueListener will notice quietingDown and stop, but it is often
+        // waiting in sleep or in pull from queue and needs to be interrupted to terminate.
+        workQueueListenerThread.interrupt();
+        try {
+            workQueueListenerThread.join(TimeUnit.SECONDS.toMillis(workQueueWaitSeconds));
+        } catch (InterruptedException ex) {
+            logger.info("Failed to join work queue listener thread");
+        }
+        logger.info("Shutdown work queue listener");
     }
 
     /**
@@ -120,10 +290,21 @@ public class Stairway {
      * @return true if we quieted; false if we were interrupted or timed out before quieting down
      */
     public boolean quietDown(long waitTimeout, TimeUnit unit) {
+        long waitSeconds = unit.toSeconds(waitTimeout);
+        long workQueueWaitSeconds;
+        if (waitSeconds < 30) {
+            logger.warn("Wait time is less than 30 seconds.");
+            workQueueWaitSeconds = 1;
+        } else {
+            workQueueWaitSeconds = 5;
+        }
+        long threadPoolWaitSeconds = waitTimeout - workQueueWaitSeconds;
+
         quietingDown.set(true);
+        terminateWorkQueueListener(workQueueWaitSeconds);
         threadPool.shutdown();
         try {
-            return threadPool.awaitTermination(waitTimeout, unit);
+            return threadPool.awaitTermination(threadPoolWaitSeconds, unit);
         } catch (InterruptedException ex) {
             return false;
         }
@@ -135,8 +316,10 @@ public class Stairway {
      * @param waitTimeout time, in some units to wait before timing out
      * @param unit the time unit of waitTimeout.
      * @throws InterruptedException on interruption during termination
+     * @return true if the thread pool cleaned up in time; false if it didn't
      */
     public boolean terminate(long waitTimeout, TimeUnit unit) throws InterruptedException {
+        terminateWorkQueueListener(0);
         List<Runnable> neverStartedFlights = threadPool.shutdownNow();
         for (Runnable flightRunnable : neverStartedFlights) {
             Flight flight = (Flight) flightRunnable;
@@ -173,11 +356,42 @@ public class Stairway {
      * @param flightClass class object of the class derived from Flight; e.g., MyFlight.class
      * @param inputParameters key-value map of parameters to the flight
      * @throws DatabaseOperationException failure during flight object creation, persisting to database or launching
-     * @throws InterruptedException on shutdown during submit
+     * @throws StairwayExecutionException failure queuing the flight
+     * @throws InterruptedException this thread was interrupted
      */
     public void submit(String flightId,
                        Class<? extends Flight> flightClass,
-                       FlightMap inputParameters) throws DatabaseOperationException, InterruptedException {
+                       FlightMap inputParameters)
+            throws DatabaseOperationException, StairwayExecutionException, InterruptedException {
+        submitWorker(flightId, flightClass, inputParameters, false);
+    }
+
+    /**
+     * Submit a flight to queue for execution.
+     *
+     * @param flightId Stairway allows clients to choose flight ids. That lets a client record an id, perhaps
+     *                 persistently, before the flight is run. Stairway requires that the ids be unique in the
+     *                 scope of a Stairway instance. As a convenience, you can use {@link #createFlightId()}
+     *                 to generate globally unique ids.
+     * @param flightClass class object of the class derived from Flight; e.g., MyFlight.class
+     * @param inputParameters key-value map of parameters to the flight
+     * @throws DatabaseOperationException failure during flight object creation, persisting to database or launching
+     * @throws StairwayExecutionException failure queuing the flight
+     * @throws InterruptedException this thread was interrupted
+     */
+    public void submitToQueue(String flightId,
+                              Class<? extends Flight> flightClass,
+                              FlightMap inputParameters)
+            throws DatabaseOperationException, StairwayExecutionException, InterruptedException {
+        submitWorker(flightId, flightClass, inputParameters, true);
+    }
+
+    private void submitWorker(String flightId,
+                              Class<? extends Flight> flightClass,
+                              FlightMap inputParameters,
+                              boolean shouldQueue)
+            throws DatabaseOperationException, StairwayExecutionException, InterruptedException {
+
         if (isQuietingDown()) {
             throw new MakeFlightException("Stairway is shutting down and cannot accept a new flight");
         }
@@ -186,15 +400,29 @@ public class Stairway {
             throw new MakeFlightException("Must supply non-null flightClass and inputParameters to submit");
         }
         Flight flight = makeFlight(flightClass, inputParameters);
+        FlightContext context = flight.context();
 
-        flight.context().setFlightId(flightId);
-        flight.context().setStairway(this);
-        flightDao.submit(flight.context());
-        launchFlight(flight);
+        context.setFlightId(flightId);
+        context.setStairway(this);
+
+        if (workQueueEnabled && shouldQueue) {
+            // Submit to the queue
+            context.setFlightStatus(FlightStatus.READY);
+            flightDao.submit(context);
+
+            String message = QueueMessage.serialize(new QueueMessageReady(context.getFlightId()));
+            workQueue.queueMessage(message);
+            context.setFlightStatus(FlightStatus.QUEUED);
+            flightDao.queued(context);
+        } else {
+            // Submit directly
+            flightDao.submit(flight.context());
+            launchFlight(flight);
+        }
     }
 
     /**
-     * Try to resume a flight. If the flight is unowned and either in WAITING or READY state, then
+     * Try to resume a flight. If the flight is unowned and either in QUEUED, WAITING or READY state, then
      * this Stairway takes ownership and executes the rest of the flight. There can be race conditions
      * with other Stairway's on resume. It is not an error if the flight is not resumed by this
      * Stairway.
@@ -311,7 +539,6 @@ public class Stairway {
         return flightDao.getFlights(offset, limit, filter);
     }
 
-
     /**
      * @return name of this stairway instance
      */
@@ -335,6 +562,38 @@ public class Stairway {
         return flightDao;
     }
 
+    // Exposed for work queue listener
+    ThreadPoolExecutor getThreadPool() {
+        return threadPool;
+    }
+
+    void exitFlight(FlightContext context)
+            throws DatabaseOperationException, FlightException, StairwayExecutionException, InterruptedException {
+        // save the flight state in the database
+        flightDao.exit(context);
+
+        if (context.getFlightStatus() == FlightStatus.READY && workQueueEnabled) {
+            queueFlight(context);
+        }
+    }
+
+    private void queueFlight(FlightContext context)
+            throws DatabaseOperationException, StairwayExecutionException, InterruptedException {
+        // If the flight state is READY, then we put the flight on the queue and mark it queued in the
+        // database. We cannot go directly from RUNNING to QUEUED. Suppose we put the flight in
+        // the queue before it was marked QUEUED. Another Stairway instance would see it was
+        // RUNNING and decide it shouldn't run it. Suppose we put the flight in the queue after
+        // we marked it QUEUED. Then if we fail before we put it on the queue, no one knows it should
+        // be queued. To close that window, we use the READY state to decouple the flight from RUNNING.
+        // Then we queue, then we mark as queued. Another Stairway looking for orphans, will find the READY
+        // and queue it. Putting a flight on the queue twice is not a problem. Stairway instances race to
+        // see who gets to run it.
+        String message = QueueMessage.serialize(new QueueMessageReady(context.getFlightId()));
+        workQueue.queueMessage(message);
+        context.setFlightStatus(FlightStatus.QUEUED);
+        flightDao.queued(context);
+    }
+
     /**
      * Find any incomplete flights and recover them. We overwrite the flight context of this flight
      * with the recovered flight context. The normal constructor path needs to give the input parameters
@@ -355,10 +614,8 @@ public class Stairway {
 
     private void resumeOneFlight(FlightContext flightContext) {
         Flight flight = makeFlightFromName(flightContext.getFlightClassName(), flightContext.getInputParameters());
-        if (!flightContext.isRerun()) {
-            flightContext.nextStepIndex();
-        }
         flightContext.setStairway(this);
+        flightContext.nextStepIndex(); // position the flight to execute the next thing
         flight.setFlightContext(flightContext);
         launchFlight(flight);
     }
@@ -369,15 +626,9 @@ public class Stairway {
      * calls can resolve it.
      */
     private void launchFlight(Flight flight) {
-        // Give the flight the flightDao object so it can properly record its steps and be found
-        flight.setFlightDao(flightDao);
-
-        if (logger.isDebugEnabled()) {
-            if (threadPool instanceof ThreadPoolExecutor) {
-                ThreadPoolExecutor tpe = (ThreadPoolExecutor) threadPool;
-                logger.debug("Stairway thread pool: " + tpe.getActiveCount() +
-                        " active from pool of " + tpe.getPoolSize());
-            }
+         if (logger.isDebugEnabled()) {
+             logger.debug("Stairway thread pool: " + threadPool.getActiveCount() +
+                    " active from pool of " + threadPool.getPoolSize());
         }
         logger.info("Launching flight " + flight.context().flightDesc());
         threadPool.submit(flight);

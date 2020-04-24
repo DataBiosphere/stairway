@@ -28,7 +28,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 public class DatabaseOperationsTest {
     @Test
     public void basicsTest() throws Exception {
-        Stairway stairway = TestUtil.setupDummyStairway();
+        Stairway stairway = TestUtil.setupDefaultStairway();
         String stairwayId = stairway.getStairwayId();
         FlightDao flightDao = stairway.getFlightDao();
 
@@ -51,7 +51,7 @@ public class DatabaseOperationsTest {
         assertThat(recoveredFlight.getFlightId(), is(equalTo(flightContext.getFlightId())));
         assertThat(recoveredFlight.getFlightClassName(), is(equalTo(flightContext.getFlightClassName())));
         assertThat(recoveredFlight.getStepIndex(), is(equalTo(0)));
-        assertThat(recoveredFlight.isDoing(), is(true));
+        assertThat(recoveredFlight.getDirection(), is(equalTo(Direction.DO)));
         assertThat(recoveredFlight.getResult().isSuccess(), is(true));
         assertThat(recoveredFlight.getFlightStatus(), CoreMatchers.is(FlightStatus.RUNNING));
 
@@ -67,13 +67,10 @@ public class DatabaseOperationsTest {
         flightContext.setStepIndex(1);
         flightDao.step(flightContext);
 
-        Thread.sleep(1000);
-
-        flightContext.setDoing(false);
         flightContext.setResult(new StepResult(StepStatus.STEP_RESULT_FAILURE_FATAL,
                 new IllegalArgumentException(errString)));
         flightContext.setStepIndex(2);
-        flightContext.setDoing(false);
+        flightContext.setDirection(Direction.SWITCH);
         flightContext.getWorkingMap().put(wfkey, dubValue);
         flightContext.getWorkingMap().put(wikey, intValue);
         flightContext.getWorkingMap().put(wskey, strValue);
@@ -84,7 +81,7 @@ public class DatabaseOperationsTest {
         assertThat(flightList.size(), is(equalTo(1)));
         recoveredFlight = flightList.get(0);
         assertThat(recoveredFlight.getStepIndex(), is(equalTo(2)));
-        assertThat(recoveredFlight.isDoing(), is(false));
+        assertThat(recoveredFlight.getDirection(), is(Direction.SWITCH));
         assertThat(recoveredFlight.getResult().isSuccess(), is(false));
         assertThat(recoveredFlight.getResult().getException().get().toString(), containsString(errString));
         assertThat(recoveredFlight.getFlightStatus(), is(FlightStatus.RUNNING));

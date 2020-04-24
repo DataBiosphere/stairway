@@ -8,6 +8,9 @@ public class TestStepResult implements Step {
 
     @Override
     public StepResult doStep(FlightContext context) throws InterruptedException {
+        logger.info("ResultStep - Flight: " + context.getFlightId() +
+                "; stairway: " + context.getStairway().getStairwayName());
+
         FlightMap inputParameters = context.getInputParameters();
         String resultValue = inputParameters.get(MapKey.RESULT, String.class);
 

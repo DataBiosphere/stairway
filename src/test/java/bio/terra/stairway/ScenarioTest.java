@@ -27,10 +27,12 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 public class ScenarioTest {
     private Stairway stairway;
     private Logger logger = LoggerFactory.getLogger("bio.terra.stairway");
+    private String stairwayName;
 
     @BeforeEach
     public void setup() throws Exception {
-        stairway = TestUtil.setupStairway();
+        stairwayName = TestUtil.randomStairwayName();
+        stairway = TestUtil.setupStairway(stairwayName, false);
     }
 
     @Test
@@ -81,7 +83,7 @@ public class ScenarioTest {
 
         // Poll waiting for done
         while (!TestUtil.isDone(stairway, flightId)) {
-            Thread.sleep(1000);
+            TimeUnit.SECONDS.sleep(1);
         }
 
         // Handle results
@@ -116,8 +118,7 @@ public class ScenarioTest {
         inputParameters.put("text", "testing 1 2 3");
 
         String flightId = "undoTest";
-        stairway.submit(
-            flightId, TestFlightUndo.class, inputParameters);
+        stairway.submit(flightId, TestFlightUndo.class, inputParameters);
 
         // Wait for done
         FlightState result = stairway.waitForFlight(flightId, null, null);
@@ -163,10 +164,10 @@ public class ScenarioTest {
 
         String stairwayName = stairway.getStairwayName();
 
-        stairway.terminate(10, TimeUnit.SECONDS);
+        stairway.terminate(5, TimeUnit.SECONDS);
         stairway = null;
 
-        stairway = TestUtil.setupContinuingStairway(stairwayName);
+        stairway = TestUtil.setupStairway(stairwayName, true);
         boolean resumedFlight = stairway.resume(flightId);
         assertTrue(resumedFlight, "successfully resumed the flight");
         stairway.waitForFlight(flightId, null, null);
@@ -188,7 +189,7 @@ public class ScenarioTest {
 
         String flightId = stairway.createFlightId();
 
-        stairway.submit(flightId, TestFlightYield.class, inputParameters);
+        stairway.submit(flightId, TestFlightWait.class, inputParameters);
         // Allow time for the flight thread to start up and yield
         TimeUnit.SECONDS.sleep(5);
 
@@ -224,10 +225,10 @@ public class ScenarioTest {
         TimeUnit.SECONDS.sleep(5);
 
         String stairwayName = stairway.getStairwayName();
-        stairway.terminate(10, TimeUnit.SECONDS);
+        stairway.terminate(5, TimeUnit.SECONDS);
         stairway = null;
 
-        stairway = TestUtil.setupContinuingStairway(stairwayName);
+        stairway = TestUtil.setupStairway(stairwayName, true);
         FlightState state = stairway.getFlightState(flightId);
         assertThat("State is ready", state.getFlightStatus(), equalTo(FlightStatus.READY));
         assertNull(state.getStairwayId(), "Flight is unowned");
@@ -284,10 +285,10 @@ public class ScenarioTest {
         TimeUnit.SECONDS.sleep(5);
 
         String stairwayName = stairway.getStairwayName();
-        stairway.terminate(10, TimeUnit.SECONDS);
+        stairway.terminate(5, TimeUnit.SECONDS);
         stairway = null;
 
-        stairway = TestUtil.setupContinuingStairway(stairwayName);
+        stairway = TestUtil.setupStairway(stairwayName, true);
         FlightState state = stairway.getFlightState(flightId);
         assertThat("State is ready", state.getFlightStatus(), equalTo(FlightStatus.READY));
         assertNull(state.getStairwayId(), "Flight is unowned");

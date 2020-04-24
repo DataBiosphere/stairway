@@ -1,7 +1,6 @@
 package bio.terra.stairway;
 
 import org.apache.commons.lang3.builder.ToStringBuilder;
-import org.apache.commons.lang3.builder.ToStringStyle;
 
 /**
  * Context for a flight. This contains the full state for a flight.
@@ -15,7 +14,7 @@ public class FlightContext {
     private FlightMap workingMap; // open-ended state used by the steps
     private int stepIndex; // what step we are on
     private boolean rerun; // true - rerun the current step
-    private boolean doing; // true - executing do's; false - executing undo's
+    private Direction direction;
     private StepResult result; // current step status
     private FlightStatus flightStatus; // Status: RUNNING while the flight is running; SUCCESS/FAILED when it completes
 
@@ -26,7 +25,7 @@ public class FlightContext {
         this.flightClassName = flightClassName;
         this.workingMap = new FlightMap();
         this.stepIndex = 0;
-        this.doing = true;
+        this.direction = Direction.DO;
         this.result = StepResult.getStepResultSuccess();
         this.flightStatus = FlightStatus.RUNNING;
     }
@@ -78,12 +77,16 @@ public class FlightContext {
         this.rerun = rerun;
     }
 
-    public boolean isDoing() {
-        return doing;
+    public Direction getDirection() {
+        return direction;
     }
 
-    public void setDoing(boolean doing) {
-        this.doing = doing;
+    public void setDirection(Direction direction) {
+        this.direction = direction;
+    }
+
+    public boolean isDoing() {
+        return (direction == Direction.DO);
     }
 
     public StepResult getResult() {
@@ -102,15 +105,24 @@ public class FlightContext {
         this.stairway = stairway;
     }
 
+
     /**
      * Set the step index to the next step. If we are doing, then we progress forwards.
      * If we are undoing, we progress backwards.
      */
     public void nextStepIndex() {
-        if (isDoing()) {
-            stepIndex++;
-        } else {
-            stepIndex--;
+        if (!isRerun()) {
+            switch(getDirection()) {
+                case DO:
+                    stepIndex++;
+                    break;
+                case UNDO:
+                    stepIndex--;
+                    break;
+                case SWITCH:
+                    // run the undo of the current step
+                    break;
+            }
         }
     }
 
@@ -130,7 +142,7 @@ public class FlightContext {
     }
 
     public String prettyStepState() {
-        return "flight id: " + flightId + " step: " + stepIndex + " direction: " + (doing ? "doing" : "undoing");
+        return "flight id: " + flightId + " step: " + stepIndex + " direction: " + direction;
     }
 
     public String flightDesc() {
@@ -140,13 +152,15 @@ public class FlightContext {
     }
     @Override
     public String toString() {
-        return new ToStringBuilder(this, ToStringStyle.JSON_STYLE)
+        return new ToStringBuilder(this)
+                .append("stairway", stairway)
                 .append("flightId", flightId)
                 .append("flightClassName", flightClassName)
                 .append("inputParameters", inputParameters)
                 .append("workingMap", workingMap)
                 .append("stepIndex", stepIndex)
-                .append("doing", doing)
+                .append("rerun", rerun)
+                .append("direction", direction)
                 .append("result", result)
                 .append("flightStatus", flightStatus)
                 .toString();

@@ -11,9 +11,8 @@ import java.util.concurrent.TimeUnit;
 
 import static org.hamcrest.CoreMatchers.containsString;
 import static org.hamcrest.CoreMatchers.is;
-import static org.hamcrest.CoreMatchers.not;
-import static org.hamcrest.Matchers.equalTo;
 import static org.hamcrest.MatcherAssert.assertThat;
+import static org.hamcrest.Matchers.equalTo;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /**
@@ -61,8 +60,7 @@ public class RecoveryTest {
     @Test
     public void successTest() throws Exception {
         // Start with a clean and shiny database environment.
-        Stairway stairway1 = new Stairway(executorService, null, null, "recoverySuccessTest");
-        stairway1.initialize(dataSource, true, true);
+        Stairway stairway1 = TestUtil.setupStairway("recoverySuccessTest", false);
 
         FlightMap inputs = new FlightMap();
 
@@ -80,8 +78,7 @@ public class RecoveryTest {
 
         // Simulate a restart with a new thread pool and stairway. Set control so this one does not sleep
         TestStopController.setControl(1);
-        Stairway stairway2 = new Stairway(executorService, null, null, "recoverySuccessTest");
-        stairway2.initialize(dataSource, false, false);
+        Stairway stairway2 = TestUtil.setupStairway("recoverySuccessTest", true);
 
         // Wait for recovery to complete
         stairway2.waitForFlight(flightId, null, null);
@@ -95,8 +92,7 @@ public class RecoveryTest {
     @Test
     public void undoTest() throws Exception {
         // Start with a clean and shiny database environment.
-        Stairway stairway1 = new Stairway(executorService, null, null, "recoverySuccessTest");
-        stairway1.initialize(dataSource, true, true);
+        Stairway stairway1 = TestUtil.setupStairway("recoverySuccessTest", false);
 
         FlightMap inputs = new FlightMap();
         Integer initialValue = 2;
@@ -110,12 +106,9 @@ public class RecoveryTest {
         // Allow time for the flight thread to go to sleep
         TimeUnit.SECONDS.sleep(5);
 
-        assertThat(stairway1.getFlightState(flightId), not(equalTo(FlightStatus.RUNNING)));
-
         // Simulate a restart with a new thread pool and stairway. Reset control so this one does not sleep
         TestStopController.setControl(1);
-        Stairway stairway2 = new Stairway(executorService, null, null, "recoverySuccessTest");
-        stairway2.initialize(dataSource, false, false);
+        Stairway stairway2 = TestUtil.setupStairway("recoverySuccessTest", true);
 
         // Wait for recovery to complete
         stairway2.waitForFlight(flightId, 5, 10);
@@ -129,6 +122,40 @@ public class RecoveryTest {
         assertTrue(result.getResultMap().isPresent());
         Integer value = result.getResultMap().get().get("value", Integer.class);
         assertThat(value, is(equalTo(2)));
+    }
+
+    @Test
+    public void undoSwitchTest() throws Exception {
+        // Test recovering at the point where we switch from doing to undoing.
+        // We do this by causing one flight in one Stairway to error and have
+        // its undo stop.
+        // Then we recover the flight and make sure it works right.
+        Stairway stairway1 = TestUtil.setupStairway("recoveryUndoSwitchTest", false);
+
+        FlightMap inputs = new FlightMap();
+        Integer initialValue = 5;
+        inputs.put("initialValue", initialValue);
+
+        // We stop the flight on the undo path
+        TestStopController.setControl(0);
+        String flightId = "undoSwitchTest";
+        stairway1.submit(flightId, TestFlightRecoveryUndoSwitch.class, inputs);
+
+        // Allow time for the flight thread to go to sleep
+        TimeUnit.SECONDS.sleep(5);
+
+        // Simulate a restart with a new thread pool and stairway. Reset control so this one does not sleep
+        TestStopController.setControl(1);
+        Stairway stairway2 = TestUtil.setupStairway("recoveryUndoSwitchTest", true);
+
+        // Wait for recovery to complete
+        stairway2.waitForFlight(flightId, 5, 10);
+        FlightState result = stairway2.getFlightState(flightId);
+        assertThat(result.getFlightStatus(), is(equalTo(FlightStatus.ERROR)));
+        assertTrue(result.getException().isPresent());
+        assertTrue(result.getResultMap().isPresent());
+        Integer value = result.getResultMap().get().get("value", Integer.class);
+        assertThat(value, is(equalTo(5)));
     }
 
 }
