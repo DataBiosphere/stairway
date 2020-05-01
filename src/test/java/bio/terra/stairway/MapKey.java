@@ -9,4 +9,5 @@ public class MapKey {
     public static String COUNTER_START = "counterStart";
     public static String COUNTER_END = "counterEnd";
     public static String COUNTER_STOP = "counterStop";
+    public static String SLEEP_SECONDS = "sleepSeconds";
 }

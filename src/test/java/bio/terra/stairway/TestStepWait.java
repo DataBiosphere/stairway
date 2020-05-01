@@ -3,8 +3,8 @@ package bio.terra.stairway;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-public class TestStepYield implements Step {
-    private Logger logger = LoggerFactory.getLogger("bio.terra.stairway");
+public class TestStepWait implements Step {
+    private Logger logger = LoggerFactory.getLogger(TestStepWait.class);
 
     @Override
     public StepResult doStep(FlightContext context) throws InterruptedException {

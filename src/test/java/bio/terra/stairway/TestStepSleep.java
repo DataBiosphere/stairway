@@ -6,16 +6,16 @@ import org.slf4j.LoggerFactory;
 import java.util.concurrent.TimeUnit;
 
 public class TestStepSleep implements Step {
-    private Logger logger = LoggerFactory.getLogger("bio.terra.stairway");
+    private Logger logger = LoggerFactory.getLogger(TestStepSleep.class);
 
     @Override
     public StepResult doStep(FlightContext context) throws InterruptedException {
-        FlightMap inputParameters = context.getInputParameters();
-        int stopSleepValue = inputParameters.get(MapKey.CONTROLLER_VALUE, Integer.class);
+        logger.info("SleepStep - Flight: " + context.getFlightId() +
+                "; stairway: " + context.getStairway().getStairwayName());
 
-        while (TestStopController.getControl() != stopSleepValue) {
-            TimeUnit.SECONDS.sleep(1);
-        }
+        FlightMap inputParameters = context.getInputParameters();
+        int sleepSeconds = inputParameters.get(MapKey.SLEEP_SECONDS, Integer.class);
+        TimeUnit.SECONDS.sleep(sleepSeconds);
 
         FlightMap workingMap = context.getWorkingMap();
         workingMap.put(MapKey.RESULT, "sleep step woke up");

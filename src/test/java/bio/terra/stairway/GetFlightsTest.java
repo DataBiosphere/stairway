@@ -25,7 +25,7 @@ public class GetFlightsTest {
 
     @BeforeEach
     public void setup() throws Exception {
-        stairway = TestUtil.setupDummyStairway();
+        stairway = TestUtil.setupDefaultStairway();
         flightDao = stairway.getFlightDao();
     }
 

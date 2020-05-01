@@ -20,7 +20,7 @@ public class RetryTest {
 
     @BeforeEach
     public void setup() throws Exception {
-        stairway = TestUtil.setupStairway();
+        stairway = TestUtil.setupDefaultStairway();
     }
 
     @Test

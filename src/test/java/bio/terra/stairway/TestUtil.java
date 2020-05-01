@@ -2,12 +2,15 @@ package bio.terra.stairway;
 
 import bio.terra.stairway.exception.StairwayException;
 import org.apache.commons.dbcp2.BasicDataSource;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import javax.sql.DataSource;
-import java.util.concurrent.ExecutorService;
-import java.util.concurrent.Executors;
+import java.util.concurrent.TimeUnit;
 
 public final class TestUtil {
+    private static Logger logger = LoggerFactory.getLogger(TestUtil.class);
+
     private TestUtil() {
     }
 
@@ -32,7 +35,7 @@ public final class TestUtil {
         return bds;
     }
 
-    private static String getEnvVar(String name, String defaultValue) {
+    public static String getEnvVar(String name, String defaultValue) {
         String value = System.getenv(name);
         if (value == null) {
             return defaultValue;
@@ -40,21 +43,46 @@ public final class TestUtil {
         return value;
     }
 
-    static Stairway setupStairway() throws Exception {
-        String stairwayName = "test_" + ShortUUID.get();
-        return makeStairway(stairwayName, true, true);
+    static String randomStairwayName() {
+        return "test_" + ShortUUID.get();
     }
 
-    static Stairway setupContinuingStairway(String stairwayName) throws Exception {
-        return makeStairway(stairwayName, false, false);
+    static Stairway setupDefaultStairway() throws Exception {
+        return setupStairway(randomStairwayName(), false);
     }
 
-    private static Stairway makeStairway(String stairwayName, boolean forceCleanStart, boolean migrateUpgrade)
-            throws Exception {
+    static Stairway setupStairway(String stairwayName, boolean continuing) throws Exception {
+        return makeStairway(stairwayName, !continuing, !continuing, null);
+    }
 
+    static Stairway setupConnectedStairway(String stairwayName, boolean continuing) throws Exception {
+        String projectId = getEnvVar("GOOGLE_CLOUD_PROJECT", null);
+        if (projectId == null) {
+            throw new IllegalStateException("You must have GOOGLE_CLOUD_PROJECT and " +
+                    "GOOGLE_APPLICATION_CREDENTIALS envvars defined");
+        }
+        return makeStairway(stairwayName, !continuing, !continuing, projectId);
+    }
+
+    static void sleepStop() throws InterruptedException {
+        if (TestStopController.getControl() == 0) {
+            logger.debug("sleepStop stopping");
+            TimeUnit.HOURS.sleep(1);
+        }
+        logger.debug("sleepStop did not stop");
+    }
+
+    private static Stairway makeStairway(String stairwayName,
+                                         boolean forceCleanStart,
+                                         boolean migrateUpgrade,
+                                         String projectId) throws Exception {
         DataSource dataSource = makeDataSource();
-        ExecutorService executorService = Executors.newFixedThreadPool(2);
-        Stairway stairway = new Stairway(executorService, null, null, stairwayName);
+        Stairway stairway = Stairway.newBuilder()
+                .stairwayClusterName("stairway-cluster")
+                .stairwayName(stairwayName)
+                .projectId(projectId)
+                .maxParallelFlights(2)
+                .build();
         stairway.initialize(dataSource, forceCleanStart, migrateUpgrade);
         return stairway;
     }
@@ -63,10 +91,4 @@ public final class TestUtil {
         return stairway.getFlightState(flightId).getFlightStatus() != FlightStatus.RUNNING;
     }
 
-    static Stairway setupDummyStairway() throws Exception {
-        DataSource dataSource = makeDataSource();
-        Stairway stairway = new Stairway(null, null);
-        stairway.initialize(dataSource, true, true);
-        return stairway;
-    }
 }
