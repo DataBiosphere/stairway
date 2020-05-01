@@ -6,7 +6,7 @@ import org.slf4j.LoggerFactory;
 import java.util.concurrent.TimeUnit;
 
 public class TestStepControlledSleep implements Step {
-    private Logger logger = LoggerFactory.getLogger("bio.terra.stairway");
+    private Logger logger = LoggerFactory.getLogger(TestStepControlledSleep.class);
 
     @Override
     public StepResult doStep(FlightContext context) throws InterruptedException {

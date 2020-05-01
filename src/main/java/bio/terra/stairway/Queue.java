@@ -6,7 +6,6 @@ package bio.terra.stairway;
 // I created a topic via GCP console called stairway-queue
 // I created a subscription via GCP console called stairway-queue-sub
 
-
 import bio.terra.stairway.exception.StairwayExecutionException;
 import com.google.api.core.ApiFuture;
 import com.google.api.gax.rpc.AlreadyExistsException;
@@ -54,9 +53,10 @@ public class Queue {
     private final String projectId;
     private final String subscriptionId;
     private final String topicId;
-    private final String subscriptionName;
+
     private final Stairway stairway;
     private final Publisher publisher;
+    private final String subscriptionName;
     private SubscriberStub subscriber;
 
     public Queue(Stairway stairway, String projectId, String subscriptionId, String topicId) throws IOException {
@@ -179,11 +179,12 @@ public class Queue {
             ApiFuture<String> future = publisher.publish(pubsubMessage);
             String messageId = future.get();
             logger.info("Queued message. Id: " + messageId + "; Msg: " + message);
-            } catch (ExecutionException ex) {
+        } catch (ExecutionException ex) {
             throw new StairwayExecutionException("Publish message failed", ex);
         }
     }
 
+    // NOTE: this is only for use in controlled tests. It should not be used to empty a queue in production.
     public void purgeQueue() {
         PullRequest pullRequest =
                 PullRequest.newBuilder()
@@ -224,14 +225,14 @@ public class Queue {
         try (TopicAdminClient topicAdminClient = TopicAdminClient.create()) {
             topicAdminClient.deleteTopic(topicName);
         } catch (IOException ex) {
-            logger.warn("Failed to delete topic: " + topicName);
+            logger.warn("Failed to delete topic: " + topicName, ex);
         }
 
         try (SubscriptionAdminClient subscriptionAdminClient = SubscriptionAdminClient.create()) {
             ProjectSubscriptionName subscription = ProjectSubscriptionName.of(projectId, subscriptionId);
             subscriptionAdminClient.deleteSubscription(subscription);
         } catch (IOException ex) {
-            logger.warn("Failed to delete subscription: " + subscriptionName);
+            logger.warn("Failed to delete subscription: " + subscriptionName, ex);
         }
     }
 }

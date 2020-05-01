@@ -8,7 +8,7 @@ import java.util.List;
 import java.util.concurrent.TimeUnit;
 
 public class SleepQueueThread implements Runnable {
-    private Logger logger = LoggerFactory.getLogger("bio.terra.stairway");
+    private Logger logger = LoggerFactory.getLogger(SleepQueueThread.class);
 
     private boolean shutdownAfter;
     private Stairway stairway;

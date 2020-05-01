@@ -4,7 +4,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 public class TestStepWait implements Step {
-    private Logger logger = LoggerFactory.getLogger("bio.terra.stairway");
+    private Logger logger = LoggerFactory.getLogger(TestStepWait.class);
 
     @Override
     public StepResult doStep(FlightContext context) throws InterruptedException {

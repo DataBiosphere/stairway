@@ -14,8 +14,6 @@ import java.util.List;
 import static bio.terra.stairway.FlightStatus.READY;
 import static bio.terra.stairway.FlightStatus.WAITING;
 
-import static bio.terra.stairway.FlightStatus.READY;
-
 /**
  * Manage the atomic execution of a series of Steps
  * This base class has the mechanisms for executing the series of steps.
@@ -34,7 +32,7 @@ public class Flight implements Runnable {
         }
     }
 
-    private static Logger logger = LoggerFactory.getLogger("bio.terra.stairway");
+    private static Logger logger = LoggerFactory.getLogger(Flight.class);
 
     private List<StepRetry> steps;
     private FlightDao flightDao;
@@ -70,7 +68,7 @@ public class Flight implements Runnable {
     }
 
     /**
-     * Execute the flight starting whereever the flight context says we are.
+     * Execute the flight starting wherever the flight context says we are.
      * We may be headed either direction.
      */
     public void run() {
@@ -91,7 +89,6 @@ public class Flight implements Runnable {
         } catch (InterruptedException ex) {
             // Shutdown - try disowning the flight
             logger.warn("Flight interrupted: " + context().getFlightId());
-            Thread.interrupted();
             flightExit(READY);
         } catch (Exception ex) {
             logger.error("Flight failed with exception", ex);

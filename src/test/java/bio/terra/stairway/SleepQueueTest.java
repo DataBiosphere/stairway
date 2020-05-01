@@ -14,7 +14,7 @@ import static org.hamcrest.MatcherAssert.assertThat;
 
 @Tag("connected")
 public class SleepQueueTest {
-    private Logger logger = LoggerFactory.getLogger("bio.terra.stairway");
+    private Logger logger = LoggerFactory.getLogger(SleepQueueTest.class);
 
     @Test
     public void clusterSuccessTest() throws Exception {

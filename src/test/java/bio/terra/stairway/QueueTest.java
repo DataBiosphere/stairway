@@ -14,7 +14,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 
 @Tag("connected")
 public class QueueTest {
-    private Logger logger = LoggerFactory.getLogger("bio.terra.stairway");
+    private Logger logger = LoggerFactory.getLogger(QueueTest.class);
 
     private static final String subscriptionId = "queueTest-sub";
     private static final String topicId = "queueTest-queue";

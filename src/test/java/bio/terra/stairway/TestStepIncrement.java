@@ -4,7 +4,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 public class TestStepIncrement implements Step {
-    private Logger logger = LoggerFactory.getLogger("bio.terra.stairway");
+    private Logger logger = LoggerFactory.getLogger(TestStepIncrement.class);
 
     @Override
     public StepResult doStep(FlightContext context) {

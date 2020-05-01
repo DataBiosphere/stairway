@@ -6,7 +6,7 @@ import org.slf4j.LoggerFactory;
 import java.io.File;
 
 public class TestStepExistence implements Step {
-    private Logger logger = LoggerFactory.getLogger("bio.terra.stairway");
+    private Logger logger = LoggerFactory.getLogger(TestStepExistence.class);
     private String filename;
 
     public TestStepExistence(String filename) {

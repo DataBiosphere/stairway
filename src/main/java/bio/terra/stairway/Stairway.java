@@ -29,7 +29,7 @@ import java.util.concurrent.atomic.AtomicBoolean;
  * Stairway is the object that drives execution of Flights.
  */
 public class Stairway {
-    private static final Logger logger = LoggerFactory.getLogger("bio.terra.stairway");
+    private static final Logger logger = LoggerFactory.getLogger(Stairway.class);
     private static final int DEFAULT_MAX_PARALLEL_FLIGHTS = 20;
     private static final int DEFAULT_MAX_QUEUED_FLIGHTS = 10;
 
@@ -401,22 +401,23 @@ public class Stairway {
         }
         Flight flight = makeFlight(flightClass, inputParameters);
         FlightContext context = flight.context();
-
         context.setFlightId(flightId);
-        context.setStairway(this);
+
+        // If we are submitting, but our local thread pool is too backed up, send the flight to the queue.
+        if (!shouldQueue && (threadPool.getQueue().size() >= maxQueuedFlights)) {
+            shouldQueue = true;
+            logger.info("Local thread pool queue is too deep. Submitting flight to queue: " + flightId);
+        }
 
         if (workQueueEnabled && shouldQueue) {
             // Submit to the queue
             context.setFlightStatus(FlightStatus.READY);
             flightDao.submit(context);
-
-            String message = QueueMessage.serialize(new QueueMessageReady(context.getFlightId()));
-            workQueue.queueMessage(message);
-            context.setFlightStatus(FlightStatus.QUEUED);
-            flightDao.queued(context);
+            queueFlight(context);
         } else {
             // Submit directly
-            flightDao.submit(flight.context());
+            context.setStairway(this);
+            flightDao.submit(context);
             launchFlight(flight);
         }
     }

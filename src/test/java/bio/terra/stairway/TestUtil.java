@@ -9,7 +9,7 @@ import javax.sql.DataSource;
 import java.util.concurrent.TimeUnit;
 
 public final class TestUtil {
-    private static Logger logger = LoggerFactory.getLogger("bio.terra.stairway");
+    private static Logger logger = LoggerFactory.getLogger(TestUtil.class);
 
     private TestUtil() {
     }

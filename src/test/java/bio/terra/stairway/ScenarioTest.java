@@ -26,7 +26,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 @Tag("unit")
 public class ScenarioTest {
     private Stairway stairway;
-    private Logger logger = LoggerFactory.getLogger("bio.terra.stairway");
+    private Logger logger = LoggerFactory.getLogger(ScenarioTest.class);
     private String stairwayName;
 
     @BeforeEach
