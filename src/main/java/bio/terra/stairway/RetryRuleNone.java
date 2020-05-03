@@ -1,17 +1,17 @@
 package bio.terra.stairway;
 
 public class RetryRuleNone implements RetryRule {
-    private static RetryRuleNone retryRuleNoneSingleton = new RetryRuleNone();
-    public static RetryRuleNone getRetryRuleNone() {
-        return retryRuleNoneSingleton;
-    }
+  private static RetryRuleNone retryRuleNoneSingleton = new RetryRuleNone();
 
-    @Override
-    public void initialize() {
-    }
+  public static RetryRuleNone getRetryRuleNone() {
+    return retryRuleNoneSingleton;
+  }
 
-    @Override
-    public boolean retrySleep() throws InterruptedException {
-        return false;
-    }
+  @Override
+  public void initialize() {}
+
+  @Override
+  public boolean retrySleep() throws InterruptedException {
+    return false;
+  }
 }
