@@ -4,30 +4,29 @@ package bio.terra.stairway;
 // That lets all message classes be easily serialized/deserialized POJOs without inheritance.
 // This class must remain constant across other changes to the message format.
 public class QueueMessageType {
-    private String version;
-    private QueueMessageEnum messageEnum;
+  private String version;
+  private QueueMessageEnum messageEnum;
 
-    private QueueMessageType() {
-    }
+  private QueueMessageType() {}
 
-    public QueueMessageType(String version, QueueMessageEnum messageEnum) {
-        this.version = version;
-        this.messageEnum = messageEnum;
-    }
+  public QueueMessageType(String version, QueueMessageEnum messageEnum) {
+    this.version = version;
+    this.messageEnum = messageEnum;
+  }
 
-    public String getVersion() {
-        return version;
-    }
+  public String getVersion() {
+    return version;
+  }
 
-    public void setVersion(String version) {
-        this.version = version;
-    }
+  public void setVersion(String version) {
+    this.version = version;
+  }
 
-    public QueueMessageEnum getMessageEnum() {
-        return messageEnum;
-    }
+  public QueueMessageEnum getMessageEnum() {
+    return messageEnum;
+  }
 
-    public void setMessageEnum(QueueMessageEnum messageEnum) {
-        this.messageEnum = messageEnum;
-    }
+  public void setMessageEnum(QueueMessageEnum messageEnum) {
+    this.messageEnum = messageEnum;
+  }
 }

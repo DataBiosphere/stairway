@@ -5,44 +5,46 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 public class QueueMessageReady extends QueueMessage {
-    private static final Logger logger = LoggerFactory.getLogger(QueueMessageReady.class);
+  private static final Logger logger = LoggerFactory.getLogger(QueueMessageReady.class);
 
-    private QueueMessageType type;
-    private String flightId;
+  private QueueMessageType type;
+  private String flightId;
 
-    private QueueMessageReady() {
+  private QueueMessageReady() {}
 
+  public QueueMessageReady(String flightId) {
+    this.type =
+        new QueueMessageType(QueueMessage.FORMAT_VERSION, QueueMessageEnum.QUEUE_MESSAGE_READY);
+    this.flightId = flightId;
+  }
+
+  @Override
+  public void process(Stairway stairway) throws InterruptedException {
+    try {
+      boolean resumed = stairway.resume(flightId);
+      logger.info(
+          "Stairway "
+              + stairway.getStairwayName()
+              + (resumed ? " resumed flight: " : " did not resume flight: ")
+              + flightId);
+    } catch (DatabaseOperationException ex) {
+      logger.error("Unexpected stairway error", ex);
     }
+  }
 
-    public QueueMessageReady(String flightId) {
-        this.type = new QueueMessageType(QueueMessage.FORMAT_VERSION, QueueMessageEnum.QUEUE_MESSAGE_READY);
-        this.flightId = flightId;
-    }
+  public QueueMessageType getType() {
+    return type;
+  }
 
-    @Override
-    public void process(Stairway stairway) throws InterruptedException {
-        try {
-            boolean resumed = stairway.resume(flightId);
-            logger.info("Stairway " + stairway.getStairwayName() +
-                    (resumed ? " resumed flight: " : " did not resume flight: ")+ flightId);
-        } catch (DatabaseOperationException ex) {
-            logger.error("Unexpected stairway error", ex);
-        }
-    }
+  private void setType(QueueMessageType type) {
+    this.type = type;
+  }
 
-    public QueueMessageType getType() {
-        return type;
-    }
+  public String getFlightId() {
+    return flightId;
+  }
 
-    private void setType(QueueMessageType type) {
-        this.type = type;
-    }
-
-    public String getFlightId() {
-        return flightId;
-    }
-
-    public void setFlightId(String flightId) {
-        this.flightId = flightId;
-    }
+  public void setFlightId(String flightId) {
+    this.flightId = flightId;
+  }
 }
