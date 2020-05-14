@@ -4,9 +4,18 @@ import static org.hamcrest.CoreMatchers.containsString;
 import static org.hamcrest.CoreMatchers.is;
 import static org.hamcrest.MatcherAssert.assertThat;
 import static org.hamcrest.Matchers.equalTo;
+import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
+import bio.terra.stairway.fixtures.TestPauseController;
+import bio.terra.stairway.fixtures.TestUtil;
+import bio.terra.stairway.flights.TestFlightRecovery;
+import bio.terra.stairway.flights.TestFlightRecoveryUndo;
+import bio.terra.stairway.flights.TestFlightRecoveryUndoSwitch;
+import bio.terra.stairway.flights.TestFlightStop;
+import java.util.List;
 import java.util.concurrent.TimeUnit;
+import javax.sql.DataSource;
 import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
 
@@ -21,33 +30,39 @@ import org.junit.jupiter.api.Test;
  * variable, and obeys the variable's instruction. Here are the cases: - stop controller = 0 means
  * to sit in a sleep loop forever (well, an hour) - stop controller = 1 means to skip sleeping
  *
- * <p>The success recovery test works like this: 1. Set stop controller = 0 2. Create stairway1 and
- * launch a flight 3. Flight runs steps up to the stop step 4. Stop step goes to sleep At this
- * point, the database looks like we have a partially complete, succeeding flight. Now we can test
- * recovery: 5. Set stop controller = 1 6. Create stairway2 with the same database. That will
- * trigger recovery. 7. Flight re-does the stop step. This time stop controller is 2 and we skip the
- * sleeping 8. Flight completes successfully At this point: we can evaluate the results of the
- * recovered flight to make sure it worked right. When the test is torn down, the sleeping thread
- * will record failure in the database, so you cannot use state there at this point for any
- * validation.
+ * <p>The success recovery test works like this:
+ * <li>Set stop controller = 0
+ * <li>Create stairway1 and launch a flight
+ * <li>Flight runs steps up to the stop step
+ * <li>Stop step goes to sleep At this point, the database looks like we have a partially complete,
+ *     succeeding flight. Now we can test recovery:
+ * <li>Set stop controller = 1
+ * <li>Create stairway2 and do the three step startup, recovering the obsolete Stairway.
+ * <li>Flight re-does the stop step. This time stop controller is 2 and we skip the sleeping
+ * <li>Flight completes successfully At this point: we can evaluate the results of the recovered
+ *     flight to make sure it worked right. When the test is torn down, the sleeping thread will
+ *     record failure in the database, so you cannot use state there at this point for any
+ *     validation.
  *
- * <p>The undo recovery test works by introducint TestStepTriggerUndo that will set the stop
- * controller from 0 and trigger undo. Then the TestStepStop will sleep on the undo path simulating
- * a failure in that direction.
+ *     <p>The undo recovery test works by introducing TestStepTriggerUndo that will set the stop
+ *     controller from 0 and trigger undo. Then the TestStepStop will sleep on the undo path
+ *     simulating a failure in that direction.
  */
 @Tag("unit")
 public class RecoveryTest {
   @Test
   public void successTest() throws Exception {
+    final String stairwayName = "recoverySuccessTest";
+
     // Start with a clean and shiny database environment.
-    Stairway stairway1 = TestUtil.setupStairway("recoverySuccessTest", false);
+    Stairway stairway1 = TestUtil.setupStairway(stairwayName, false);
 
     FlightMap inputs = new FlightMap();
 
     Integer initialValue = 0;
     inputs.put("initialValue", initialValue);
 
-    TestStopController.setControl(0);
+    TestPauseController.setControl(0);
     String flightId = "successTest";
     stairway1.submit(flightId, TestFlightRecovery.class, inputs);
 
@@ -57,9 +72,23 @@ public class RecoveryTest {
     assertThat(TestUtil.isDone(stairway1, flightId), is(equalTo(false)));
 
     // Simulate a restart with a new thread pool and stairway. Set control so this one does not
-    // sleep
-    TestStopController.setControl(1);
-    Stairway stairway2 = TestUtil.setupStairway("recoverySuccessTest", true);
+    // sleep. We create the new stairway directly, rather than use TestUtil so we can validate the
+    // process. We reuse the stairway name to make sure that replacement by the same name works.
+    TestPauseController.setControl(1);
+    DataSource dataSource = TestUtil.makeDataSource();
+    Stairway stairway2 =
+        Stairway.newBuilder()
+            .stairwayClusterName("stairway-cluster")
+            .stairwayName(stairwayName)
+            .projectId(null)
+            .maxParallelFlights(2)
+            .build();
+    List<String> recordedStairways = stairway2.initialize(dataSource, false, false);
+    assertThat("One obsolete stairway to recover", recordedStairways.size(), equalTo(1));
+    String obsoleteStairway = recordedStairways.get(0);
+    assertThat("Obsolete stairway has the right name", obsoleteStairway, equalTo(stairwayName));
+
+    stairway2.recoverAndStart(recordedStairways);
 
     // Wait for recovery to complete
     stairway2.waitForFlight(flightId, null, null);
@@ -81,7 +110,7 @@ public class RecoveryTest {
 
     // We don't want to stop on the do path; the undo trigger will set the control to 0 and put the
     // flight to sleep
-    TestStopController.setControl(1);
+    TestPauseController.setControl(1);
     String flightId = "undoTest";
     stairway1.submit(flightId, TestFlightRecoveryUndo.class, inputs);
 
@@ -90,7 +119,7 @@ public class RecoveryTest {
 
     // Simulate a restart with a new thread pool and stairway. Reset control so this one does not
     // sleep
-    TestStopController.setControl(1);
+    TestPauseController.setControl(1);
     Stairway stairway2 = TestUtil.setupStairway("recoverySuccessTest", true);
 
     // Wait for recovery to complete
@@ -119,7 +148,7 @@ public class RecoveryTest {
     inputs.put("initialValue", initialValue);
 
     // We stop the flight on the undo path
-    TestStopController.setControl(0);
+    TestPauseController.setControl(0);
     String flightId = "undoSwitchTest";
     stairway1.submit(flightId, TestFlightRecoveryUndoSwitch.class, inputs);
 
@@ -128,7 +157,7 @@ public class RecoveryTest {
 
     // Simulate a restart with a new thread pool and stairway. Reset control so this one does not
     // sleep
-    TestStopController.setControl(1);
+    TestPauseController.setControl(1);
     Stairway stairway2 = TestUtil.setupStairway("recoveryUndoSwitchTest", true);
 
     // Wait for recovery to complete
@@ -139,5 +168,32 @@ public class RecoveryTest {
     assertTrue(result.getResultMap().isPresent());
     Integer value = result.getResultMap().get().get("value", Integer.class);
     assertThat(value, is(equalTo(5)));
+  }
+
+  @Test
+  public void stopStepResultTest() throws Exception {
+    Stairway stairway = TestUtil.setupStairway("stopStepResult", false);
+
+    FlightMap inputs = new FlightMap();
+    Integer initialValue = 10;
+    inputs.put("initialValue", initialValue);
+
+    String flightId = "stopStepResultTest";
+    stairway.submit(flightId, TestFlightStop.class, inputs);
+
+    // Allow time for the flight to stop
+    TimeUnit.SECONDS.sleep(5);
+    FlightState flightState = stairway.getFlightState(flightId);
+    assertThat("Flight is READY", flightState.getFlightStatus(), equalTo(FlightStatus.READY));
+
+    stairway.recoverReady();
+
+    stairway.waitForFlight(flightId, 5, 10);
+    FlightState result = stairway.getFlightState(flightId);
+    assertThat(result.getFlightStatus(), is(equalTo(FlightStatus.SUCCESS)));
+    assertFalse(result.getException().isPresent());
+    assertTrue(result.getResultMap().isPresent());
+    Integer value = result.getResultMap().get().get("value", Integer.class);
+    assertThat(value, is(equalTo(12)));
   }
 }

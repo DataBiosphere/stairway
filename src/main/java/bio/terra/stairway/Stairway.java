@@ -7,6 +7,14 @@ import bio.terra.stairway.exception.MakeFlightException;
 import bio.terra.stairway.exception.MigrateException;
 import bio.terra.stairway.exception.QueueException;
 import bio.terra.stairway.exception.StairwayExecutionException;
+import org.apache.commons.lang3.builder.EqualsBuilder;
+import org.apache.commons.lang3.builder.HashCodeBuilder;
+import org.apache.commons.lang3.builder.ToStringBuilder;
+import org.apache.commons.lang3.builder.ToStringStyle;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
+import javax.sql.DataSource;
 import java.io.IOException;
 import java.lang.reflect.Constructor;
 import java.lang.reflect.InvocationTargetException;
@@ -16,19 +24,13 @@ import java.util.concurrent.LinkedBlockingQueue;
 import java.util.concurrent.ThreadPoolExecutor;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
-import javax.sql.DataSource;
-import org.apache.commons.lang3.builder.EqualsBuilder;
-import org.apache.commons.lang3.builder.HashCodeBuilder;
-import org.apache.commons.lang3.builder.ToStringBuilder;
-import org.apache.commons.lang3.builder.ToStringStyle;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 
 /** Stairway is the object that drives execution of Flights. */
 public class Stairway {
   private static final Logger logger = LoggerFactory.getLogger(Stairway.class);
   private static final int DEFAULT_MAX_PARALLEL_FLIGHTS = 20;
-  private static final int DEFAULT_MAX_QUEUED_FLIGHTS = 10;
+  private static final int DEFAULT_MAX_QUEUED_FLIGHTS = 2;
+  private static final int MIN_QUEUED_FLIGHTS = 0;
 
   // Constructor parameters
   private final Object applicationContext;
@@ -38,13 +40,14 @@ public class Stairway {
   private final String projectId;
   private final int maxParallelFlights;
   private final int maxQueuedFlights;
-  private boolean workQueueEnabled;
-  private HookWrapper hookWrapper;
+  private final boolean workQueueEnabled;
+  private final ClassLoader classLoader;
+  private final HookWrapper hookWrapper;
 
   // Initialized state
-  private ThreadPoolExecutor threadPool;
+  private StairwayThreadPool threadPool;
   private String stairwayId;
-  private AtomicBoolean quietingDown; // flights test this and force yield if true
+  private final AtomicBoolean quietingDown;
   private FlightDao flightDao;
   private Queue workQueue;
   private WorkQueueListener workQueueListener;
@@ -59,6 +62,8 @@ public class Stairway {
     private String stairwayClusterName;
     private String projectId;
     private StairwayHook stairwayHook;
+    private boolean enableWorkQueue;
+    private ClassLoader classLoader;
 
     /**
      * Determines the size of the thread pool used for running Stairway flights. Default is
@@ -76,7 +81,11 @@ public class Stairway {
      * If we are running a cluster work queue, then this parameter determines the number of flights
      * we allow to queue locally. If the queue depth is, larger than this max, then we stop taking
      * work off of the work queue and we add new submitted flights to the cluster work queue.
-     * Default is DEFAULT_MAX_QUEUED_FLIGHTS (10 at this moment)
+     * Default is DEFAULT_MAX_QUEUED_FLIGHTS (1 at this moment)
+     *
+     * <p>If maxQueuedFlights is smaller than MIN_QUEUED_FLIGHTS (0 at this moment), then it is set
+     * to MIN_QUEUED_FLIGHTS. For the admission policy to work properly, MIN_QUEUED_FLIGHT
+     * <b>must</b> be greater than 0.
      *
      * @param maxQueuedFlights maximum flights to queue in our local thread pool
      * @return this
@@ -130,12 +139,30 @@ public class Stairway {
     }
 
     /**
-     * @param projectId Google projectId to create the Stairway work queue. If not present, no
-     *     queuing will be done.
+     * @param projectId Google projectId to create the Stairway work queue. If null, no queuing will
+     *     be done.
      * @return this
      */
     public Builder projectId(String projectId) {
       this.projectId = projectId;
+      return this;
+    }
+
+    public Builder enableWorkQueue(boolean enableWorkQueue) {
+      this.enableWorkQueue = enableWorkQueue;
+      return this;
+    }
+
+    /**
+     * Class loader to use for loading flights. By default, Stairway will use the class loader associated with
+     * the Stairway object itself. However, in some environments - I'm looking at you Spring - a different class
+     * loader must be used. Otherwise, Stairway is unable to properly reconstruct flight objects by class name.
+     *
+     * @param classLoader
+     * @return
+     */
+    public Builder classLoader(ClassLoader classLoader) {
+      this.classLoader = classLoader;
       return this;
     }
 
@@ -164,12 +191,18 @@ public class Stairway {
   }
 
   /**
-   * We do initialization in two steps. The constructor does the first step of constructing the
+   * We do initialization in three steps. The constructor does the first step of constructing the
    * object and remembering the inputs. It does not do any flightDao activity. That lets the rest of
    * the application come up and do any database configuration.
    *
-   * <p>The second step is the 'initialize' call (below) that sets up the flightDao and performs any
-   * recovery needed.
+   * <p>The second step is the 'initialize' call (below) that performs any necessary database
+   * initialization and migration. It sets up the flightDao and returns the current list of Stairway
+   * instances recorded in the database.
+   *
+   * <p>The third step is the 'recover-and-start' call (further below) that performs any requested
+   * recovery and opens this Stairway for business. Some flights may already be running depending on
+   * how recovery went. They get first crack at the resources. Then submissions from the API and the
+   * Work Queue are enabled.
    *
    * @param builder Builder input
    */
@@ -180,7 +213,11 @@ public class Stairway {
             : builder.maxParallelFlights;
 
     this.maxQueuedFlights =
-        (builder.maxQueuedFlights == null) ? DEFAULT_MAX_QUEUED_FLIGHTS : builder.maxQueuedFlights;
+        (builder.maxQueuedFlights == null)
+            ? DEFAULT_MAX_QUEUED_FLIGHTS
+            : (builder.maxQueuedFlights < MIN_QUEUED_FLIGHTS
+                ? MIN_QUEUED_FLIGHTS
+                : builder.maxQueuedFlights);
 
     this.exceptionSerializer =
         (builder.exceptionSerializer == null)
@@ -197,9 +234,10 @@ public class Stairway {
             ? "stairwaycluster" + UUID.randomUUID().toString()
             : builder.stairwayClusterName;
 
+    this.classLoader = builder.classLoader;
     this.applicationContext = builder.applicationContext;
     this.projectId = builder.projectId;
-    this.workQueueEnabled = (projectId != null);
+    this.workQueueEnabled = (projectId != null && builder.enableWorkQueue);
     this.quietingDown = new AtomicBoolean();
     this.hookWrapper = new HookWrapper(builder.stairwayHook);
   }
@@ -211,48 +249,78 @@ public class Stairway {
    * @param forceCleanStart true will drop any existing stairway data and purge the work queue.
    *     Otherwise existing flights are recovered.
    * @param migrateUpgrade true will run the migrate to upgrade the database
-   * @throws DatabaseSetupException failed to clean the database on startup
    * @throws DatabaseOperationException failures to perform recovery
    * @throws MigrateException migration failures
-   * @throws InterruptedException on shutdown during recovery
    * @throws QueueException queue and queue listener setup
+   * @throws StairwayExecutionException another exception
+   * @return list of Stairway instances recorded in the database
    */
-  public void initialize(DataSource dataSource, boolean forceCleanStart, boolean migrateUpgrade)
-      throws DatabaseSetupException, DatabaseOperationException, MigrateException, QueueException,
-          InterruptedException {
+  public List<String> initialize(
+      DataSource dataSource, boolean forceCleanStart, boolean migrateUpgrade)
+      throws DatabaseOperationException, MigrateException, QueueException,
+          StairwayExecutionException {
 
-    // Clear quietingDown on initialization. In production, we expect that once we are quieted
-    // the process is shut down. However, if the Stairway object is reused, like in unit tests,
-    // then we need to clear the flag so we can actually process.
-    quietingDown.set(false);
-
-    if (migrateUpgrade) {
-      Migrate migrate = new Migrate();
-      migrate.initialize("stairway/db/changelog.xml", dataSource);
+    // If we have been shut down, do not restart.
+    if (isQuietingDown()) {
+      throw new StairwayExecutionException("Stairway is shut down and cannot be initialized");
     }
 
-    this.flightDao = new FlightDao(dataSource, exceptionSerializer);
-
-    createThreadPool();
-    setupWorkQueue();
+    flightDao = new FlightDao(dataSource, exceptionSerializer);
 
     if (forceCleanStart) {
-      // If cleaning, set the stairway id after cleaning (or it gets cleaned!)
-      flightDao.startClean();
-      stairwayId = flightDao.findOrCreateStairwayInstance(stairwayName);
-      if (workQueue != null) {
-        workQueue.purgeQueue();
-      }
-    } else {
-      stairwayId = flightDao.findOrCreateStairwayInstance(stairwayName);
-      recoverFlights();
+      // Drop all tables and recreate the database
+      Migrate migrate = new Migrate();
+      migrate.initialize("stairway/db/changelog.xml", dataSource);
+    } else if (migrateUpgrade) {
+      // Migrate the database to a revised schema, if needed
+      Migrate migrate = new Migrate();
+      migrate.upgrade("stairway/db/changelog.xml", dataSource);
     }
+
+    createThreadPool();
+    setupWorkQueue(forceCleanStart);
+    return flightDao.getStairwayInstanceList();
+  }
+
+  /**
+   * Third step of initialization
+   *
+   * <p>recoverAndStart will do recovery on any obsolete Stairway instances passed in by the caller.
+   * Presumably, an edited list of what was returned by the initialize call above.
+   *
+   * <p>It makes a scan for ready flights and queues them (or launches if no queue).
+   *
+   * @param obsoleteStairways list of stairways to recover
+   * @throws DatabaseSetupException database migrate failure
+   * @throws DatabaseOperationException database access failure
+   * @throws QueueException queue access failure
+   * @throws StairwayExecutionException stairway error
+   * @throws InterruptedException interruption during recovery/startup
+   */
+  public void recoverAndStart(List<String> obsoleteStairways)
+      throws DatabaseSetupException, DatabaseOperationException, QueueException,
+          InterruptedException, StairwayExecutionException {
+
+    if (obsoleteStairways != null) {
+      for (String instance : obsoleteStairways) {
+        String stairwayId = flightDao.lookupStairwayInstanceId(instance);
+        logger.info("Recovering stairway " + instance);
+        flightDao.disownRecovery(stairwayId);
+      }
+    }
+
+    // Start this Stairway instance up!
+    stairwayId = flightDao.findOrCreateStairwayInstance(stairwayName);
+
+    // Recover any flights in the READY state
+    recoverReady();
     startWorkQueueListener();
   }
 
   private void createThreadPool() {
+    // TODO: tune the keep alive time
     threadPool =
-        new ThreadPoolExecutor(
+        new StairwayThreadPool(
             maxParallelFlights,
             maxParallelFlights,
             0L,
@@ -260,7 +328,7 @@ public class Stairway {
             new LinkedBlockingQueue<Runnable>());
   }
 
-  private void setupWorkQueue() throws QueueException {
+  private void setupWorkQueue(boolean forceClean) throws QueueException {
     if (!workQueueEnabled) {
       return; // no work queue for you!
     }
@@ -270,6 +338,9 @@ public class Stairway {
 
     try {
       workQueue = new Queue(this, projectId, topicId, subscriptionId);
+      if (forceClean) {
+        workQueue.purgeQueue();
+      }
     } catch (IOException ex) {
       throw new QueueException("Failed to create work queue", ex);
     }
@@ -279,7 +350,7 @@ public class Stairway {
     if (!workQueueEnabled) {
       return;
     }
-    workQueueListener = new WorkQueueListener(this, maxQueuedFlights, workQueue);
+    workQueueListener = new WorkQueueListener(this, workQueue);
     workQueueListenerThread = new Thread(workQueueListener);
     workQueueListenerThread.start();
   }
@@ -425,9 +496,8 @@ public class Stairway {
     FlightContext context = flight.context();
     context.setFlightId(flightId);
 
-    // If we are submitting, but our local thread pool is too backed up, send the flight to the
-    // queue.
-    if (!shouldQueue && (threadPool.getQueue().size() >= maxQueuedFlights)) {
+    // If we are submitting, but we don't have space available for the flight, queue it
+    if (!shouldQueue && !spaceAvailable()) {
       shouldQueue = true;
       logger.info("Local thread pool queue is too deep. Submitting flight to queue: " + flightId);
     }
@@ -436,13 +506,32 @@ public class Stairway {
       // Submit to the queue
       context.setFlightStatus(FlightStatus.READY);
       flightDao.submit(context);
-      queueFlight(context);
+      queueFlight(context.getFlightId());
     } else {
       // Submit directly
       context.setStairway(this);
       flightDao.submit(context);
       launchFlight(flight);
     }
+  }
+
+  /**
+   * This code trinket is used by submit and WorkQueueListener to decide if there is room
+   *
+   * @return true if there is room to take on more work.
+   */
+  boolean spaceAvailable() {
+    logger.info(
+        "Space available? active: "
+            + threadPool.getActiveFlights()
+            + " of max: "
+            + maxParallelFlights
+            + " queueSize: "
+            + threadPool.getQueuedFlights()
+            + " of max: "
+            + maxQueuedFlights);
+    return ((threadPool.getActiveFlights() < maxParallelFlights)
+        || (threadPool.getQueuedFlights() < maxQueuedFlights));
   }
 
   /**
@@ -467,7 +556,13 @@ public class Stairway {
       return false;
     }
 
-    resumeOneFlight(flightContext);
+    Flight flight =
+        makeFlightFromName(flightContext.getFlightClassName(), flightContext.getInputParameters());
+    flightContext.setStairway(this);
+    flightContext.nextStepIndex(); // position the flight to execute the next thing
+    flight.setFlightContext(flightContext);
+    launchFlight(flight);
+
     return true;
   }
 
@@ -598,11 +693,11 @@ public class Stairway {
     flightDao.exit(context);
 
     if (context.getFlightStatus() == FlightStatus.READY && workQueueEnabled) {
-      queueFlight(context);
+      queueFlight(context.getFlightId());
     }
   }
 
-  private void queueFlight(FlightContext context)
+  private void queueFlight(String flightId)
       throws DatabaseOperationException, StairwayExecutionException, InterruptedException {
     // If the flight state is READY, then we put the flight on the queue and mark it queued in the
     // database. We cannot go directly from RUNNING to QUEUED. Suppose we put the flight in
@@ -615,38 +710,64 @@ public class Stairway {
     // and queue it. Putting a flight on the queue twice is not a problem. Stairway instances race
     // to
     // see who gets to run it.
-    String message = QueueMessage.serialize(new QueueMessageReady(context.getFlightId()));
+    String message = QueueMessage.serialize(new QueueMessageReady(flightId));
     workQueue.queueMessage(message);
-    context.setFlightStatus(FlightStatus.QUEUED);
-    flightDao.queued(context);
+    flightDao.queued(flightId);
   }
 
   /**
-   * Find any incomplete flights and recover them. We overwrite the flight context of this flight
-   * with the recovered flight context. The normal constructor path needs to give the input
-   * parameters to the flight subclass. This is a case where we don't really want to have the Flight
-   * object set up its own context. It is simpler to override it than to make a separate code path
-   * for this recovery case.
+   * Return a list of the names of Stairway instances known to this stairway. They may not all be
+   * active.
    *
-   * <p>The flightlog records the last operation performed; so we need to set the execution point to
-   * the next step index.
-   *
-   * @throws DatabaseOperationException on database errors
+   * @return List of stairway instance names
+   * @throws DatabaseOperationException unexpected database error
    */
-  private void recoverFlights() throws DatabaseOperationException, InterruptedException {
-    List<FlightContext> flightList = flightDao.recover(stairwayId);
-    for (FlightContext flightContext : flightList) {
-      resumeOneFlight(flightContext);
-    }
+  public List<String> getStairwayInstanceList() throws DatabaseOperationException {
+    return flightDao.getStairwayInstanceList();
   }
 
-  private void resumeOneFlight(FlightContext flightContext) {
-    Flight flight =
-        makeFlightFromName(flightContext.getFlightClassName(), flightContext.getInputParameters());
-    flightContext.setStairway(this);
-    flightContext.nextStepIndex(); // position the flight to execute the next thing
-    flight.setFlightContext(flightContext);
-    launchFlight(flight);
+  /**
+   * Recover any orphaned flights from a particular Stairway instance
+   *
+   * @param stairwayName name of a stairway instance to recover
+   * @throws DatabaseOperationException database access error
+   * @throws InterruptedException interruption during recovery
+   * @throws StairwayExecutionException stairway error
+   */
+  public void recoverStairway(String stairwayName)
+      throws DatabaseOperationException, InterruptedException, StairwayExecutionException {
+    String stairwayId = flightDao.lookupStairwayInstanceId(stairwayName);
+    flightDao.disownRecovery(stairwayId);
+    recoverReady();
+  }
+
+  /**
+   * Recover flights in the READY state. Flights need recovery from the READY state in two cases:
+   *
+   * <ol>
+   *   <li>when a Stairway instance fails during the process of putting a flight in the work queue
+   *   <li>the second step of recovery of a failed Stairway instance; in the first step, we disowned
+   *       the running flights and put them in the READY state.
+   * </ol>
+   *
+   * If the work queue is enabled, we then queue the flights. We don't want this Stairway instance
+   * to take on all of the recovered flights itself. If there is no workQueue, we build the flight
+   * object and launch it ourselves.
+   *
+   * @throws DatabaseOperationException unexpected database error
+   * @throws InterruptedException on shutdown during recovery
+   * @throws StairwayExecutionException stairway error
+   */
+  void recoverReady()
+      throws DatabaseOperationException, InterruptedException, StairwayExecutionException {
+    List<String> readyFlightList = flightDao.getReadyFlights();
+    for (String flightId : readyFlightList) {
+      if (workQueueEnabled) {
+        queueFlight(flightId);
+      } else {
+        resume(flightId);
+      }
+    }
   }
 
   /*
@@ -693,9 +814,22 @@ public class Stairway {
    */
   private Flight makeFlightFromName(String className, FlightMap inputMap) {
     try {
-      Class<?> someClass = Class.forName(className);
+      ClassLoader useClassLoader = this.getClass().getClassLoader();
+      logger.info("Stairway class loader: " + classLoader);
+      if (classLoader != null) {
+        useClassLoader = classLoader;
+        logger.info("Builder class loader: " + classLoader);
+      }
+
+      Class<?> someClass = Class.forName(className, true, useClassLoader);
       if (Flight.class.isAssignableFrom(someClass)) {
         Class<? extends Flight> flightClass = (Class<? extends Flight>) someClass;
+        logger.info("flightClass class loader: " + flightClass.getClassLoader());
+        try {
+          TimeUnit.SECONDS.sleep(5);
+        } catch (InterruptedException ex) {
+          logger.debug("interrupted");
+        }
         return makeFlight(flightClass, inputMap);
       }
       // Error case

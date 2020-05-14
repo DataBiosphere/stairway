@@ -251,7 +251,7 @@ public class Flight implements Runnable {
         // The purpose of this catch is to relieve steps of implementing their own repetitive
         // try-catch
         // simply to turn exceptions into StepResults.
-        logger.info("Caught exception: (" + ex.toString() + ") " + context().prettyStepState());
+        logger.info("Caught exception: (" + ex.toString() + ") " + context().prettyStepState(), ex);
 
         StepStatus stepStatus =
             (ex instanceof RetryException)

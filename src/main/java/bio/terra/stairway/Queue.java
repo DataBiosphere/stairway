@@ -9,10 +9,14 @@ package bio.terra.stairway;
 
 import bio.terra.stairway.exception.StairwayExecutionException;
 import com.google.api.core.ApiFuture;
+import com.google.api.gax.core.GoogleCredentialsProvider;
 import com.google.api.gax.rpc.AlreadyExistsException;
+import com.google.api.gax.rpc.DeadlineExceededException;
 import com.google.cloud.pubsub.v1.Publisher;
 import com.google.cloud.pubsub.v1.SubscriptionAdminClient;
+import com.google.cloud.pubsub.v1.SubscriptionAdminSettings;
 import com.google.cloud.pubsub.v1.TopicAdminClient;
+import com.google.cloud.pubsub.v1.TopicAdminSettings;
 import com.google.cloud.pubsub.v1.stub.GrpcSubscriberStub;
 import com.google.cloud.pubsub.v1.stub.SubscriberStub;
 import com.google.cloud.pubsub.v1.stub.SubscriberStubSettings;
@@ -30,6 +34,7 @@ import com.google.pubsub.v1.TopicName;
 import edu.umd.cs.findbugs.annotations.SuppressFBWarnings;
 import java.io.IOException;
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.List;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.TimeUnit;
@@ -62,17 +67,23 @@ public class Queue {
   private final Stairway stairway;
   private final Publisher publisher;
   private final String subscriptionName;
-  private SubscriberStub subscriber;
+  private SubscriberStub subscriberStub;
 
-  public Queue(Stairway stairway, String projectId, String subscriptionId, String topicId)
+  public Queue(Stairway stairway, String projectId, String topicId, String subscriptionId)
       throws IOException {
     this.projectId = projectId;
-    this.subscriptionId = subscriptionId;
     this.topicId = topicId;
+    this.subscriptionId = subscriptionId;
+    subscriptionName = ProjectSubscriptionName.format(projectId, subscriptionId);
 
     // Create the topic and subscription
     maybeCreateTopicAndSubscription();
 
+    // Setup the publisher
+    ProjectTopicName topicName = ProjectTopicName.of(projectId, topicId);
+    publisher = Publisher.newBuilder(topicName).build();
+
+    // Build the stub for issuing pulls from the queue
     SubscriberStubSettings subscriberStubSettings =
         SubscriberStubSettings.newBuilder()
             .setTransportChannelProvider(
@@ -80,29 +91,41 @@ public class Queue {
                     .setMaxInboundMessageSize(MAX_INBOUND_MESSAGE_BYTES)
                     .build())
             .build();
-    subscriptionName = ProjectSubscriptionName.format(projectId, subscriptionId);
-    subscriber = GrpcSubscriberStub.create(subscriberStubSettings);
-
-    ProjectTopicName topicName = ProjectTopicName.of(projectId, topicId);
-    publisher = Publisher.newBuilder(topicName).build();
+    subscriberStub = GrpcSubscriberStub.create(subscriberStubSettings);
 
     this.stairway = stairway;
   }
 
   // Create a topic and a subscription, if it doesn't exist
   private void maybeCreateTopicAndSubscription() throws IOException {
+    logger.info("Start maybeCreateTopicAndSubscription");
     ProjectSubscriptionName subscriptionName =
         ProjectSubscriptionName.of(projectId, subscriptionId);
+    logger.info("Construct topic name");
     TopicName topicName = TopicName.ofProjectTopicName(projectId, topicId);
 
-    try (TopicAdminClient topicAdminClient = TopicAdminClient.create()) {
+    logger.info("Construct credentials");
+    GoogleCredentialsProvider credentialsProvider =
+        GoogleCredentialsProvider.newBuilder()
+            .setScopesToApply(Collections.singletonList("https://www.googleapis.com/auth/pubsub"))
+            .build();
+    logger.info("Credentials are: " + credentialsProvider);
+    TopicAdminSettings topicAdminSettings =
+        TopicAdminSettings.newBuilder().setCredentialsProvider(credentialsProvider).build();
+    SubscriptionAdminSettings subscriptionAdminSettings =
+        SubscriptionAdminSettings.newBuilder().setCredentialsProvider(credentialsProvider).build();
+
+    logger.info("Try to create the topic");
+    try (TopicAdminClient topicAdminClient = TopicAdminClient.create(topicAdminSettings)) {
       topicAdminClient.createTopic(topicName);
       logger.info("Created topic: " + topicId);
     } catch (AlreadyExistsException ex) {
       logger.info("Topic already exists: " + topicId);
     }
 
-    try (SubscriptionAdminClient subscriptionAdminClient = SubscriptionAdminClient.create()) {
+    logger.info("Try to create the subscription");
+    try (SubscriptionAdminClient subscriptionAdminClient =
+        SubscriptionAdminClient.create(subscriptionAdminSettings)) {
       Subscription request =
           Subscription.newBuilder()
               .setName(subscriptionName.toString())
@@ -126,9 +149,9 @@ public class Queue {
   }
 
   public void shutdownSubscriber() {
-    if (subscriber != null) {
-      subscriber.close();
-      subscriber = null;
+    if (subscriberStub != null) {
+      subscriberStub.close();
+      subscriberStub = null;
     }
   }
 
@@ -139,44 +162,69 @@ public class Queue {
     }
   }
 
-  public void dispatchMessages(
-      int numOfMessages, QueueProcessFunction<String, Stairway, Boolean> processFunction)
-      throws InterruptedException {
-
+  private PullResponse pullFromQueue(int numOfMessages, boolean returnImmediately) {
     PullRequest pullRequest =
         PullRequest.newBuilder()
             .setMaxMessages(numOfMessages)
-            .setReturnImmediately(false)
+            .setReturnImmediately(returnImmediately)
             .setSubscription(subscriptionName)
             .build();
 
     // use pullCallable().futureCall to asynchronously perform this operation
     // The call can complete without returning any messages.
-    PullResponse pullResponse = subscriber.pullCallable().call(pullRequest);
-    if (pullResponse.getReceivedMessagesList().size() == 0) {
-      return;
-    }
-
-    List<String> ackIds = new ArrayList<>();
-    for (ReceivedMessage message : pullResponse.getReceivedMessagesList()) {
-      String smess = message.getMessage().getData().toStringUtf8();
-      logger.info("Received message: " + smess);
-
-      Boolean processSucceeded = processFunction.apply(smess, stairway);
-      if (processSucceeded) {
-        ackIds.add(message.getAckId());
+    PullResponse pullResponse = null;
+    try {
+      pullResponse = subscriberStub.pullCallable().call(pullRequest);
+      if (pullResponse.getReceivedMessagesList().size() == 0) {
+        return null;
       }
+    } catch (DeadlineExceededException ex) {
+      // This error can happen when there are no messages in the queue
+      logger.info("Deadline exceeded on pull request", ex);
+    } catch (Exception ex) {
+      // TODO: Is this the right error handling for this case?
+      logger.warn("Unexpected exception on pull request - continuing", ex);
     }
 
-    if (ackIds.size() > 0) {
-      // acknowledge received messages
-      AcknowledgeRequest acknowledgeRequest =
-          AcknowledgeRequest.newBuilder()
-              .setSubscription(subscriptionName)
-              .addAllAckIds(ackIds)
-              .build();
-      // use acknowledgeCallable().futureCall to asynchronously perform this operation
-      subscriber.acknowledgeCallable().call(acknowledgeRequest);
+    return pullResponse;
+  }
+
+  public void dispatchMessages(
+      int numOfMessages, QueueProcessFunction<String, Stairway, Boolean> processFunction)
+      throws InterruptedException {
+
+    try {
+      PullResponse pullResponse = pullFromQueue(numOfMessages, false);
+      if (pullResponse == null) {
+        return;
+      }
+
+      List<String> ackIds = new ArrayList<>();
+      for (ReceivedMessage message : pullResponse.getReceivedMessagesList()) {
+        String smess = message.getMessage().getData().toStringUtf8();
+        logger.info("Received message: " + smess);
+
+        Boolean processSucceeded = processFunction.apply(smess, stairway);
+        if (processSucceeded) {
+          ackIds.add(message.getAckId());
+        }
+      }
+
+      if (ackIds.size() > 0) {
+        // acknowledge received messages
+        AcknowledgeRequest acknowledgeRequest =
+            AcknowledgeRequest.newBuilder()
+                .setSubscription(subscriptionName)
+                .addAllAckIds(ackIds)
+                .build();
+        // use acknowledgeCallable().futureCall to asynchronously perform this operation
+        subscriberStub.acknowledgeCallable().call(acknowledgeRequest);
+      }
+    } catch (InterruptedException ex) {
+      throw ex;
+    } catch (Exception ex) {
+      // TODO: Is this the right error handling?
+      logger.warn("Unexpected exception dispatching messages - continuing", ex);
     }
   }
 
@@ -197,21 +245,12 @@ public class Queue {
   // NOTE: this is only for use in controlled tests. It should not be used to empty a queue in
   // production.
   public void purgeQueue() {
-    PullRequest pullRequest =
-        PullRequest.newBuilder()
-            .setMaxMessages(1)
-            .setReturnImmediately(true)
-            .setSubscription(subscriptionName)
-            .build();
-
     // Sometimes we get an empty response even when there are messages, so receive empty twice
     // before calling it purged.
     int emptyCount = 0;
     while (emptyCount < 2) {
-      PullResponse pullResponse;
-      pullResponse = subscriber.pullCallable().call(pullRequest);
-
-      if (pullResponse.getReceivedMessagesList().size() == 0) {
+      PullResponse pullResponse = pullFromQueue(1, true);
+      if (pullResponse == null || pullResponse.getReceivedMessagesList().size() == 0) {
         emptyCount++;
         continue;
       }
@@ -225,7 +264,7 @@ public class Queue {
                 .setSubscription(subscriptionName)
                 .addAckIds(message.getAckId())
                 .build();
-        subscriber.acknowledgeCallable().call(acknowledgeRequest);
+        subscriberStub.acknowledgeCallable().call(acknowledgeRequest);
       }
     }
   }

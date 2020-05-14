@@ -96,16 +96,57 @@ Terra Data Repository (Jade) uses Stairway and has many examples of its use.
 See [jade-data-repo](https://github.com/DataBiosphere/jade-data-repo)
 
 ## Details
-### Execution Model
-When the application starts, it must construct one or more Stairway objects. Each object is a separate
-context for running flights and has a separate table in the database. The Stairway object can be started 
-in _recovery-mode_ where it will re-launch any flights that were in progress when it failed.
-It can also be started in _initialization-mode_, where it will clean the database and start empty.
-The _initialization-mode_ is intended for development testing where we want to start with a clean
-slate each time.
+### Stairway Startup
+There are three steps to starting up a Stairway instance in your application, described in the next
+sections.
 
+#### Stairway Object Construction
+Use the Stairway.Builder to create a Stairway object. There are a number of parameters you can set to control
+how Stairway functions. You can check the javadoc for most. The ones that affect Stairway startup are:
+- stairwayClusterName - the name of a group of Stairway instances running in a Kubernetes cluster. This name
+is used to find or create a shared work queue for the instances. In a standalone environment, you can allow the
+name to default to a unique random name. 
+- stairwayName - the name of this particular Stairway among the instance running. In Kubernetes, assuming a pod
+contains exactly one Stairway instance, it is handy to use the pod name as the stairwayName. The important property
+is that it be unique among instances. If you don't supply a name, a random one is provided. It may be 
+- projectId - if you supply a projectId, then Stairway will find or create a work 
+queue in that GCP project. (Other clouds to be named later.) Otherwise, there will be no work queue.
+
+The object construction itself just records the inputs. It does not take action on them until the next step.
+That behavior works better in frameworks like Spring where all of the components get created and wired before
+the application starts running.
+
+#### Stairway Initialization
+Stairway initialization sets up the connection to the database. If run in a cluster, all Stairway instances
+must share one database in order to share the state of flights.
+
+The Stairway initialization method provides two booleans that are useful in controlling the database:
+- migrateUpgrade - if true, Stairway performs a liquibase migration on its database.
+- forceCleanStart - if true, Stairway empties the database and the work queue. That is not useful in a
+production system, but handy for test environments.
+
+Stairway initialization allocates internal resources, like thread pools, and the shared work queue.
+
+The last step of initialization is to collect a list of the names of Stairway instances currently recorded in the
+database. Those are returned as the result of the call. Note that this newly created instance is *not* added
+to the list. If the same name is on the list, it should be recovered as described next.
+
+#### Stairway Recover and Start
+Recover-and-start accepts a list of obsolete Stairway instances that should be recovered. It is up to the application
+to determine which instances are obsolete. In the standalone case, all instances found should be recovered.
+
+In the Kubernetes cluster case, the application needs to check if any of the currently recorded instances are running
+in other pods or if they are no longer active. By using pod name for Stairway name, it is easy to match the
+result of a pod list with the recorded instance list returned from initialization.  
+
+Stairway recover-and-start performs recovery on the obsolete instances. It then records this new instance
+and starts accepting flights from the Stairway API and from the Work Queue, if enabled.
+
+### Execution Model
 Stairway provides a set of library calls for flight submission, status check, and waiting for completion.
 These calls all run on the calling thread.
+
+LIES and MORE LIES - this needs to be rewritten
 
 The application provides a thread pool to Stairway on construction. The application to decide the thread
 allocation model. When a flight is submitted, it is run using a thread from the provided pool.

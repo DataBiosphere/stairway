@@ -1,5 +1,7 @@
 package bio.terra.stairway;
 
+import bio.terra.stairway.fixtures.MapKey;
+import bio.terra.stairway.flights.TestFlightSleep;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.concurrent.TimeUnit;

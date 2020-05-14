@@ -3,6 +3,7 @@ package bio.terra.stairway;
 import static org.hamcrest.CoreMatchers.equalTo;
 import static org.hamcrest.MatcherAssert.assertThat;
 
+import bio.terra.stairway.fixtures.TestUtil;
 import java.util.List;
 import java.util.concurrent.TimeUnit;
 import org.junit.jupiter.api.Tag;

@@ -1,6 +1,5 @@
 package bio.terra.stairway;
 
-import java.util.concurrent.ThreadPoolExecutor;
 import java.util.concurrent.TimeUnit;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -12,11 +11,9 @@ public class WorkQueueListener implements Runnable {
 
   private final Stairway stairway;
   private final Queue workQueue;
-  private final int maxQueuedFlights;
 
-  public WorkQueueListener(Stairway stairway, int maxQueuedFlights, Queue workQueue) {
+  public WorkQueueListener(Stairway stairway, Queue workQueue) {
     this.stairway = stairway;
-    this.maxQueuedFlights = maxQueuedFlights;
     this.workQueue = workQueue;
   }
 
@@ -41,9 +38,7 @@ public class WorkQueueListener implements Runnable {
   public void run() {
     try {
       while (!stairway.isQuietingDown()) {
-        ThreadPoolExecutor threadPool = stairway.getThreadPool();
-        int queueDepth = threadPool.getQueue().size();
-        if (queueDepth < maxQueuedFlights) {
+        if (stairway.spaceAvailable()) {
           logger.info("Asking the work queue for messages: " + MAX_MESSAGES_PER_PULL);
           workQueue.dispatchMessages(MAX_MESSAGES_PER_PULL, QueueMessage::processMessage);
         } else {
