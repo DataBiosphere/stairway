@@ -39,6 +39,7 @@ public class Stairway {
   private final int maxParallelFlights;
   private final int maxQueuedFlights;
   private boolean workQueueEnabled;
+  private StairwayHook stairwayHook;
 
   // Initialized state
   private ThreadPoolExecutor threadPool;
@@ -57,6 +58,7 @@ public class Stairway {
     private String stairwayName;
     private String stairwayClusterName;
     private String projectId;
+    private StairwayHook stairwayHook;
 
     /**
      * Determines the size of the thread pool used for running Stairway flights. Default is
@@ -138,6 +140,16 @@ public class Stairway {
     }
 
     /**
+     * @param stairwayHook object containing hooks for logging at beginning and end of
+     *                     flight and step of stairway
+     * @return this
+     */
+    public Builder stairwayHook(StairwayHook stairwayHook) {
+      this.stairwayHook = stairwayHook;
+      return this;
+    }
+
+    /**
      * Construct a Stairway instance based on the builder inputs
      *
      * @return Stairway
@@ -189,6 +201,29 @@ public class Stairway {
     this.projectId = builder.projectId;
     this.workQueueEnabled = (projectId != null);
     this.quietingDown = new AtomicBoolean();
+    this.stairwayHook = (builder.stairwayHook == null) ?
+            // TODO: add default hook in case this is null
+            new StairwayHook() {
+              @Override
+              public void startFlight(FlightContext context) {
+
+              }
+
+              @Override
+              public void startStep() {
+
+              }
+
+              @Override
+              public void endFlight() {
+
+              }
+
+              @Override
+              public void endStep() {
+
+              }
+            } : builder.stairwayHook;
   }
 
   /**
