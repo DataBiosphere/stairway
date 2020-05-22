@@ -590,6 +590,10 @@ public class Stairway {
     return stairwayName;
   }
 
+  public StairwayHook getStairwayHook() {
+    return stairwayHook;
+  }
+
   /** @return id of this stairway instance */
   public String getStairwayId() {
     return stairwayId;

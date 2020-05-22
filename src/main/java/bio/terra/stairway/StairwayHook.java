@@ -1,8 +1,8 @@
 package bio.terra.stairway;
 
 public interface StairwayHook {
-    void startFlight(FlightContext context);
-    void startStep();
-    void endFlight();
-    void endStep();
+    HookAction startFlight(FlightContext context);
+    HookAction startStep(FlightContext context);
+    HookAction endFlight(FlightContext context);
+    HookAction endStep(FlightContext context);
 }
