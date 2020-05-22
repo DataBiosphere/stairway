@@ -1,18 +1,17 @@
 package bio.terra.stairway;
 
+import static bio.terra.stairway.FlightStatus.READY;
+import static bio.terra.stairway.FlightStatus.WAITING;
+
 import bio.terra.stairway.exception.DatabaseOperationException;
 import bio.terra.stairway.exception.RetryException;
 import bio.terra.stairway.exception.StairwayExecutionException;
+import java.util.LinkedList;
+import java.util.List;
 import org.apache.commons.lang3.builder.ToStringBuilder;
 import org.apache.commons.lang3.builder.ToStringStyle;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-
-import java.util.LinkedList;
-import java.util.List;
-
-import static bio.terra.stairway.FlightStatus.READY;
-import static bio.terra.stairway.FlightStatus.WAITING;
 
 /**
  * Manage the atomic execution of a series of Steps This base class has the mechanisms for executing
@@ -44,6 +43,7 @@ public class Flight implements Runnable {
     this.applicationContext = applicationContext;
     steps = new LinkedList<>();
   }
+
   HookWrapper wrapper = new HookWrapper(context().getStairway());
 
   public FlightContext context() {

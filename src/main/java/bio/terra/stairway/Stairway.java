@@ -140,8 +140,8 @@ public class Stairway {
     }
 
     /**
-     * @param stairwayHook object containing hooks for logging at beginning and end of
-     *                     flight and step of stairway
+     * @param stairwayHook object containing hooks for logging at beginning and end of flight and
+     *     step of stairway
      * @return this
      */
     public Builder stairwayHook(StairwayHook stairwayHook) {
@@ -201,29 +201,32 @@ public class Stairway {
     this.projectId = builder.projectId;
     this.workQueueEnabled = (projectId != null);
     this.quietingDown = new AtomicBoolean();
-    this.stairwayHook = (builder.stairwayHook == null) ?
+    this.stairwayHook =
+        (builder.stairwayHook == null)
+            ?
             // TODO: add default hook in case this is null
             new StairwayHook() {
               @Override
-              public void startFlight(FlightContext context) {
-
+              public HookAction startFlight(FlightContext context) {
+                return HookAction.FAULT;
               }
 
               @Override
-              public void startStep() {
-
+              public HookAction startStep(FlightContext context) {
+                return HookAction.FAULT;
               }
 
               @Override
-              public void endFlight() {
-
+              public HookAction endFlight(FlightContext context) {
+                return HookAction.FAULT;
               }
 
               @Override
-              public void endStep() {
-
+              public HookAction endStep(FlightContext context) {
+                return HookAction.FAULT;
               }
-            } : builder.stairwayHook;
+            }
+            : builder.stairwayHook;
   }
 
   /**
