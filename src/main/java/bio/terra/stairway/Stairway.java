@@ -202,31 +202,36 @@ public class Stairway {
     this.workQueueEnabled = (projectId != null);
     this.quietingDown = new AtomicBoolean();
     this.stairwayHook =
-        (builder.stairwayHook == null)
-            ?
-            // TODO: add default hook in case this is null
-            new StairwayHook() {
-              @Override
-              public HookAction startFlight(FlightContext context) {
-                return HookAction.FAULT;
-              }
+        (builder.stairwayHook == null) ? populateDefaultStairwayHook() : builder.stairwayHook;
+  }
 
-              @Override
-              public HookAction startStep(FlightContext context) {
-                return HookAction.FAULT;
-              }
+  public StairwayHook populateDefaultStairwayHook() {
+    return new StairwayHook() {
+      @Override
+      public HookAction startFlight(FlightContext context) {
+        return handleDeafultHook();
+      }
 
-              @Override
-              public HookAction endFlight(FlightContext context) {
-                return HookAction.FAULT;
-              }
+      @Override
+      public HookAction startStep(FlightContext context) {
+        return handleDeafultHook();
+      }
 
-              @Override
-              public HookAction endStep(FlightContext context) {
-                return HookAction.FAULT;
-              }
-            }
-            : builder.stairwayHook;
+      @Override
+      public HookAction endFlight(FlightContext context) {
+        return handleDeafultHook();
+      }
+
+      @Override
+      public HookAction endStep(FlightContext context) {
+        return handleDeafultHook();
+      }
+    };
+  }
+
+  private HookAction handleDeafultHook() {
+    logger.info("Stairway Hook not defined.");
+    return HookAction.CONTINUE;
   }
 
   /**

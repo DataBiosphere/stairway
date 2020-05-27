@@ -11,6 +11,44 @@ public class HookWrapper {
     this.stairway = stairway;
   }
 
+  public HookAction startFlight(FlightContext context) {
+    return handleHook(context, HookType.startFlight);
+  }
+
+  public HookAction endFlight(FlightContext context) {
+    return handleHook(context, HookType.endFlight);
+  }
+
+  public HookAction startStep(FlightContext context) {
+    return handleHook(context, HookType.startStep);
+  }
+
+  public HookAction endStep(FlightContext context) {
+    return handleHook(context, HookType.endStep);
+  }
+
+  private HookAction handleHook(FlightContext context, HookType type) {
+    if (stairway.getStairwayHook() == null) {
+      return HookAction.CONTINUE;
+    }
+    FlightContext contextCopy = makeCopy(context);
+    try {
+      switch (type) {
+        case startFlight:
+          return stairway.getStairwayHook().startFlight(contextCopy);
+        case endFlight:
+          return stairway.getStairwayHook().endFlight(contextCopy);
+        case startStep:
+          return stairway.getStairwayHook().startStep(contextCopy);
+        case endStep:
+          return stairway.getStairwayHook().endStep(contextCopy);
+      }
+    } catch (Exception ex) {
+      logger.info("Stairway Hook failed with exception: {}", ex);
+    }
+    return HookAction.CONTINUE;
+  }
+
   private FlightContext makeCopy(FlightContext fc) {
     FlightContext fc_new = new FlightContext(fc.getInputParameters(), fc.getFlightClassName());
     fc_new.setDirection(fc.getDirection());
@@ -23,55 +61,10 @@ public class HookWrapper {
     return fc_new;
   }
 
-  public HookAction startFlight(FlightContext context) {
-    if (stairway.getStairwayHook() == null) {
-      return HookAction.FAULT;
-    }
-    FlightContext contextCopy = makeCopy(context);
-    try {
-      return stairway.getStairwayHook().startFlight(contextCopy);
-    } catch (Exception ex) {
-      logger.info("the hook did a bad thing");
-      return HookAction.FAULT;
-    }
-  }
-
-  public HookAction endFlight(FlightContext context) {
-    if (stairway.getStairwayHook() == null) {
-      return HookAction.FAULT;
-    }
-    FlightContext contextCopy = makeCopy(context);
-    try {
-      return stairway.getStairwayHook().endFlight(contextCopy);
-    } catch (Exception ex) {
-      logger.info("the hook did a bad thing");
-      return HookAction.FAULT;
-    }
-  }
-
-  public HookAction startStep(FlightContext context) {
-    if (stairway.getStairwayHook() == null) {
-      return HookAction.FAULT;
-    }
-    FlightContext contextCopy = makeCopy(context);
-    try {
-      return stairway.getStairwayHook().startStep(contextCopy);
-    } catch (Exception ex) {
-      logger.info("the hook did a bad thing");
-      return HookAction.FAULT;
-    }
-  }
-
-  public HookAction endStep(FlightContext context) {
-    if (stairway.getStairwayHook() == null) {
-      return HookAction.FAULT;
-    }
-    FlightContext contextCopy = makeCopy(context);
-    try {
-      return stairway.getStairwayHook().endStep(contextCopy);
-    } catch (Exception ex) {
-      logger.info("the hook did a bad thing");
-      return HookAction.FAULT;
-    }
+  private enum HookType {
+    startFlight,
+    endFlight,
+    startStep,
+    endStep
   }
 }
