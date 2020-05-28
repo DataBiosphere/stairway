@@ -5,10 +5,10 @@ import org.slf4j.LoggerFactory;
 
 public class HookWrapper {
   private static final Logger logger = LoggerFactory.getLogger(HookWrapper.class);
-  private Stairway stairway;
+  private StairwayHook stairwayHook;
 
-  public HookWrapper(Stairway stairway) {
-    this.stairway = stairway;
+  public HookWrapper(StairwayHook stairwayHook) {
+    this.stairwayHook = stairwayHook;
   }
 
   public HookAction startFlight(FlightContext context) {
@@ -28,20 +28,20 @@ public class HookWrapper {
   }
 
   private HookAction handleHook(FlightContext context, HookType type) {
-    if (stairway.getStairwayHook() == null) {
+    if (stairwayHook == null) {
       return HookAction.CONTINUE;
     }
     FlightContext contextCopy = makeCopy(context);
     try {
       switch (type) {
         case startFlight:
-          return stairway.getStairwayHook().startFlight(contextCopy);
+          return stairwayHook.startFlight(contextCopy);
         case endFlight:
-          return stairway.getStairwayHook().endFlight(contextCopy);
+          return stairwayHook.endFlight(contextCopy);
         case startStep:
-          return stairway.getStairwayHook().startStep(contextCopy);
+          return stairwayHook.startStep(contextCopy);
         case endStep:
-          return stairway.getStairwayHook().endStep(contextCopy);
+          return stairwayHook.endStep(contextCopy);
       }
     } catch (Exception ex) {
       logger.info("Stairway Hook failed with exception: {}", ex);

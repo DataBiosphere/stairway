@@ -39,7 +39,7 @@ public class Stairway {
   private final int maxParallelFlights;
   private final int maxQueuedFlights;
   private boolean workQueueEnabled;
-  private StairwayHook stairwayHook;
+  private HookWrapper hookWrapper;
 
   // Initialized state
   private ThreadPoolExecutor threadPool;
@@ -201,37 +201,7 @@ public class Stairway {
     this.projectId = builder.projectId;
     this.workQueueEnabled = (projectId != null);
     this.quietingDown = new AtomicBoolean();
-    this.stairwayHook =
-        (builder.stairwayHook == null) ? populateDefaultStairwayHook() : builder.stairwayHook;
-  }
-
-  public StairwayHook populateDefaultStairwayHook() {
-    return new StairwayHook() {
-      @Override
-      public HookAction startFlight(FlightContext context) {
-        return handleDeafultHook();
-      }
-
-      @Override
-      public HookAction startStep(FlightContext context) {
-        return handleDeafultHook();
-      }
-
-      @Override
-      public HookAction endFlight(FlightContext context) {
-        return handleDeafultHook();
-      }
-
-      @Override
-      public HookAction endStep(FlightContext context) {
-        return handleDeafultHook();
-      }
-    };
-  }
-
-  private HookAction handleDeafultHook() {
-    logger.info("Stairway Hook not defined.");
-    return HookAction.CONTINUE;
+    this.hookWrapper = new HookWrapper(builder.stairwayHook);
   }
 
   /**
@@ -598,8 +568,8 @@ public class Stairway {
     return stairwayName;
   }
 
-  public StairwayHook getStairwayHook() {
-    return stairwayHook;
+  public HookWrapper getHookWrapper() {
+    return hookWrapper;
   }
 
   /** @return id of this stairway instance */

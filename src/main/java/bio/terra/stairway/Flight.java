@@ -44,8 +44,8 @@ public class Flight implements Runnable {
     steps = new LinkedList<>();
   }
 
-  public HookWrapper wrapper() {
-    return new HookWrapper(flightContext.getStairway());
+  public HookWrapper hookWrapper() {
+    return context().getStairway().getHookWrapper();
   }
 
   public FlightContext context() {
@@ -75,7 +75,7 @@ public class Flight implements Runnable {
    * direction.
    */
   public void run() {
-    wrapper().startFlight(flightContext);
+    hookWrapper().startFlight(flightContext);
     try {
       // We use flightDao all over the place, so we put it in a private to avoid passing it through
       // all of
@@ -91,7 +91,7 @@ public class Flight implements Runnable {
       logger.debug("Executing: " + context().toString());
       FlightStatus flightStatus = fly();
       flightExit(flightStatus);
-      wrapper().endFlight(flightContext);
+      hookWrapper().endFlight(flightContext);
     } catch (InterruptedException ex) {
       // Shutdown - try disowning the flight
       logger.warn("Flight interrupted: " + context().getFlightId());
@@ -234,13 +234,13 @@ public class Flight implements Runnable {
     do {
       try {
         // Do or undo based on direction we are headed
-        wrapper().startStep(flightContext);
+        hookWrapper().startStep(flightContext);
         if (context().isDoing()) {
           result = currentStep.step.doStep(context());
         } else {
           result = currentStep.step.undoStep(context());
         }
-        wrapper().endStep(flightContext);
+        hookWrapper().endStep(flightContext);
       } catch (InterruptedException ex) {
         // Interrupted exception - we assume this means that the thread pool is shutting down and
         // forcibly
