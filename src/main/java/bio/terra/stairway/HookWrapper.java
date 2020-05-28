@@ -11,6 +11,26 @@ public class HookWrapper {
     this.stairwayHook = stairwayHook;
   }
 
+  public HookAction startFlight(FlightContext flightContext) {
+    return handleHook(flightContext, context -> stairwayHook.startFlight(context));
+  }
+
+  public HookAction startStep(FlightContext flightContext) {
+    return handleHook(flightContext, context -> stairwayHook.startStep(context));
+  }
+
+  public HookAction endStep(FlightContext flightContext) {
+    return handleHook(flightContext, context -> stairwayHook.endStep(context));
+  }
+
+  public HookAction endFlight(FlightContext flightContext) {
+    return handleHook(flightContext, context -> stairwayHook.endFlight(context));
+  }
+
+  private interface HookInterface {
+    HookAction hook(FlightContext context) throws InterruptedException;
+  }
+
   private HookAction handleHook(FlightContext context, HookInterface hookMethod) {
     if (stairwayHook == null) {
       return HookAction.CONTINUE;
@@ -34,51 +54,5 @@ public class HookWrapper {
     fc_new.setResult(fc.getResult());
     fc_new.setRerun(fc.isRerun());
     return fc_new;
-  }
-
-  // Hooks
-  public HookAction startFlight(FlightContext context) {
-    return handleHook(context, new StartFlightCommand());
-  }
-
-  public HookAction startStep(FlightContext context) {
-    return handleHook(context, new StartStepCommand());
-  }
-
-  public HookAction endStep(FlightContext context) {
-    return handleHook(context, new EndStepCommand());
-  }
-
-  public HookAction endFlight(FlightContext context) {
-    return handleHook(context, new EndFlightCommand());
-  }
-
-  // Specify hook action
-  private interface HookInterface {
-    HookAction hook(FlightContext context) throws InterruptedException;
-  }
-
-  private class StartFlightCommand implements HookInterface {
-    public HookAction hook(FlightContext context) throws InterruptedException {
-      return stairwayHook.startFlight(context);
-    }
-  }
-
-  private class StartStepCommand implements HookInterface {
-    public HookAction hook(FlightContext context) throws InterruptedException {
-      return stairwayHook.startStep(context);
-    }
-  }
-
-  private class EndStepCommand implements HookInterface {
-    public HookAction hook(FlightContext context) throws InterruptedException {
-      return stairwayHook.endStep(context);
-    }
-  }
-
-  private class EndFlightCommand implements HookInterface {
-    public HookAction hook(FlightContext context) throws InterruptedException {
-      return stairwayHook.endFlight(context);
-    }
   }
 }
