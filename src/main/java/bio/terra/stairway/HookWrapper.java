@@ -11,52 +11,13 @@ public class HookWrapper {
     this.stairwayHook = stairwayHook;
   }
 
-  public HookAction startFlight(FlightContext context) {
+  private HookAction handleHook(FlightContext context, HookInterface hookMethod) {
     if (stairwayHook == null) {
       return HookAction.CONTINUE;
     }
     FlightContext contextCopy = makeCopy(context);
     try {
-      return stairwayHook.startFlight(contextCopy);
-    } catch (Exception ex) {
-      logger.info("Stairway Hook failed with exception: {}", ex);
-    }
-    return HookAction.CONTINUE;
-  }
-
-  public HookAction endFlight(FlightContext context) {
-    if (stairwayHook == null) {
-      return HookAction.CONTINUE;
-    }
-    FlightContext contextCopy = makeCopy(context);
-    try {
-      return stairwayHook.endFlight(contextCopy);
-    } catch (Exception ex) {
-      logger.info("Stairway Hook failed with exception: {}", ex);
-    }
-    return HookAction.CONTINUE;
-  }
-
-  public HookAction startStep(FlightContext context) {
-    if (stairwayHook == null) {
-      return HookAction.CONTINUE;
-    }
-    FlightContext contextCopy = makeCopy(context);
-    try {
-      return stairwayHook.startStep(contextCopy);
-    } catch (Exception ex) {
-      logger.info("Stairway Hook failed with exception: {}", ex);
-    }
-    return HookAction.CONTINUE;
-  }
-
-  public HookAction endStep(FlightContext context) {
-    if (stairwayHook == null) {
-      return HookAction.CONTINUE;
-    }
-    FlightContext contextCopy = makeCopy(context);
-    try {
-      return stairwayHook.endStep(contextCopy);
+      return hookMethod.hook(contextCopy);
     } catch (Exception ex) {
       logger.info("Stairway Hook failed with exception: {}", ex);
     }
@@ -73,5 +34,51 @@ public class HookWrapper {
     fc_new.setResult(fc.getResult());
     fc_new.setRerun(fc.isRerun());
     return fc_new;
+  }
+
+  // Hooks
+  public HookAction startFlight(FlightContext context) {
+    return handleHook(context, new StartFlightCommand());
+  }
+
+  public HookAction startStep(FlightContext context) {
+    return handleHook(context, new StartStepCommand());
+  }
+
+  public HookAction endStep(FlightContext context) {
+    return handleHook(context, new EndStepCommand());
+  }
+
+  public HookAction endFlight(FlightContext context) {
+    return handleHook(context, new EndFlightCommand());
+  }
+
+  // Specify hook action
+  private interface HookInterface {
+    HookAction hook(FlightContext context) throws InterruptedException;
+  }
+
+  private class StartFlightCommand implements HookInterface {
+    public HookAction hook(FlightContext context) throws InterruptedException {
+      return stairwayHook.startFlight(context);
+    }
+  }
+
+  private class StartStepCommand implements HookInterface {
+    public HookAction hook(FlightContext context) throws InterruptedException {
+      return stairwayHook.startStep(context);
+    }
+  }
+
+  private class EndStepCommand implements HookInterface {
+    public HookAction hook(FlightContext context) throws InterruptedException {
+      return stairwayHook.endStep(context);
+    }
+  }
+
+  private class EndFlightCommand implements HookInterface {
+    public HookAction hook(FlightContext context) throws InterruptedException {
+      return stairwayHook.endFlight(context);
+    }
   }
 }
