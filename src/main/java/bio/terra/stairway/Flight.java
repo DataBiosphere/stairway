@@ -1,18 +1,17 @@
 package bio.terra.stairway;
 
+import static bio.terra.stairway.FlightStatus.READY;
+import static bio.terra.stairway.FlightStatus.WAITING;
+
 import bio.terra.stairway.exception.DatabaseOperationException;
 import bio.terra.stairway.exception.RetryException;
 import bio.terra.stairway.exception.StairwayExecutionException;
+import java.util.LinkedList;
+import java.util.List;
 import org.apache.commons.lang3.builder.ToStringBuilder;
 import org.apache.commons.lang3.builder.ToStringStyle;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-
-import java.util.LinkedList;
-import java.util.List;
-
-import static bio.terra.stairway.FlightStatus.READY;
-import static bio.terra.stairway.FlightStatus.WAITING;
 
 /**
  * Manage the atomic execution of a series of Steps This base class has the mechanisms for executing
@@ -45,6 +44,10 @@ public class Flight implements Runnable {
     steps = new LinkedList<>();
   }
 
+  public HookWrapper hookWrapper() {
+    return context().getStairway().getHookWrapper();
+  }
+
   public FlightContext context() {
     return flightContext;
   }
@@ -72,6 +75,7 @@ public class Flight implements Runnable {
    * direction.
    */
   public void run() {
+    hookWrapper().startFlight(flightContext);
     try {
       // We use flightDao all over the place, so we put it in a private to avoid passing it through
       // all of
@@ -87,6 +91,7 @@ public class Flight implements Runnable {
       logger.debug("Executing: " + context().toString());
       FlightStatus flightStatus = fly();
       flightExit(flightStatus);
+      hookWrapper().endFlight(flightContext);
     } catch (InterruptedException ex) {
       // Shutdown - try disowning the flight
       logger.warn("Flight interrupted: " + context().getFlightId());
@@ -229,12 +234,13 @@ public class Flight implements Runnable {
     do {
       try {
         // Do or undo based on direction we are headed
+        hookWrapper().startStep(flightContext);
         if (context().isDoing()) {
           result = currentStep.step.doStep(context());
         } else {
           result = currentStep.step.undoStep(context());
         }
-
+        hookWrapper().endStep(flightContext);
       } catch (InterruptedException ex) {
         // Interrupted exception - we assume this means that the thread pool is shutting down and
         // forcibly
@@ -285,7 +291,6 @@ public class Flight implements Runnable {
       }
     } while (currentStep.retryRule
         .retrySleep()); // retry rule decides if we should try again or not
-
     return result;
   }
 
