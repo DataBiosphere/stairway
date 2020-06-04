@@ -156,9 +156,9 @@ public class Stairway {
     }
 
     /**
-     * For debugging flights and stairway, it can sometimes be useful to skip cleaning up the flightlog
-     * table at the completion of a flight. This flag can be set on Stairway create to request keeping
-     * the flightlog instead of cleaning it.
+     * For debugging flights and stairway, it can sometimes be useful to skip cleaning up the
+     * flightlog table at the completion of a flight. This flag can be set on Stairway create to
+     * request keeping the flightlog instead of cleaning it.
      *
      * @param keepFlightLog true to keep the flight log. Default is false;
      * @return this
@@ -519,10 +519,6 @@ public class Stairway {
       boolean shouldQueue)
       throws DatabaseOperationException, StairwayExecutionException, InterruptedException {
 
-    if (isQuietingDown()) {
-      throw new MakeFlightException("Stairway is shutting down and cannot accept a new flight");
-    }
-
     if (flightClass == null || inputParameters == null) {
       throw new MakeFlightException(
           "Must supply non-null flightClass and inputParameters to submit");
@@ -530,6 +526,11 @@ public class Stairway {
     Flight flight = flightFactory.makeFlight(flightClass, inputParameters, applicationContext);
     FlightContext context = flight.context();
     context.setFlightId(flightId);
+
+    if (isQuietingDown()) {
+      shouldQueue = true;
+      logger.info("Shutting down. Submitting flight to queue: " + flightId);
+    }
 
     // If we are submitting, but we don't have space available for the flight, queue it
     if (!shouldQueue && !spaceAvailable()) {
@@ -543,7 +544,10 @@ public class Stairway {
       flightDao.submit(context);
       queueFlight(context.getFlightId());
     } else {
-      // Submit directly
+      // Submit directly - not allowed if we are shutting down
+      if (isQuietingDown()) {
+        throw new MakeFlightException("Stairway is shutting down and cannot accept a new flight");
+      }
       context.setStairway(this);
       flightDao.submit(context);
       launchFlight(flight);
