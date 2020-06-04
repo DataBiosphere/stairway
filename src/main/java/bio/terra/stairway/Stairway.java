@@ -16,8 +16,6 @@ import org.slf4j.LoggerFactory;
 
 import javax.sql.DataSource;
 import java.io.IOException;
-import java.lang.reflect.Constructor;
-import java.lang.reflect.InvocationTargetException;
 import java.util.List;
 import java.util.UUID;
 import java.util.concurrent.LinkedBlockingQueue;
@@ -41,8 +39,10 @@ public class Stairway {
   private final int maxParallelFlights;
   private final int maxQueuedFlights;
   private final boolean workQueueEnabled;
-  private final ClassLoader classLoader;
+  private final boolean keepFlightLog;
   private final HookWrapper hookWrapper;
+  private final ClassLoader classLoader;
+  private final FlightFactory flightFactory;
 
   // Initialized state
   private StairwayThreadPool threadPool;
@@ -63,7 +63,9 @@ public class Stairway {
     private String projectId;
     private StairwayHook stairwayHook;
     private boolean enableWorkQueue;
+    private boolean keepFlightLog;
     private ClassLoader classLoader;
+    private FlightFactory flightFactory;
 
     /**
      * Determines the size of the thread pool used for running Stairway flights. Default is
@@ -154,15 +156,42 @@ public class Stairway {
     }
 
     /**
-     * Class loader to use for loading flights. By default, Stairway will use the class loader associated with
-     * the Stairway object itself. However, in some environments - I'm looking at you Spring - a different class
-     * loader must be used. Otherwise, Stairway is unable to properly reconstruct flight objects by class name.
+     * For debugging flights and stairway, it can sometimes be useful to skip cleaning up the flightlog
+     * table at the completion of a flight. This flag can be set on Stairway create to request keeping
+     * the flightlog instead of cleaning it.
      *
-     * @param classLoader
-     * @return
+     * @param keepFlightLog true to keep the flight log. Default is false;
+     * @return this
+     */
+    public Builder keepFlightLog(boolean keepFlightLog) {
+      this.keepFlightLog = keepFlightLog;
+      return this;
+    }
+
+    /**
+     * By default, Stairway creates Flight objects using its default class loader. Sometimes a
+     * different class loader should be used. For example, Spring uses alternate class loaders in
+     * some cases, as when devtools are being used.
+     *
+     * @param classLoader class loader to override Stairway's default loader
+     * @return this
      */
     public Builder classLoader(ClassLoader classLoader) {
       this.classLoader = classLoader;
+      return this;
+    }
+
+    /**
+     * Flight factory Stairway Flight objects need to be created by class and by name. In all known
+     * configurations, Stairway's flight factory can be used. This is an escape hatch in case we run
+     * into a configuration that requires special handling for flight creates. Specifying the class
+     * loader is simpler and covers the known cases.
+     *
+     * @param flightFactory flight factory to use
+     * @return this
+     */
+    public Builder flightFactory(FlightFactory flightFactory) {
+      this.flightFactory = flightFactory;
       return this;
     }
 
@@ -234,10 +263,16 @@ public class Stairway {
             ? "stairwaycluster" + UUID.randomUUID().toString()
             : builder.stairwayClusterName;
 
-    this.classLoader = builder.classLoader;
+    this.classLoader =
+        (builder.classLoader == null) ? this.getClass().getClassLoader() : builder.classLoader;
+
+    this.flightFactory =
+        (builder.flightFactory == null) ? new StairwayFlightFactory() : builder.flightFactory;
+
     this.applicationContext = builder.applicationContext;
     this.projectId = builder.projectId;
     this.workQueueEnabled = (projectId != null && builder.enableWorkQueue);
+    this.keepFlightLog = builder.keepFlightLog;
     this.quietingDown = new AtomicBoolean();
     this.hookWrapper = new HookWrapper(builder.stairwayHook);
   }
@@ -265,7 +300,7 @@ public class Stairway {
       throw new StairwayExecutionException("Stairway is shut down and cannot be initialized");
     }
 
-    flightDao = new FlightDao(dataSource, exceptionSerializer);
+    flightDao = new FlightDao(dataSource, exceptionSerializer, keepFlightLog);
 
     if (forceCleanStart) {
       // Drop all tables and recreate the database
@@ -492,7 +527,7 @@ public class Stairway {
       throw new MakeFlightException(
           "Must supply non-null flightClass and inputParameters to submit");
     }
-    Flight flight = makeFlight(flightClass, inputParameters);
+    Flight flight = flightFactory.makeFlight(flightClass, inputParameters, applicationContext);
     FlightContext context = flight.context();
     context.setFlightId(flightId);
 
@@ -557,9 +592,11 @@ public class Stairway {
     }
 
     Flight flight =
-        makeFlightFromName(flightContext.getFlightClassName(), flightContext.getInputParameters());
+        flightFactory.makeFlightFromName(
+            flightContext.getFlightClassName(),
+            flightContext.getInputParameters(),
+            applicationContext);
     flightContext.setStairway(this);
-    flightContext.nextStepIndex(); // position the flight to execute the next thing
     flight.setFlightContext(flightContext);
     launchFlight(flight);
 
@@ -785,63 +822,6 @@ public class Stairway {
     }
     logger.info("Launching flight " + flight.context().flightDesc());
     threadPool.submit(flight);
-  }
-
-  /*
-   * Create a Flight instance given the class name of the derived class of Flight
-   * and the input parameters.
-   *
-   * Note that you can adjust the steps you generate based on the input parameters.
-   */
-  private Flight makeFlight(Class<? extends Flight> flightClass, FlightMap inputParameters) {
-    try {
-      // Find the flightClass constructor that takes the input parameter map and
-      // use it to make the flight.
-      Constructor constructor = flightClass.getConstructor(FlightMap.class, Object.class);
-      Flight flight = (Flight) constructor.newInstance(inputParameters, applicationContext);
-      return flight;
-    } catch (InvocationTargetException
-        | NoSuchMethodException
-        | InstantiationException
-        | IllegalAccessException ex) {
-      throw new MakeFlightException("Failed to make a flight from class '" + flightClass + "'", ex);
-    }
-  }
-
-  /*
-   * Version of makeFlight that accepts the class name instead of the class object
-   * We use the class name to store and retrieve from the flightDao when we recover.
-   */
-  private Flight makeFlightFromName(String className, FlightMap inputMap) {
-    try {
-      ClassLoader useClassLoader = this.getClass().getClassLoader();
-      logger.info("Stairway class loader: " + classLoader);
-      if (classLoader != null) {
-        useClassLoader = classLoader;
-        logger.info("Builder class loader: " + classLoader);
-      }
-
-      Class<?> someClass = Class.forName(className, true, useClassLoader);
-      if (Flight.class.isAssignableFrom(someClass)) {
-        Class<? extends Flight> flightClass = (Class<? extends Flight>) someClass;
-        logger.info("flightClass class loader: " + flightClass.getClassLoader());
-        try {
-          TimeUnit.SECONDS.sleep(5);
-        } catch (InterruptedException ex) {
-          logger.debug("interrupted");
-        }
-        return makeFlight(flightClass, inputMap);
-      }
-      // Error case
-      throw new MakeFlightException(
-          "Failed to make a flight from class name '"
-              + className
-              + "' - it is not a subclass of Flight");
-
-    } catch (ClassNotFoundException ex) {
-      throw new MakeFlightException(
-          "Failed to make a flight from class name '" + className + "'", ex);
-    }
   }
 
   @Override
