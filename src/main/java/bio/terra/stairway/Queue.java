@@ -32,14 +32,15 @@ import com.google.pubsub.v1.ReceivedMessage;
 import com.google.pubsub.v1.Subscription;
 import com.google.pubsub.v1.TopicName;
 import edu.umd.cs.findbugs.annotations.SuppressFBWarnings;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.TimeUnit;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 
 /**
  * ServiceQueue implements a service-wide queue for Stairway. The initial implementation is only for
@@ -109,7 +110,6 @@ public class Queue {
         GoogleCredentialsProvider.newBuilder()
             .setScopesToApply(Collections.singletonList("https://www.googleapis.com/auth/pubsub"))
             .build();
-    logger.info("Credentials are: " + credentialsProvider);
     TopicAdminSettings topicAdminSettings =
         TopicAdminSettings.newBuilder().setCredentialsProvider(credentialsProvider).build();
     SubscriptionAdminSettings subscriptionAdminSettings =

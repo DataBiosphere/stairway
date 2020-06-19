@@ -1,9 +1,5 @@
 package bio.terra.stairway.fixtures;
 
-import static org.hamcrest.CoreMatchers.equalTo;
-import static org.hamcrest.MatcherAssert.assertThat;
-import static org.junit.jupiter.api.Assertions.assertNull;
-
 import bio.terra.stairway.FlightState;
 import bio.terra.stairway.FlightStatus;
 import bio.terra.stairway.ShortUUID;
@@ -14,12 +10,17 @@ import bio.terra.stairway.exception.MigrateException;
 import bio.terra.stairway.exception.QueueException;
 import bio.terra.stairway.exception.StairwayException;
 import bio.terra.stairway.exception.StairwayExecutionException;
-import java.util.List;
-import java.util.concurrent.TimeUnit;
-import javax.sql.DataSource;
 import org.apache.commons.dbcp2.BasicDataSource;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+
+import javax.sql.DataSource;
+import java.util.List;
+import java.util.concurrent.TimeUnit;
+
+import static org.hamcrest.CoreMatchers.equalTo;
+import static org.hamcrest.MatcherAssert.assertThat;
+import static org.junit.jupiter.api.Assertions.assertNull;
 
 public final class TestUtil {
   private static Logger logger = LoggerFactory.getLogger(TestUtil.class);
@@ -69,13 +70,7 @@ public final class TestUtil {
 
   public static Stairway setupConnectedStairway(String stairwayName, boolean continuing)
       throws Exception {
-    String projectId = getEnvVar("GOOGLE_CLOUD_PROJECT", null);
-    if (projectId == null) {
-      throw new IllegalStateException(
-          "You must have GOOGLE_CLOUD_PROJECT and "
-              + "GOOGLE_APPLICATION_CREDENTIALS envvars defined");
-    }
-    return makeStairway(stairwayName, !continuing, !continuing, projectId);
+    return makeStairway(stairwayName, !continuing, !continuing, getProjectId());
   }
 
   // Optionally pauses a flight in the middle so we can fake failures
