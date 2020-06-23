@@ -11,6 +11,15 @@ import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import bio.terra.stairway.exception.FlightNotFoundException;
+import bio.terra.stairway.fixtures.MapKey;
+import bio.terra.stairway.fixtures.TestPauseController;
+import bio.terra.stairway.fixtures.TestUtil;
+import bio.terra.stairway.flights.TestFlight;
+import bio.terra.stairway.flights.TestFlightQuietDown;
+import bio.terra.stairway.flights.TestFlightRerun;
+import bio.terra.stairway.flights.TestFlightRerunUndo;
+import bio.terra.stairway.flights.TestFlightUndo;
+import bio.terra.stairway.flights.TestFlightWait;
 import java.io.File;
 import java.io.PrintWriter;
 import java.util.UUID;
@@ -139,7 +148,7 @@ public class ScenarioTest {
     inputParameters.put(MapKey.CONTROLLER_VALUE, 1);
     inputParameters.put(MapKey.RESULT, inResult);
 
-    TestStopController.setControl(0);
+    TestPauseController.setControl(0);
     String flightId = stairway.createFlightId();
 
     stairway.submit(flightId, TestFlightQuietDown.class, inputParameters);
@@ -151,7 +160,7 @@ public class ScenarioTest {
     assertFalse(quietYet, "Not quiet yet");
 
     // Wake up the thread; it should exit into READY state
-    TestStopController.setControl(1);
+    TestPauseController.setControl(1);
     // Allow time for the flight thread to wake up and exit
     TimeUnit.SECONDS.sleep(5);
 
@@ -164,11 +173,9 @@ public class ScenarioTest {
     stairway.terminate(5, TimeUnit.SECONDS);
     stairway = null;
 
-    stairway = TestUtil.setupStairway(stairwayName, true);
-    boolean resumedFlight = stairway.resume(flightId);
-    assertTrue(resumedFlight, "successfully resumed the flight");
-    stairway.waitForFlight(flightId, null, null);
+    stairway = TestUtil.makeStairwayValidateRecovery(stairwayName, flightId);
 
+    stairway.waitForFlight(flightId, null, null);
     state = stairway.getFlightState(flightId);
     assertThat("State is success", state.getFlightStatus(), equalTo(FlightStatus.SUCCESS));
 
@@ -214,7 +221,7 @@ public class ScenarioTest {
     inputParameters.put(MapKey.CONTROLLER_VALUE, 1);
     inputParameters.put(MapKey.RESULT, inResult);
 
-    TestStopController.setControl(0);
+    TestPauseController.setControl(0);
     String flightId = stairway.createFlightId();
 
     stairway.submit(flightId, TestFlightQuietDown.class, inputParameters);
@@ -225,17 +232,12 @@ public class ScenarioTest {
     stairway.terminate(5, TimeUnit.SECONDS);
     stairway = null;
 
-    stairway = TestUtil.setupStairway(stairwayName, true);
-    FlightState state = stairway.getFlightState(flightId);
-    assertThat("State is ready", state.getFlightStatus(), equalTo(FlightStatus.READY));
-    assertNull(state.getStairwayId(), "Flight is unowned");
+    stairway = TestUtil.makeStairwayValidateRecovery(stairwayName, flightId);
 
-    boolean resumedFlight = stairway.resume(flightId);
-    assertTrue(resumedFlight, "successfully resumed the flight");
-    TestStopController.setControl(1); // wake it up
+    TestPauseController.setControl(1); // wake it up
     stairway.waitForFlight(flightId, null, null);
 
-    state = stairway.getFlightState(flightId);
+    FlightState state = stairway.getFlightState(flightId);
     assertThat("State is success", state.getFlightStatus(), equalTo(FlightStatus.SUCCESS));
 
     FlightMap resultMap = state.getResultMap().orElse(null);
@@ -275,7 +277,7 @@ public class ScenarioTest {
     inputParameters.put(MapKey.COUNTER_STOP, 3);
     inputParameters.put(MapKey.RESULT, inResult);
 
-    TestStopController.setControl(0); // have the flight sleep at COUNTER_STOP
+    TestPauseController.setControl(0); // have the flight sleep at COUNTER_STOP
     String flightId = stairway.createFlightId();
     stairway.submit(flightId, TestFlightRerun.class, inputParameters);
     // Allow time for the flight thread to go to sleep
@@ -285,17 +287,12 @@ public class ScenarioTest {
     stairway.terminate(5, TimeUnit.SECONDS);
     stairway = null;
 
-    stairway = TestUtil.setupStairway(stairwayName, true);
-    FlightState state = stairway.getFlightState(flightId);
-    assertThat("State is ready", state.getFlightStatus(), equalTo(FlightStatus.READY));
-    assertNull(state.getStairwayId(), "Flight is unowned");
+    stairway = TestUtil.makeStairwayValidateRecovery(stairwayName, flightId);
 
-    TestStopController.setControl(1); // prevent the flight from re-sleeping
-    boolean resumedFlight = stairway.resume(flightId);
-    assertTrue(resumedFlight, "successfully resumed the flight");
+    TestPauseController.setControl(1); // prevent the flight from re-sleeping
     stairway.waitForFlight(flightId, null, null);
 
-    state = stairway.getFlightState(flightId);
+    FlightState state = stairway.getFlightState(flightId);
     assertThat("State is success", state.getFlightStatus(), equalTo(FlightStatus.SUCCESS));
     FlightMap resultMap = state.getResultMap().orElse(null);
     assertNotNull(resultMap, "result map is present");
@@ -334,6 +331,9 @@ public class ScenarioTest {
       }
     }
   }
+
+  @Test
+  public void testStop() throws Exception {}
 
   private String makeExistingFile() throws Exception {
     // Generate a filename and create the file

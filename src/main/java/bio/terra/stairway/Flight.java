@@ -78,8 +78,7 @@ public class Flight implements Runnable {
     hookWrapper().startFlight(flightContext);
     try {
       // We use flightDao all over the place, so we put it in a private to avoid passing it through
-      // all of
-      // the method argument lists.
+      // all of the method argument lists.
       flightDao = context().getStairway().getFlightDao();
 
       if (context().getStairway().isQuietingDown()) {
@@ -115,6 +114,8 @@ public class Flight implements Runnable {
    */
   private FlightStatus fly() throws InterruptedException {
     try {
+      context().nextStepIndex(); // position the flight to execute the next thing
+
       // Part 1 - running forward (doing). We either succeed or we record the failure and
       // fall through to running backward (undoing)
       if (context().isDoing()) {
@@ -251,7 +252,7 @@ public class Flight implements Runnable {
         // The purpose of this catch is to relieve steps of implementing their own repetitive
         // try-catch
         // simply to turn exceptions into StepResults.
-        logger.info("Caught exception: (" + ex.toString() + ") " + context().prettyStepState());
+        logger.info("Caught exception: (" + ex.toString() + ") " + context().prettyStepState(), ex);
 
         StepStatus stepStatus =
             (ex instanceof RetryException)

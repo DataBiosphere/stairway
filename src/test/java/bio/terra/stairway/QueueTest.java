@@ -2,6 +2,7 @@ package bio.terra.stairway;
 
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
+import bio.terra.stairway.fixtures.TestUtil;
 import java.util.HashMap;
 import java.util.Map;
 import org.junit.jupiter.api.BeforeEach;
@@ -21,12 +22,7 @@ public class QueueTest {
 
   @BeforeEach
   public void setup() throws Exception {
-    String projectId = TestUtil.getEnvVar("GOOGLE_CLOUD_PROJECT", null);
-    if (projectId == null) {
-      throw new IllegalStateException(
-          "You must have GOOGLE_CLOUD_PROJECT and "
-              + "GOOGLE_APPLICATION_CREDENTIALS envvars defined");
-    }
+    String projectId = TestUtil.getProjectId();
     workQueue = new Queue(null, projectId, subscriptionId, topicId);
     workQueue.purgeQueue();
   }

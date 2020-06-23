@@ -5,9 +5,9 @@ import java.time.LocalDateTime;
 import java.util.concurrent.TimeUnit;
 
 public class RetryRuleExponentialBackoff implements RetryRule {
-  private long initialIntervalSeconds;
-  private long maxIntervalSeconds;
-  private long maxOperationTimeSeconds;
+  private final long initialIntervalSeconds;
+  private final long maxIntervalSeconds;
+  private final long maxOperationTimeSeconds;
 
   private LocalDateTime endTime;
   private long intervalSeconds;

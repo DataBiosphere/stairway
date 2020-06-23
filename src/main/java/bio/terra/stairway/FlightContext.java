@@ -9,16 +9,14 @@ import org.apache.commons.lang3.builder.ToStringBuilder;
 public class FlightContext {
   private Stairway stairway; // the stairway instance running this flight
   private String flightId; // unique id for the flight
-  private String
-      flightClassName; // class name of the flight; sufficient for recreating the flight object
+  private String flightClassName; // class name of the flight;  for recreating the flight object
   private FlightMap inputParameters; // allows for reconstructing the flight; set unmodifiable
   private FlightMap workingMap; // open-ended state used by the steps
   private int stepIndex; // what step we are on
   private boolean rerun; // true - rerun the current step
   private Direction direction;
   private StepResult result; // current step status
-  private FlightStatus
-      flightStatus; // Status: RUNNING while the flight is running; SUCCESS/FAILED when it completes
+  private FlightStatus flightStatus;
 
   // Construct the context with defaults
   public FlightContext(FlightMap inputParameters, String flightClassName) {
@@ -27,7 +25,7 @@ public class FlightContext {
     this.flightClassName = flightClassName;
     this.workingMap = new FlightMap();
     this.stepIndex = 0;
-    this.direction = Direction.DO;
+    this.direction = Direction.START;
     this.result = StepResult.getStepResultSuccess();
     this.flightStatus = FlightStatus.RUNNING;
   }
@@ -88,7 +86,7 @@ public class FlightContext {
   }
 
   public boolean isDoing() {
-    return (direction == Direction.DO);
+    return (direction == Direction.DO || direction == Direction.START);
   }
 
   public StepResult getResult() {
@@ -114,6 +112,10 @@ public class FlightContext {
   public void nextStepIndex() {
     if (!isRerun()) {
       switch (getDirection()) {
+        case START:
+          stepIndex = 0;
+          setDirection(Direction.DO);
+          break;
         case DO:
           stepIndex++;
           break;
