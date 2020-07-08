@@ -80,7 +80,7 @@ public class RecoveryTest {
         Stairway.newBuilder()
             .stairwayClusterName("stairway-cluster")
             .stairwayName(stairwayName)
-            .projectId(null)
+            .workQueueProjectId(null)
             .maxParallelFlights(2)
             .build();
     List<String> recordedStairways = stairway2.initialize(dataSource, false, false);

@@ -5,6 +5,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 import bio.terra.stairway.fixtures.TestUtil;
 import java.util.HashMap;
 import java.util.Map;
+import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
@@ -19,12 +20,20 @@ public class QueueTest {
   private static final String topicId = "queueTest-queue";
 
   private Queue workQueue;
+  private String projectId;
 
   @BeforeEach
   public void setup() throws Exception {
-    String projectId = TestUtil.getProjectId();
-    workQueue = new Queue(null, projectId, subscriptionId, topicId);
+    projectId = TestUtil.getProjectId();
+    QueueCreate.makeTopic(projectId, topicId);
+    QueueCreate.makeSubscription(projectId, topicId, subscriptionId);
+    workQueue = new Queue(null, projectId, topicId, subscriptionId);
     workQueue.purgeQueue();
+  }
+
+  @AfterEach
+  public void teardown() throws Exception {
+    //    QueueCreate.deleteQueue(projectId, topicId, subscriptionId);
   }
 
   private Map<String, Boolean> messages;
@@ -60,7 +69,7 @@ public class QueueTest {
 
   @Test
   public void deleteTest() throws Exception {
-    workQueue.deleteQueue();
+    QueueCreate.deleteQueue(projectId, topicId, subscriptionId);
   }
 
   public Boolean simpleMessageProcessor(String message, Stairway stairway) {

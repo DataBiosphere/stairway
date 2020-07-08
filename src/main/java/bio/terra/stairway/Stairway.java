@@ -34,14 +34,15 @@ public class Stairway {
   private final Object applicationContext;
   private final ExceptionSerializer exceptionSerializer;
   private final String stairwayName;
-  private final String stairwayClusterName;
-  private final String projectId;
+  private final String workQueueProjectId;
+  private final String workQueueTopicId;
+  private final String workQueueSubscriptionId;
+  private final boolean workQueueCreate;
   private final int maxParallelFlights;
   private final int maxQueuedFlights;
   private final boolean workQueueEnabled;
   private final boolean keepFlightLog;
   private final HookWrapper hookWrapper;
-  private final ClassLoader classLoader;
   private final FlightFactory flightFactory;
 
   // Initialized state
@@ -50,7 +51,6 @@ public class Stairway {
   private final AtomicBoolean quietingDown;
   private FlightDao flightDao;
   private Queue workQueue;
-  private WorkQueueListener workQueueListener;
   private Thread workQueueListenerThread;
 
   public static class Builder {
@@ -60,12 +60,13 @@ public class Stairway {
     private ExceptionSerializer exceptionSerializer;
     private String stairwayName;
     private String stairwayClusterName;
-    private String projectId;
     private StairwayHook stairwayHook;
     private boolean enableWorkQueue;
     private boolean keepFlightLog;
-    private ClassLoader classLoader;
     private FlightFactory flightFactory;
+    private String workQueueProjectId;
+    private String workQueueTopicId;
+    private String workQueueSubscriptionId;
 
     /**
      * Determines the size of the thread pool used for running Stairway flights. Default is
@@ -141,15 +142,12 @@ public class Stairway {
     }
 
     /**
-     * @param projectId Google projectId to create the Stairway work queue. If null, no queuing will
-     *     be done.
+     * You must explicitly enable the work queue when running in a cluster configuration. That
+     * allows for testing where a work queue is not used or created.
+     *
+     * @param enableWorkQueue said true to enable the work queue
      * @return this
      */
-    public Builder projectId(String projectId) {
-      this.projectId = projectId;
-      return this;
-    }
-
     public Builder enableWorkQueue(boolean enableWorkQueue) {
       this.enableWorkQueue = enableWorkQueue;
       return this;
@@ -165,19 +163,6 @@ public class Stairway {
      */
     public Builder keepFlightLog(boolean keepFlightLog) {
       this.keepFlightLog = keepFlightLog;
-      return this;
-    }
-
-    /**
-     * By default, Stairway creates Flight objects using its default class loader. Sometimes a
-     * different class loader should be used. For example, Spring uses alternate class loaders in
-     * some cases, as when devtools are being used.
-     *
-     * @param classLoader class loader to override Stairway's default loader
-     * @return this
-     */
-    public Builder classLoader(ClassLoader classLoader) {
-      this.classLoader = classLoader;
       return this;
     }
 
@@ -206,11 +191,47 @@ public class Stairway {
     }
 
     /**
+     * Specify the project id in which to find/create the work queue topic and subscription If not
+     * supplied, no queue will be used.
+     *
+     * @param workQueueProjectId a goggle project id
+     * @return this
+     */
+    public Builder workQueueProjectId(String workQueueProjectId) {
+      this.workQueueProjectId = workQueueProjectId;
+      return this;
+    }
+
+    /**
+     * Specify the topic id of the work queue. if no id is supplied, then a topic and subscription
+     * will be created based on the cluster name.
+     *
+     * @param workQueueTopicId the name of the topic to use in the work queue project
+     * @return this
+     */
+    public Builder workQueueTopicId(String workQueueTopicId) {
+      this.workQueueTopicId = workQueueTopicId;
+      return this;
+    }
+
+    /**
+     * Specify these subscription id for the work queue. If the topic id is not supplied, then this
+     * parameter is ignored. If the topic id is supplied, then this parameter it must be supplied.
+     *
+     * @param workQueueSubscriptionId the name of the subscription to use in the work queue project
+     * @return this
+     */
+    public Builder workQueueSubscriptionId(String workQueueSubscriptionId) {
+      this.workQueueSubscriptionId = workQueueSubscriptionId;
+      return this;
+    }
+
+    /**
      * Construct a Stairway instance based on the builder inputs
      *
      * @return Stairway
      */
-    public Stairway build() {
+    public Stairway build() throws StairwayExecutionException {
       return new Stairway(this);
     }
   }
@@ -235,7 +256,7 @@ public class Stairway {
    *
    * @param builder Builder input
    */
-  public Stairway(Stairway.Builder builder) {
+  public Stairway(Stairway.Builder builder) throws StairwayExecutionException {
     this.maxParallelFlights =
         (builder.maxParallelFlights == null)
             ? DEFAULT_MAX_PARALLEL_FLIGHTS
@@ -258,20 +279,37 @@ public class Stairway {
             ? "stairway" + UUID.randomUUID().toString()
             : builder.stairwayName;
 
-    this.stairwayClusterName =
+    String stairwayClusterName =
         (builder.stairwayClusterName == null)
             ? "stairwaycluster" + UUID.randomUUID().toString()
             : builder.stairwayClusterName;
 
-    this.classLoader =
-        (builder.classLoader == null) ? this.getClass().getClassLoader() : builder.classLoader;
-
     this.flightFactory =
         (builder.flightFactory == null) ? new StairwayFlightFactory() : builder.flightFactory;
 
+    this.workQueueProjectId = builder.workQueueProjectId;
+    this.workQueueEnabled = (workQueueProjectId != null && builder.enableWorkQueue);
+    if (!workQueueEnabled) {
+      workQueueCreate = false;
+      this.workQueueTopicId = null;
+      this.workQueueSubscriptionId = null;
+    } else {
+      if (builder.workQueueTopicId == null) {
+        workQueueCreate = true;
+        this.workQueueTopicId = stairwayClusterName + "-workqueue";
+        this.workQueueSubscriptionId = stairwayClusterName + "-workqueue-sub";
+      } else {
+        workQueueCreate = false;
+        this.workQueueTopicId = builder.workQueueTopicId;
+        this.workQueueSubscriptionId = builder.workQueueSubscriptionId;
+        if (workQueueSubscriptionId == null) {
+          throw new StairwayExecutionException(
+              "subscription id must be specified if topic id is specified");
+        }
+      }
+    }
+
     this.applicationContext = builder.applicationContext;
-    this.projectId = builder.projectId;
-    this.workQueueEnabled = (projectId != null && builder.enableWorkQueue);
     this.keepFlightLog = builder.keepFlightLog;
     this.quietingDown = new AtomicBoolean();
     this.hookWrapper = new HookWrapper(builder.stairwayHook);
@@ -368,11 +406,13 @@ public class Stairway {
       return; // no work queue for you!
     }
 
-    String topicId = stairwayClusterName + "-workqueue";
-    String subscriptionId = stairwayClusterName + "-workqueue-sub";
-
     try {
-      workQueue = new Queue(this, projectId, topicId, subscriptionId);
+      if (workQueueCreate) {
+        QueueCreate.makeTopic(workQueueProjectId, workQueueTopicId);
+        QueueCreate.makeSubscription(workQueueProjectId, workQueueTopicId, workQueueSubscriptionId);
+      }
+
+      workQueue = new Queue(this, workQueueProjectId, workQueueTopicId, workQueueSubscriptionId);
       if (forceClean) {
         workQueue.purgeQueue();
       }
@@ -385,7 +425,7 @@ public class Stairway {
     if (!workQueueEnabled) {
       return;
     }
-    workQueueListener = new WorkQueueListener(this, workQueue);
+    WorkQueueListener workQueueListener = new WorkQueueListener(this, workQueue);
     workQueueListenerThread = new Thread(workQueueListener);
     workQueueListenerThread.start();
   }

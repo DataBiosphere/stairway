@@ -165,8 +165,9 @@ class FlightDao {
     try (Connection connection = dataSource.getConnection()) {
       startReadOnlyTransaction(connection);
 
-      try (NamedParameterPreparedStatement instanceStatement = new NamedParameterPreparedStatement(connection, sql);
-           ResultSet rs = instanceStatement.getPreparedStatement().executeQuery()) {
+      try (NamedParameterPreparedStatement instanceStatement =
+              new NamedParameterPreparedStatement(connection, sql);
+          ResultSet rs = instanceStatement.getPreparedStatement().executeQuery()) {
         while (rs.next()) {
           instanceList.add(rs.getString("stairway_name"));
         }

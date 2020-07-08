@@ -9,19 +9,12 @@ package bio.terra.stairway;
 
 import bio.terra.stairway.exception.StairwayExecutionException;
 import com.google.api.core.ApiFuture;
-import com.google.api.gax.core.GoogleCredentialsProvider;
-import com.google.api.gax.rpc.AlreadyExistsException;
 import com.google.api.gax.rpc.DeadlineExceededException;
 import com.google.cloud.pubsub.v1.Publisher;
-import com.google.cloud.pubsub.v1.SubscriptionAdminClient;
-import com.google.cloud.pubsub.v1.SubscriptionAdminSettings;
-import com.google.cloud.pubsub.v1.TopicAdminClient;
-import com.google.cloud.pubsub.v1.TopicAdminSettings;
 import com.google.cloud.pubsub.v1.stub.GrpcSubscriberStub;
 import com.google.cloud.pubsub.v1.stub.SubscriberStub;
 import com.google.cloud.pubsub.v1.stub.SubscriberStubSettings;
 import com.google.protobuf.ByteString;
-import com.google.protobuf.Duration;
 import com.google.pubsub.v1.AcknowledgeRequest;
 import com.google.pubsub.v1.ProjectSubscriptionName;
 import com.google.pubsub.v1.ProjectTopicName;
@@ -29,18 +22,14 @@ import com.google.pubsub.v1.PubsubMessage;
 import com.google.pubsub.v1.PullRequest;
 import com.google.pubsub.v1.PullResponse;
 import com.google.pubsub.v1.ReceivedMessage;
-import com.google.pubsub.v1.Subscription;
-import com.google.pubsub.v1.TopicName;
 import edu.umd.cs.findbugs.annotations.SuppressFBWarnings;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
-
 import java.io.IOException;
 import java.util.ArrayList;
-import java.util.Collections;
 import java.util.List;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.TimeUnit;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 /**
  * ServiceQueue implements a service-wide queue for Stairway. The initial implementation is only for
@@ -77,9 +66,6 @@ public class Queue {
     this.subscriptionId = subscriptionId;
     subscriptionName = ProjectSubscriptionName.format(projectId, subscriptionId);
 
-    // Create the topic and subscription
-    maybeCreateTopicAndSubscription();
-
     // Setup the publisher
     ProjectTopicName topicName = ProjectTopicName.of(projectId, topicId);
     publisher = Publisher.newBuilder(topicName).build();
@@ -95,51 +81,6 @@ public class Queue {
     subscriberStub = GrpcSubscriberStub.create(subscriberStubSettings);
 
     this.stairway = stairway;
-  }
-
-  // Create a topic and a subscription, if it doesn't exist
-  private void maybeCreateTopicAndSubscription() throws IOException {
-    logger.info("Start maybeCreateTopicAndSubscription");
-    ProjectSubscriptionName subscriptionName =
-        ProjectSubscriptionName.of(projectId, subscriptionId);
-    logger.info("Construct topic name");
-    TopicName topicName = TopicName.ofProjectTopicName(projectId, topicId);
-
-    logger.info("Construct credentials");
-    GoogleCredentialsProvider credentialsProvider =
-        GoogleCredentialsProvider.newBuilder()
-            .setScopesToApply(Collections.singletonList("https://www.googleapis.com/auth/pubsub"))
-            .build();
-    TopicAdminSettings topicAdminSettings =
-        TopicAdminSettings.newBuilder().setCredentialsProvider(credentialsProvider).build();
-    SubscriptionAdminSettings subscriptionAdminSettings =
-        SubscriptionAdminSettings.newBuilder().setCredentialsProvider(credentialsProvider).build();
-
-    logger.info("Try to create the topic");
-    try (TopicAdminClient topicAdminClient = TopicAdminClient.create(topicAdminSettings)) {
-      topicAdminClient.createTopic(topicName);
-      logger.info("Created topic: " + topicId);
-    } catch (AlreadyExistsException ex) {
-      logger.info("Topic already exists: " + topicId);
-    }
-
-    logger.info("Try to create the subscription");
-    try (SubscriptionAdminClient subscriptionAdminClient =
-        SubscriptionAdminClient.create(subscriptionAdminSettings)) {
-      Subscription request =
-          Subscription.newBuilder()
-              .setName(subscriptionName.toString())
-              .setTopic(topicName.toString())
-              .setAckDeadlineSeconds(ACK_DEADLINE_SECONDS)
-              .setMessageRetentionDuration(
-                  Duration.newBuilder().setSeconds(MESSAGE_RETENTION_SECONDS))
-              .build();
-
-      subscriptionAdminClient.createSubscription(request);
-      logger.info("Created subscription: " + subscriptionId);
-    } catch (AlreadyExistsException ex) {
-      logger.info("Subscription already exists: " + subscriptionId);
-    }
   }
 
   @Override
@@ -266,23 +207,6 @@ public class Queue {
                 .build();
         subscriberStub.acknowledgeCallable().call(acknowledgeRequest);
       }
-    }
-  }
-
-  public void deleteQueue() {
-    TopicName topicName = TopicName.ofProjectTopicName(projectId, topicId);
-
-    try (TopicAdminClient topicAdminClient = TopicAdminClient.create()) {
-      topicAdminClient.deleteTopic(topicName);
-    } catch (IOException ex) {
-      logger.warn("Failed to delete topic: " + topicName, ex);
-    }
-
-    try (SubscriptionAdminClient subscriptionAdminClient = SubscriptionAdminClient.create()) {
-      ProjectSubscriptionName subscription = ProjectSubscriptionName.of(projectId, subscriptionId);
-      subscriptionAdminClient.deleteSubscription(subscription);
-    } catch (IOException ex) {
-      logger.warn("Failed to delete subscription: " + subscriptionName, ex);
     }
   }
 }

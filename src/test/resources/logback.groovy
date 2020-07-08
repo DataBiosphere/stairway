@@ -15,7 +15,7 @@ appender("Console-Appender", ConsoleAppender) {
 }
 // Appender that sends to a file
 appender("File-Appender", FileAppender) {
-    file = "${LOG_PATH}/datarepo.log"
+    file = "${LOG_PATH}/stairway.log"
     encoder(PatternLayoutEncoder) {
         pattern = "%date %-5level [%thread]: %message%n"
         outputPatternAsHeader = true
