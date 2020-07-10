@@ -1,15 +1,17 @@
 package bio.terra.stairway;
 
-import static org.junit.jupiter.api.Assertions.assertTrue;
-
 import bio.terra.stairway.fixtures.TestUtil;
-import java.util.HashMap;
-import java.util.Map;
+import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+
+import java.util.HashMap;
+import java.util.Map;
+
+import static org.junit.jupiter.api.Assertions.assertTrue;
 
 @Tag("connected")
 public class QueueTest {
@@ -19,12 +21,20 @@ public class QueueTest {
   private static final String topicId = "queueTest-queue";
 
   private Queue workQueue;
+  private String projectId;
 
   @BeforeEach
   public void setup() throws Exception {
-    String projectId = TestUtil.getProjectId();
-    workQueue = new Queue(null, projectId, subscriptionId, topicId);
+    projectId = TestUtil.getProjectId();
+    QueueCreate.makeTopic(projectId, topicId);
+    QueueCreate.makeSubscription(projectId, topicId, subscriptionId);
+    workQueue = new Queue(null, projectId, topicId, subscriptionId);
     workQueue.purgeQueue();
+  }
+
+  @AfterEach
+  public void teardown() throws Exception {
+    QueueCreate.deleteQueue(projectId, topicId, subscriptionId);
   }
 
   private Map<String, Boolean> messages;
@@ -51,16 +61,11 @@ public class QueueTest {
     workQueue.dispatchMessages(2, this::simpleMessageProcessor);
 
     for (Map.Entry<String, Boolean> entry : messages.entrySet()) {
-      Boolean seen = (Boolean) entry.getValue();
-      String message = (String) entry.getKey();
+      Boolean seen = entry.getValue();
+      String message = entry.getKey();
       logger.info("Saw value for " + message);
       assertTrue(seen, "saw value for " + message);
     }
-  }
-
-  @Test
-  public void deleteTest() throws Exception {
-    workQueue.deleteQueue();
   }
 
   public Boolean simpleMessageProcessor(String message, Stairway stairway) {
