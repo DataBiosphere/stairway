@@ -2,7 +2,7 @@ name: version bump
 on:
   push:
     branches:
-      - master
+      - jh-DR-967-auto-version
 jobs:
   update_image:
     strategy:
@@ -13,7 +13,7 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v2
         with:
-          ref: master
+          ref: jh-DR-967-auto-version
       - name: "Bump the tag to a new version"
         uses: broadinstitute/datarepo-actions@0.8.1
         with:
