@@ -24,4 +24,5 @@ jobs:
           secret_id: not_used
           version_file_path: build.gradle
           version_variable_name: version
+          release_branches: jh-DR-967-auto-version
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
