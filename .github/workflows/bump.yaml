@@ -1,0 +1,34 @@
+name: version bump
+on:
+  push:
+    branches:
+      - master
+jobs:
+  update_image:
+    strategy:
+      matrix:
+        os: [ubuntu-latest]
+    runs-on: ${{ matrix.os }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v2
+        with:
+          ref: master
+      - name: "Bump the tag to a new version"
+        uses: broadinstitute/datarepo-actions@0.8.1
+        with:
+          actions_subcommand: 'bumper'
+          # TODO: this subcommand does not need a vault token but it will fail
+          # if one of these role_id or secret_id inputs isn't present
+          role_id: not_used
+          secret_id: not_used
+          version_file_path: build.gradle
+          version_variable_name: version
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      - name: "Publish to Artifactory"
+        uses: broadinstitute/gradle-command-action@v1
+        with:
+          arguments: artifactoryPublish
+        env:
+          ARTIFACTORY_USER: ${{ secrets.ARTIFACTORY_USER }}
+          ARTIFACTORY_PASSWORD: ${{ secrets.ARTIFACTORY_PASSWORD }}
