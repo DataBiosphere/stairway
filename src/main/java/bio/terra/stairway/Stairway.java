@@ -230,6 +230,7 @@ public class Stairway {
      * Construct a Stairway instance based on the builder inputs
      *
      * @return Stairway
+     * @throws StairwayExecutionException on invalid input
      */
     public Stairway build() throws StairwayExecutionException {
       return new Stairway(this);
@@ -254,7 +255,8 @@ public class Stairway {
    * how recovery went. They get first crack at the resources. Then submissions from the API and the
    * Work Queue are enabled.
    *
-   * @param builder Builder input
+   * @param builder Builder input!
+   * @throws StairwayExecutionException on invalid input
    */
   public Stairway(Stairway.Builder builder) throws StairwayExecutionException {
     this.maxParallelFlights =
@@ -288,18 +290,24 @@ public class Stairway {
         (builder.flightFactory == null) ? new StairwayFlightFactory() : builder.flightFactory;
 
     this.workQueueProjectId = builder.workQueueProjectId;
-    this.workQueueEnabled = (workQueueProjectId != null && builder.enableWorkQueue);
+    this.workQueueEnabled = builder.enableWorkQueue;
+    if (workQueueProjectId == null && workQueueEnabled) {
+      throw new StairwayExecutionException(
+          "project id must be specified if it enable work queue is requested");
+    }
     if (!workQueueEnabled) {
+      // work queue is not requested so we do not create one
       workQueueCreate = false;
       this.workQueueTopicId = null;
       this.workQueueSubscriptionId = null;
     } else {
-      if (builder.workQueueTopicId == null) {
-        workQueueCreate = true;
+      // work queue is requested. if we have to create it we build name based on the
+      // cluster name.
+      workQueueCreate = (builder.workQueueTopicId == null);
+      if (workQueueCreate) {
         this.workQueueTopicId = stairwayClusterName + "-workqueue";
         this.workQueueSubscriptionId = stairwayClusterName + "-workqueue-sub";
       } else {
-        workQueueCreate = false;
         this.workQueueTopicId = builder.workQueueTopicId;
         this.workQueueSubscriptionId = builder.workQueueSubscriptionId;
         if (workQueueSubscriptionId == null) {

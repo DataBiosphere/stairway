@@ -383,7 +383,8 @@ class FlightDao {
 
         startTransaction(connection);
         statement.setString("stairwayId", stairwayId);
-        statement.getPreparedStatement().executeUpdate();
+        int disownCount = statement.getPreparedStatement().executeUpdate();
+        logger.info("Disowned " + disownCount + " flights for stairway: " + stairwayId);
 
         deleteStatement.setString("stairwayId", stairwayId);
         deleteStatement.getPreparedStatement().executeUpdate();
@@ -418,13 +419,14 @@ class FlightDao {
         NamedParameterPreparedStatement statement =
             new NamedParameterPreparedStatement(connection, sql)) {
 
-      startReadOnlyTransaction(connection);
+      startTransaction(connection);
 
       try (ResultSet rs = statement.getPreparedStatement().executeQuery()) {
         while (rs.next()) {
           flightList.add(rs.getString("flightid"));
         }
       }
+      logger.info("Found ready flights: " + flightList.size());
 
       commitTransaction(connection);
     } catch (SQLException ex) {
