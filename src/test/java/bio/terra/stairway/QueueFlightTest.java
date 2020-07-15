@@ -1,20 +1,21 @@
 package bio.terra.stairway;
 
-import static org.hamcrest.CoreMatchers.equalTo;
-import static org.hamcrest.MatcherAssert.assertThat;
-import static org.junit.jupiter.api.Assertions.assertNotNull;
-
 import bio.terra.stairway.fixtures.MapKey;
 import bio.terra.stairway.fixtures.TestPauseController;
 import bio.terra.stairway.fixtures.TestUtil;
 import bio.terra.stairway.flights.TestFlightControlledSleep;
-import java.util.List;
-import java.util.concurrent.TimeUnit;
-import javax.sql.DataSource;
 import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+
+import javax.sql.DataSource;
+import java.util.List;
+import java.util.concurrent.TimeUnit;
+
+import static org.hamcrest.CoreMatchers.equalTo;
+import static org.hamcrest.MatcherAssert.assertThat;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
 
 @Tag("connected")
 public class QueueFlightTest {

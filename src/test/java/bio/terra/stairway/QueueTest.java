@@ -1,7 +1,5 @@
 package bio.terra.stairway;
 
-import static org.junit.jupiter.api.Assertions.assertTrue;
-
 import bio.terra.stairway.fixtures.TestUtil;
 import java.util.HashMap;
 import java.util.Map;
@@ -11,6 +9,8 @@ import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+
+import static org.junit.jupiter.api.Assertions.assertTrue;
 
 @Tag("connected")
 public class QueueTest {
