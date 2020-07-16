@@ -419,6 +419,9 @@ class FlightDao {
         NamedParameterPreparedStatement statement =
             new NamedParameterPreparedStatement(connection, sql)) {
 
+      // My concern, maybe unfounded, is that the snapshot transaction would be reading out of date data,
+      // because there would be too many other transactions writing to the table. Making this a serialized
+      // transaction makes sure that the read transaction is ordered with the write transactions.
       startTransaction(connection);
 
       try (ResultSet rs = statement.getPreparedStatement().executeQuery()) {
