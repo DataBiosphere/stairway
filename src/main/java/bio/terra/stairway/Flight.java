@@ -1,17 +1,18 @@
 package bio.terra.stairway;
 
-import static bio.terra.stairway.FlightStatus.READY;
-import static bio.terra.stairway.FlightStatus.WAITING;
-
 import bio.terra.stairway.exception.DatabaseOperationException;
 import bio.terra.stairway.exception.RetryException;
 import bio.terra.stairway.exception.StairwayExecutionException;
-import java.util.LinkedList;
-import java.util.List;
 import org.apache.commons.lang3.builder.ToStringBuilder;
 import org.apache.commons.lang3.builder.ToStringStyle;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+
+import java.util.LinkedList;
+import java.util.List;
+
+import static bio.terra.stairway.FlightStatus.READY;
+import static bio.terra.stairway.FlightStatus.WAITING;
 
 /**
  * Manage the atomic execution of a series of Steps This base class has the mechanisms for executing
@@ -154,6 +155,10 @@ public class Flight implements Runnable {
       // Dismal failure - undo failed!
       context().setResult(undoResult);
 
+    } catch (InterruptedException ex) {
+      // Interrupted exception - we assume this means that the thread pool is shutting down and
+      // forcibly stopping all threads. We propagate the exception.
+      throw ex;
     } catch (Exception ex) {
       logger.error("Unhandled flight exception", ex);
       context().setResult(new StepResult(StepStatus.STEP_RESULT_FAILURE_FATAL, ex));
@@ -244,14 +249,11 @@ public class Flight implements Runnable {
         hookWrapper().endStep(flightContext);
       } catch (InterruptedException ex) {
         // Interrupted exception - we assume this means that the thread pool is shutting down and
-        // forcibly
-        // stopping all threads. We treat this as a STOP.
-        result = new StepResult(StepStatus.STEP_RESULT_STOP);
-
+        // forcibly stopping all threads. We propagate the exception.
+        throw ex;
       } catch (Exception ex) {
         // The purpose of this catch is to relieve steps of implementing their own repetitive
-        // try-catch
-        // simply to turn exceptions into StepResults.
+        // try-catch simply to turn exceptions into StepResults.
         logger.info("Caught exception: (" + ex.toString() + ") " + context().prettyStepState(), ex);
 
         StepStatus stepStatus =

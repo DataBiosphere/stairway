@@ -383,7 +383,8 @@ class FlightDao {
 
         startTransaction(connection);
         statement.setString("stairwayId", stairwayId);
-        statement.getPreparedStatement().executeUpdate();
+        int disownCount = statement.getPreparedStatement().executeUpdate();
+        logger.info("Disowned " + disownCount + " flights for stairway: " + stairwayId);
 
         deleteStatement.setString("stairwayId", stairwayId);
         deleteStatement.getPreparedStatement().executeUpdate();
@@ -418,13 +419,17 @@ class FlightDao {
         NamedParameterPreparedStatement statement =
             new NamedParameterPreparedStatement(connection, sql)) {
 
-      startReadOnlyTransaction(connection);
+      // My concern, maybe unfounded, is that the snapshot transaction would be reading out of date data,
+      // because there would be too many other transactions writing to the table. Making this a serialized
+      // transaction makes sure that the read transaction is ordered with the write transactions.
+      startTransaction(connection);
 
       try (ResultSet rs = statement.getPreparedStatement().executeQuery()) {
         while (rs.next()) {
           flightList.add(rs.getString("flightid"));
         }
       }
+      logger.info("Found ready flights: " + flightList.size());
 
       commitTransaction(connection);
     } catch (SQLException ex) {
