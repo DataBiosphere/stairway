@@ -194,7 +194,19 @@ Stairway's `RetryException`, then we will treat it as if you had returned a `STE
 it is treated as if you had returned a `STEP_RESULT_FAILURE_FATAL`. 
 
 # Developing Stairway
- 
+
+## Branching and Versioning
+There are two branches of interest in the stairway github. The **master** branch is used for distributing code
+for other components to consume for alpha, staging, and production. It is published to the `libs-release-local`
+repository inside of artifactory. It always has simple semantic version numbers: _major_._minor_._patch_
+
+The **develop** branch is used for developing code. The results need to be published in order to properly test
+Stairway, should not be used for any production purposes. Is published to the `libs-snapshot-local` repository 
+inside of artifactory. It has a semantic version number and the word snapshot:  _major_._minor_._patch_-SNAPSHOT
+
+The versions are related by convention. The develop version is typically a minor or major increment ahead
+of the master version.
+
 ## Testing
 
 The Stairway project has unit tests. Running the unit tests requires some configuration:
