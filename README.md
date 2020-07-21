@@ -146,7 +146,8 @@ and starts accepting flights from the Stairway API and from the Work Queue, if e
 Stairway provides a set of library calls for flight submission, status check, and waiting for completion.
 These calls all run on the calling thread.
 
-**LIES and MORE LIES - this needs to be rewritten**
+
+_LIES and MORE LIES - this needs to be rewritten_
 
 The application provides a thread pool to Stairway on construction. The application to decide the thread
 allocation model. When a flight is submitted, it is run using a thread from the provided pool.
