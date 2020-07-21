@@ -41,7 +41,7 @@ public class RetryRuleRandomBackoff implements RetryRule {
 
     int sleepUnits = ThreadLocalRandom.current().nextInt(0, maxConcurrency);
     TimeUnit.MILLISECONDS.sleep(sleepUnits * operationIncrementMilliseconds);
-
+    retryCount++;
     return true;
   }
 }
