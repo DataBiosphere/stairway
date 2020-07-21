@@ -147,7 +147,7 @@ Stairway provides a set of library calls for flight submission, status check, an
 These calls all run on the calling thread.
 
 
-_LIES and MORE LIES - this needs to be rewritten_
+_LIES, LIES and MORE LIES - this needs to be rewritten_
 
 The application provides a thread pool to Stairway on construction. The application to decide the thread
 allocation model. When a flight is submitted, it is run using a thread from the provided pool.
