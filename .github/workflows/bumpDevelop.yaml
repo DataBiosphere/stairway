@@ -25,6 +25,8 @@ jobs:
           version_file_path: build.gradle
           version_variable_name: version
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        env:
+          INITIAL_VERSION: "0.0.16"
       - name: "Publish to Artifactory"
         uses: broadinstitute/gradle-command-action@v1
         with:
