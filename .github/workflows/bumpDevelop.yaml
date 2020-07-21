@@ -13,7 +13,7 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v2
         with:
-          ref: master
+          ref: develop
       - name: "Bump the tag to a new version"
         uses: broadinstitute/datarepo-actions@0.8.1
         with:
