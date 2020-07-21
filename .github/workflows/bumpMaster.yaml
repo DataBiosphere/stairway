@@ -1,4 +1,4 @@
-name: version bump
+2name: version bump
 on:
   push:
     branches:
@@ -23,7 +23,7 @@ jobs:
           role_id: not_used
           secret_id: not_used
           version_file_path: build.gradle
-          version_variable_name: version
+          version_variable_name: masterVersion
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
       - name: "Publish to Artifactory"
         uses: broadinstitute/gradle-command-action@v1
@@ -32,3 +32,4 @@ jobs:
         env:
           ARTIFACTORY_USER: ${{ secrets.ARTIFACTORY_USER }}
           ARTIFACTORY_PASSWORD: ${{ secrets.ARTIFACTORY_PASSWORD }}
+          ARTIFACTORY_REPO_KEY: "libs-release-local"
