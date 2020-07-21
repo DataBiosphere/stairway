@@ -18,7 +18,7 @@ plugins {
 
 group 'bio.terra'
 masterVersion '0.0.1'
-developedVersion '1.0.0'
+developVersion '1.0.0'
 sourceCompatibility = 1.8
 
 // TODO: there may be a better way to supply these values than envvars.
