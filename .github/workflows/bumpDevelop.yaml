@@ -15,7 +15,7 @@ jobs:
         with:
           ref: develop
       - name: "Bump the tag to a new version"
-        uses: databiosphere/github-actions/actions/bumper@v0.0.1
+        uses: databiosphere/github-actions/actions/bumper@v0.0.2
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           DEFAULT_BUMP: patch
