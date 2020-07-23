@@ -15,7 +15,7 @@ jobs:
         with:
           ref: master
       - name: "Bump the tag to a new version"
-        uses: broadinstitute/github-actions/actions/bumper@c9c40bdb2b99f8821e8987cffe76c15a07c183e0
+        uses: broadinstitute/github-actions/actions/bumper@v0.0.1
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           DEFAULT_BUMP: patch
