@@ -1,0 +1,33 @@
+name: development version bump
+on:
+  push:
+    branches:
+      - develop
+jobs:
+  update_image:
+    strategy:
+      matrix:
+        os: [ubuntu-latest]
+    runs-on: ${{ matrix.os }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v2
+        with:
+          ref: develop
+      - name: "Bump the tag to a new version"
+        uses: databiosphere/github-actions/actions/bumper@v0.0.3
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          DEFAULT_BUMP: patch
+          RELEASE_BRANCHES: master,develop
+          VERSION_FILE_PATH: build.gradle
+          VERSION_LINE_MATCH: ^version
+          VERSION_SUFFIX: SNAPSHOT
+      - name: "Publish to Artifactory"
+        uses: broadinstitute/gradle-command-action@v1
+        with:
+          arguments: artifactoryPublish
+        env:
+          ARTIFACTORY_USER: ${{ secrets.ARTIFACTORY_USER }}
+          ARTIFACTORY_PASSWORD: ${{ secrets.ARTIFACTORY_PASSWORD }}
+          ARTIFACTORY_REPO_KEY: "libs-snapshot-local"
