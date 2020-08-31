@@ -28,7 +28,7 @@ public class WorkQueueListener implements Runnable {
   // happens we sleep for NO_PULL_SLEEP_SECONDS and then check the queue depth.
   //
   // The reason to limit to MAX_MESSAGES_PER_PULL is that the evaluation of queue depth is done at,
-  // say,time T0, but the pull will wait for message arrival from pubsub at, say, time T1.
+  // say, time T0, but the pull will wait for message arrival from pubsub at, say, time T1.
   // By time T1, the queue depth situation might have changed. So we don't want to set up to grab
   // lots of messages and then find we are queuing flights way over maxQueuedFlights.
   @Override

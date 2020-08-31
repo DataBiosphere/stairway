@@ -419,8 +419,10 @@ class FlightDao {
         NamedParameterPreparedStatement statement =
             new NamedParameterPreparedStatement(connection, sql)) {
 
-      // My concern, maybe unfounded, is that the snapshot transaction would be reading out of date data,
-      // because there would be too many other transactions writing to the table. Making this a serialized
+      // My concern, maybe unfounded, is that the snapshot transaction would be reading out of date
+      // data,
+      // because there would be too many other transactions writing to the table. Making this a
+      // serialized
       // transaction makes sure that the read transaction is ordered with the write transactions.
       startTransaction(connection);
 
@@ -571,7 +573,9 @@ class FlightDao {
           if (rs.next()) {
             List<FlightInput> inputList = retrieveInputParameters(connection, flightId);
             FlightMap inputParameters = new FlightMap(inputList);
-            flightContext = new FlightContext(inputParameters, rs.getString("class_name"));
+            flightContext =
+                new FlightContext(
+                    inputParameters, rs.getString("class_name"), Collections.EMPTY_LIST);
             flightContext.setFlightId(flightId);
 
             fillFlightContexts(connection, Collections.singletonList(flightContext));

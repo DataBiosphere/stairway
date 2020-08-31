@@ -12,7 +12,8 @@ import java.util.List;
 public class FlightContext {
   private Stairway stairway; // the stairway instance running this flight
   private String flightId; // unique id for the flight
-  private final String flightClassName; // class name of the flight;  for recreating the flight object
+  private final String
+      flightClassName; // class name of the flight;  for recreating the flight object
   private final FlightMap inputParameters; // allows for reconstructing the flight; set unmodifiable
   private final FlightMap workingMap; // open-ended state used by the steps
   private int stepIndex; // what step we are on
@@ -23,7 +24,8 @@ public class FlightContext {
   private List<String> stepClassNames;
 
   // Construct the context with defaults
-  public FlightContext(FlightMap inputParameters, String flightClassName, List<String> stepClassNames) {
+  public FlightContext(
+      FlightMap inputParameters, String flightClassName, List<String> stepClassNames) {
     this.inputParameters = inputParameters;
     this.inputParameters.makeImmutable();
     this.flightClassName = flightClassName;
