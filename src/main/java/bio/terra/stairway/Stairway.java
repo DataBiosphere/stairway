@@ -608,7 +608,7 @@ public class Stairway {
    * @return true if there is room to take on more work.
    */
   boolean spaceAvailable() {
-    logger.info(
+    logger.debug(
         "Space available? active: "
             + threadPool.getActiveFlights()
             + " of max: "
