@@ -143,7 +143,7 @@ public class EnumerateFlightsTest {
       }
     }
 
-    FlightContext flightContext = new FlightContext(inputParams, className);
+    FlightContext flightContext = new FlightContext(inputParams, className, Collections.EMPTY_LIST);
     flightContext.setFlightId(flightId);
     flightContext.setStairway(stairway);
 
