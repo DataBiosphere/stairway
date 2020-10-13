@@ -22,8 +22,8 @@ import org.slf4j.LoggerFactory;
  */
 public class Flight implements Runnable {
   static class StepRetry {
-    private Step step;
-    private RetryRule retryRule;
+    private final Step step;
+    private final RetryRule retryRule;
 
     StepRetry(Step step, RetryRule retryRule) {
       this.step = step;
@@ -31,17 +31,19 @@ public class Flight implements Runnable {
     }
   }
 
-  private static Logger logger = LoggerFactory.getLogger(Flight.class);
+  private static final Logger logger = LoggerFactory.getLogger(Flight.class);
 
-  private List<StepRetry> steps;
+  private final List<StepRetry> steps;
+  private final List<String> stepClassNames;
   private FlightDao flightDao;
   private FlightContext flightContext;
-  private Object applicationContext;
+  private final Object applicationContext;
 
   public Flight(FlightMap inputParameters, Object applicationContext) {
-    flightContext = new FlightContext(inputParameters, this.getClass().getName());
     this.applicationContext = applicationContext;
     steps = new LinkedList<>();
+    stepClassNames = new LinkedList<>();
+    flightContext = new FlightContext(inputParameters, this.getClass().getName(), stepClassNames);
   }
 
   public HookWrapper hookWrapper() {
@@ -57,17 +59,19 @@ public class Flight implements Runnable {
   }
 
   public void setFlightContext(FlightContext flightContext) {
+    flightContext.setStepClassNames(stepClassNames);
     this.flightContext = flightContext;
   }
 
   // Used by subclasses to build the step list with default no-retry rule
   protected void addStep(Step step) {
-    steps.add(new StepRetry(step, RetryRuleNone.getRetryRuleNone()));
+    addStep(step, RetryRuleNone.getRetryRuleNone());
   }
 
   // Used by subclasses to build the step list with a retry rule
   protected void addStep(Step step, RetryRule retryRule) {
     steps.add(new StepRetry(step, retryRule));
+    stepClassNames.add(step.getClass().getName());
   }
 
   /**
@@ -147,12 +151,16 @@ public class Flight implements Runnable {
         return FlightStatus.ERROR;
       }
 
-      // Part 3 - dismal failure
+      // Part 3 - dismal failure - undo failed!
       // Record the undo failure
       flightDao.step(context());
-
-      // Dismal failure - undo failed!
       context().setResult(undoResult);
+      logger.error(
+          "DISMAL FAILURE: non-retry-able error during undo. Flight: {}({}) Step: {}({})",
+          context().getFlightId(),
+          context().getFlightClassName(),
+          context().getStepIndex(),
+          context().getStepClassName());
 
     } catch (InterruptedException ex) {
       // Interrupted exception - we assume this means that the thread pool is shutting down and
@@ -173,7 +181,7 @@ public class Flight implements Runnable {
    * recording it into the database.
    *
    * @return StepResult recording the success or failure of the most recent step
-   * @throws InterruptedException
+   * @throws InterruptedException on thread pool shutdown
    */
   private StepResult runSteps()
       throws InterruptedException, StairwayExecutionException, DatabaseOperationException {

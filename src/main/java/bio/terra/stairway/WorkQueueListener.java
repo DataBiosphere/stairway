@@ -1,8 +1,9 @@
 package bio.terra.stairway;
 
-import java.util.concurrent.TimeUnit;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+
+import java.util.concurrent.TimeUnit;
 
 public class WorkQueueListener implements Runnable {
   private static final Logger logger = LoggerFactory.getLogger(WorkQueueListener.class);
@@ -24,22 +25,18 @@ public class WorkQueueListener implements Runnable {
   //
   // The algorithm here will pull MAX_MESSAGES_PER_PULL from the queue and resume them, up to the
   // point where the threadPool queue depth is at or over its maxQueuedFlights size. When that
-  // happens
-  // we sleep for NO_PULL_SLEEP_SECONDS and then check the queue depth.
+  // happens we sleep for NO_PULL_SLEEP_SECONDS and then check the queue depth.
   //
   // The reason to limit to MAX_MESSAGES_PER_PULL is that the evaluation of queue depth is done at,
-  // say,
-  // time T0, but the pull will wait for message arrival from pubsub at, say, time T1. By time T1,
-  // the
-  // queue depth situation might have changed. So we don't want to set up to grab lots of messages
-  // and
-  // then find we are queuing flights way over maxQueuedFlights.
+  // say, time T0, but the pull will wait for message arrival from pubsub at, say, time T1.
+  // By time T1, the queue depth situation might have changed. So we don't want to set up to grab
+  // lots of messages and then find we are queuing flights way over maxQueuedFlights.
   @Override
   public void run() {
     try {
       while (!stairway.isQuietingDown()) {
         if (stairway.spaceAvailable()) {
-          logger.info("Asking the work queue for messages: " + MAX_MESSAGES_PER_PULL);
+          logger.debug("Asking the work queue for messages: " + MAX_MESSAGES_PER_PULL);
           workQueue.dispatchMessages(MAX_MESSAGES_PER_PULL, QueueMessage::processMessage);
         } else {
           // No room to queue messages. Take a rest.
