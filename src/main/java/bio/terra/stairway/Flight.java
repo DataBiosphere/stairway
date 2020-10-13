@@ -253,7 +253,6 @@ public class Flight implements Runnable {
         } else {
           result = currentStep.step.undoStep(context());
         }
-        hookWrapper().endStep(flightContext);
       } catch (InterruptedException ex) {
         // Interrupted exception - we assume this means that the thread pool is shutting down and
         // forcibly stopping all threads. We propagate the exception.
@@ -268,6 +267,8 @@ public class Flight implements Runnable {
                 ? StepStatus.STEP_RESULT_FAILURE_RETRY
                 : StepStatus.STEP_RESULT_FAILURE_FATAL;
         result = new StepResult(stepStatus, ex);
+      } finally {
+        hookWrapper().endStep(flightContext);
       }
 
       switch (result.getStepStatus()) {
