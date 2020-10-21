@@ -194,19 +194,4 @@ public class FlightContext {
         .append("flightStatus", flightStatus)
         .toString();
   }
-
-  public String toStringTrunc() {
-    return new ToStringBuilder(this)
-        .append("stairway", stairway)
-        .append("flightId", flightId)
-        .append("flightClassName", flightClassName)
-        // .append("inputParameters", inputParameters)
-        .append("workingMap", workingMap)
-        .append("stepIndex", stepIndex)
-        .append("rerun", rerun)
-        .append("direction", direction)
-        .append("result", result)
-        .append("flightStatus", flightStatus)
-        .toString();
-  }
 }
