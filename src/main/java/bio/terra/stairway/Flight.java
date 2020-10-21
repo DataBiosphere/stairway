@@ -91,7 +91,7 @@ public class Flight implements Runnable {
         return;
       }
 
-      logger.debug("Executing: " + context().toString());
+      logger.debug("Executing: " + context().toStringTrunc());
       FlightStatus flightStatus = fly();
       flightExit(flightStatus);
       hookWrapper().endFlight(flightContext);
