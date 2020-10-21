@@ -11,8 +11,6 @@ import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
-import org.apache.commons.lang3.builder.ToStringBuilder;
-import org.apache.commons.lang3.builder.ToStringStyle;
 
 /**
  * FlightMap wraps a {@code HashMap<String, Object>} It provides a subset of the HashMap methods. It
@@ -110,8 +108,23 @@ public class FlightMap {
     }
   }
 
+  // Truncate working map to only print first 500 characters
   @Override
   public String toString() {
-    return new ToStringBuilder(this, ToStringStyle.JSON_STYLE).append("map", map).toString();
+    int truncateLength = 500;
+    StringBuilder sb = new StringBuilder("{");
+    map.forEach(
+        (k, v) -> {
+          int valLength = v.toString().length();
+          sb.append(
+              k
+                  + "="
+                  + v.toString()
+                      .substring(0, valLength > truncateLength ? truncateLength : valLength)
+                  + ", ");
+        });
+    sb.delete(sb.length() - 2, sb.length());
+    sb.append("}");
+    return sb.toString();
   }
 }
