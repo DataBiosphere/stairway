@@ -11,6 +11,7 @@ import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.stream.Collectors;
 
 /**
  * FlightMap wraps a {@code HashMap<String, Object>} It provides a subset of the HashMap methods. It
@@ -113,17 +114,17 @@ public class FlightMap {
   public String toString() {
     int truncateLength = 500;
     StringBuilder sb = new StringBuilder("{");
-    map.forEach(
-        (k, v) -> {
-          int valLength = v.toString().length();
-          sb.append(
-              k
-                  + "="
-                  + v.toString()
-                      .substring(0, valLength > truncateLength ? truncateLength : valLength)
-                  + ", ");
-        });
-    sb.delete(sb.length() - 2, sb.length());
+    sb.append(
+        map.entrySet().stream()
+            .map(
+                set -> {
+                  String valString = set.getValue().toString();
+                  return String.join(
+                      "=",
+                      set.getKey(),
+                      valString.substring(0, Math.min(truncateLength, valString.length())));
+                })
+            .collect(Collectors.joining(", ")));
     sb.append("}");
     return sb.toString();
   }
