@@ -117,12 +117,11 @@ public class FlightMap {
     sb.append(
         map.entrySet().stream()
             .map(
-                set -> {
-                  String valString = set.getValue().toString();
-                  return String.join(
-                      "=",
-                      set.getKey(),
-                      valString.substring(0, Math.min(truncateLength, valString.length())));
+                entry -> {
+                  String valString = entry.getValue().toString();
+                  return entry.getKey()
+                      + "="
+                      + valString.substring(0, Math.min(truncateLength, valString.length()));
                 })
             .collect(Collectors.joining(", ")));
     sb.append("}");
