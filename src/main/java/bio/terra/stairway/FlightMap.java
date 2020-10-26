@@ -118,7 +118,7 @@ public class FlightMap {
         map.entrySet().stream()
             .map(
                 entry -> {
-                  String valString = entry.getValue().toString();
+                  String valString = String.valueOf(entry.getValue());
                   return entry.getKey()
                       + "="
                       + valString.substring(0, Math.min(truncateLength, valString.length()));
