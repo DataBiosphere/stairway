@@ -2,6 +2,7 @@ package bio.terra.stairway;
 
 import bio.terra.stairway.exception.DatabaseOperationException;
 import bio.terra.stairway.exception.DatabaseSetupException;
+import bio.terra.stairway.exception.DuplicateFlightIdSubmittedException;
 import bio.terra.stairway.exception.FlightException;
 import bio.terra.stairway.exception.FlightFilterException;
 import bio.terra.stairway.exception.FlightNotFoundException;
@@ -181,7 +182,8 @@ class FlightDao {
   }
 
   /** Record a new flight */
-  void submit(FlightContext flightContext) throws DatabaseOperationException, InterruptedException {
+  void submit(FlightContext flightContext)
+      throws DatabaseOperationException, InterruptedException, DuplicateFlightIdSubmittedException {
     final String sqlInsertFlight =
         "INSERT INTO "
             + FLIGHT_TABLE
@@ -209,6 +211,13 @@ class FlightDao {
 
       commitTransaction(connection);
     } catch (SQLException ex) {
+      // SQL state 23505 indicates a unique key violation, which in this case indicates a duplicate
+      // flightId. See https://www.postgresql.org/docs/10/errcodes-appendix.html for postgres
+      // error codes.
+      if (ex.getSQLState().equals("23505")) {
+        throw new DuplicateFlightIdSubmittedException(
+            "Duplicate flightID " + flightContext.getFlightId(), ex);
+      }
       handleSqlException("Failed to create database tables", ex, flightContext);
     }
   }
