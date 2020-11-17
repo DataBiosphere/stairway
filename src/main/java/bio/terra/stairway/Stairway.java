@@ -2,6 +2,7 @@ package bio.terra.stairway;
 
 import bio.terra.stairway.exception.DatabaseOperationException;
 import bio.terra.stairway.exception.DatabaseSetupException;
+import bio.terra.stairway.exception.DuplicateFlightIdSubmittedException;
 import bio.terra.stairway.exception.FlightException;
 import bio.terra.stairway.exception.MakeFlightException;
 import bio.terra.stairway.exception.MigrateException;
@@ -532,10 +533,12 @@ public class Stairway {
    *     database or launching
    * @throws StairwayExecutionException failure queuing the flight
    * @throws InterruptedException this thread was interrupted
+   * @throws DuplicateFlightIdSubmittedException provided flightId is already in use
    */
   public void submit(
       String flightId, Class<? extends Flight> flightClass, FlightMap inputParameters)
-      throws DatabaseOperationException, StairwayExecutionException, InterruptedException {
+      throws DatabaseOperationException, StairwayExecutionException, InterruptedException,
+          DuplicateFlightIdSubmittedException {
     submitWorker(flightId, flightClass, inputParameters, false);
   }
 
@@ -552,10 +555,12 @@ public class Stairway {
    *     database or launching
    * @throws StairwayExecutionException failure queuing the flight
    * @throws InterruptedException this thread was interrupted
+   * @throws DuplicateFlightIdSubmittedException provided flightId is already in use
    */
   public void submitToQueue(
       String flightId, Class<? extends Flight> flightClass, FlightMap inputParameters)
-      throws DatabaseOperationException, StairwayExecutionException, InterruptedException {
+      throws DatabaseOperationException, StairwayExecutionException, InterruptedException,
+          DuplicateFlightIdSubmittedException {
     submitWorker(flightId, flightClass, inputParameters, true);
   }
 
@@ -564,7 +569,8 @@ public class Stairway {
       Class<? extends Flight> flightClass,
       FlightMap inputParameters,
       boolean shouldQueue)
-      throws DatabaseOperationException, StairwayExecutionException, InterruptedException {
+      throws DatabaseOperationException, StairwayExecutionException, InterruptedException,
+          DuplicateFlightIdSubmittedException {
 
     if (flightClass == null || inputParameters == null) {
       throw new MakeFlightException(
