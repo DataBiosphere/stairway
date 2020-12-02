@@ -12,29 +12,40 @@ public class HookWrapper {
   }
 
   public HookAction startFlight(FlightContext flightContext) {
-    return handleHook(flightContext, context -> stairwayHook.startFlight(context));
+    return handleFlightHook(flightContext, context -> stairwayHook.startFlight(context));
   }
 
   public HookAction startStep(FlightContext flightContext) {
-    return handleHook(flightContext, context -> stairwayHook.startStep(context));
+    return handleStepHook(flightContext, context -> stairwayHook.newStepHook().startStep(context));
   }
 
   public HookAction endStep(FlightContext flightContext) {
-    return handleHook(flightContext, context -> stairwayHook.endStep(context));
+    return handleStepHook(flightContext, context -> stairwayHook.newStepHook().endStep(context));
   }
 
   public HookAction endFlight(FlightContext flightContext) {
-    return handleHook(flightContext, context -> stairwayHook.endFlight(context));
+    return handleFlightHook(flightContext, context -> stairwayHook.endFlight(context));
   }
 
   private interface HookInterface {
     HookAction hook(FlightContext context) throws InterruptedException;
   }
 
-  private HookAction handleHook(FlightContext context, HookInterface hookMethod) {
-    if (stairwayHook == null) {
+  private HookAction handleStepHook(FlightContext context, HookInterface hookMethod) {
+    if (stairwayHook == null || stairwayHook.newStepHook() == null) {
       return HookAction.CONTINUE;
     }
+    return handleHook(context, hookMethod);
+  }
+
+  private HookAction handleFlightHook(FlightContext context, HookInterface hookMethod) {
+    if (stairwayHook == null ) {
+      return HookAction.CONTINUE;
+    }
+    return handleHook(context, hookMethod);
+  }
+
+  private HookAction handleHook(FlightContext context, HookInterface hookMethod) {
     FlightContext contextCopy = makeCopy(context);
     try {
       return hookMethod.hook(contextCopy);
