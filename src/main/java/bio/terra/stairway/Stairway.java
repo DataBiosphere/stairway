@@ -62,7 +62,7 @@ public class Stairway {
     private String stairwayClusterName;
     private StairwayHook stairwayHook;
     private boolean enableWorkQueue;
-    private boolean keepFlightLog;
+    private Boolean keepFlightLog;
     private FlightFactory flightFactory;
     private String workQueueProjectId;
     private String workQueueTopicId;
@@ -162,7 +162,7 @@ public class Stairway {
      * @return this
      */
     public Builder keepFlightLog(boolean keepFlightLog) {
-      this.keepFlightLog = keepFlightLog;
+      this.keepFlightLog = Boolean.valueOf(keepFlightLog);
       return this;
     }
 
@@ -318,7 +318,7 @@ public class Stairway {
     }
 
     this.applicationContext = builder.applicationContext;
-    this.keepFlightLog = builder.keepFlightLog;
+    this.keepFlightLog = (builder.keepFlightLog == null) ? true : builder.keepFlightLog;
     this.quietingDown = new AtomicBoolean();
     this.hookWrapper = new HookWrapper(builder.stairwayHook);
   }
