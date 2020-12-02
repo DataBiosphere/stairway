@@ -46,6 +46,10 @@ public class HookWrapper {
   }
 
   private HookAction handleHook(FlightContext context, HookInterface hookMethod) {
+    if (stairwayHook == null ) {
+      return HookAction.CONTINUE;
+    }
+
     FlightContext contextCopy = makeCopy(context);
     try {
       return hookMethod.hook(contextCopy);
