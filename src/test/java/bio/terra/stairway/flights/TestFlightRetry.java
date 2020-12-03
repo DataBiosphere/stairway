@@ -1,6 +1,7 @@
 package bio.terra.stairway.flights;
 
 import bio.terra.stairway.Flight;
+import bio.terra.stairway.FlightDebugInfo;
 import bio.terra.stairway.FlightMap;
 import bio.terra.stairway.RetryRule;
 import bio.terra.stairway.RetryRuleExponentialBackoff;
@@ -9,8 +10,9 @@ import org.apache.commons.lang3.StringUtils;
 
 public class TestFlightRetry extends Flight {
 
-  public TestFlightRetry(FlightMap inputParameters, Object applicationContext) {
-    super(inputParameters, applicationContext);
+  public TestFlightRetry(
+      FlightMap inputParameters, Object applicationContext, FlightDebugInfo debugInfo) {
+    super(inputParameters, applicationContext, debugInfo);
 
     RetryRule retryRule;
 

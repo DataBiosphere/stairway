@@ -1,12 +1,14 @@
 package bio.terra.stairway.flights;
 
 import bio.terra.stairway.Flight;
+import bio.terra.stairway.FlightDebugInfo;
 import bio.terra.stairway.FlightMap;
 
 public class TestFlightRecovery extends Flight {
 
-  public TestFlightRecovery(FlightMap inputParameters, Object applicationContext) {
-    super(inputParameters, applicationContext);
+  public TestFlightRecovery(
+      FlightMap inputParameters, Object applicationContext, FlightDebugInfo debugInfo) {
+    super(inputParameters, applicationContext, debugInfo);
 
     // Step 1 - increment
     addStep(new TestStepIncrement());

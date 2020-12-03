@@ -38,9 +38,11 @@ public class Flight implements Runnable {
   private FlightDao flightDao;
   private FlightContext flightContext;
   private final Object applicationContext;
+  private FlightDebugInfo debugInfo;
 
-  public Flight(FlightMap inputParameters, Object applicationContext) {
+  public Flight(FlightMap inputParameters, Object applicationContext, FlightDebugInfo debugInfo) {
     this.applicationContext = applicationContext;
+    this.debugInfo = debugInfo;
     steps = new LinkedList<>();
     stepClassNames = new LinkedList<>();
     flightContext = new FlightContext(inputParameters, this.getClass().getName(), stepClassNames);
@@ -231,6 +233,9 @@ public class Flight implements Runnable {
         default:
           throw new StairwayExecutionException("Unexpected step status: " + result.getStepStatus());
       }
+    }
+    if (this.debugInfo != null && this.debugInfo.getRestartEachStep()) {
+      return result;
     }
     return result;
   }

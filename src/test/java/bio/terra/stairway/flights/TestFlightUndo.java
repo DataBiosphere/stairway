@@ -1,12 +1,14 @@
 package bio.terra.stairway.flights;
 
 import bio.terra.stairway.Flight;
+import bio.terra.stairway.FlightDebugInfo;
 import bio.terra.stairway.FlightMap;
 
 public class TestFlightUndo extends Flight {
 
-  public TestFlightUndo(FlightMap inputParameters, Object applicationContext) {
-    super(inputParameters, applicationContext);
+  public TestFlightUndo(
+      FlightMap inputParameters, Object applicationContext, FlightDebugInfo debugInfo) {
+    super(inputParameters, applicationContext, debugInfo);
 
     // Pull out our parameters and feed them in to the step classes.
     String filename = inputParameters.get("filename", String.class);
