@@ -249,9 +249,9 @@ public class Flight implements Runnable {
       //  but would look something like this.
       StairwayHookV2.StepHook stepHook = hookWrapper().startStep(flightContext);
       stepHook.start(context());
+      result = null;
       try {
         // Do or undo based on direction we are headed
-        //hookWrapper().startStep(flightContext);
         if (context().isDoing()) {
           result = currentStep.step.doStep(context());
         } else {
@@ -273,7 +273,6 @@ public class Flight implements Runnable {
         result = new StepResult(stepStatus, ex);
       } finally {
         stepHook.end(flightContext, result);
-        //hookWrapper().endStep(flightContext);
       }
 
       switch (result.getStepStatus()) {
