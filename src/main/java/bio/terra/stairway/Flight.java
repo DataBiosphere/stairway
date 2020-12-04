@@ -245,9 +245,13 @@ public class Flight implements Runnable {
 
     // Retry loop
     do {
+      // TODO: Not actually wired through HookWrapper, or backwards compatible,
+      //  but would look something like this.
+      StairwayHookV2.StepHook stepHook = hookWrapper().startStep(flightContext);
+      stepHook.start(context());
       try {
         // Do or undo based on direction we are headed
-        hookWrapper().startStep(flightContext);
+        //hookWrapper().startStep(flightContext);
         if (context().isDoing()) {
           result = currentStep.step.doStep(context());
         } else {
@@ -268,7 +272,8 @@ public class Flight implements Runnable {
                 : StepStatus.STEP_RESULT_FAILURE_FATAL;
         result = new StepResult(stepStatus, ex);
       } finally {
-        hookWrapper().endStep(flightContext);
+        stepHook.end(flightContext, result);
+        //hookWrapper().endStep(flightContext);
       }
 
       switch (result.getStepStatus()) {

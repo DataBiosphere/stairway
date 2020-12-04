@@ -12,7 +12,7 @@ public class HookWrapper {
   }
 
   public HookAction startFlight(FlightContext flightContext) {
-    return handleHook(flightContext, context -> stairwayHook.startFlight(context));
+    return handleHook(flightContext, stairwayHook::startFlight);
   }
 
   public HookAction startStep(FlightContext flightContext) {
