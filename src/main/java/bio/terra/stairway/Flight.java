@@ -203,6 +203,13 @@ public class Flight implements Runnable {
         context().setDirection(Direction.UNDO);
       }
 
+      if (this.debugInfo != null && this.debugInfo.getRestartEachStep()) {
+        StepResult newResult =
+            new StepResult(StepStatus.STEP_RESULT_STOP,
+                result.getException().orElse(null));
+        flightDao.step(context());
+        return newResult;
+      }
       switch (result.getStepStatus()) {
         case STEP_RESULT_SUCCESS:
           // Finished a step; run the next one
@@ -233,9 +240,6 @@ public class Flight implements Runnable {
         default:
           throw new StairwayExecutionException("Unexpected step status: " + result.getStepStatus());
       }
-    }
-    if (this.debugInfo != null && this.debugInfo.getRestartEachStep()) {
-      return result;
     }
     return result;
   }

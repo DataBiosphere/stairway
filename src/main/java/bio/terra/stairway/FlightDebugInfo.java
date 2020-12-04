@@ -1,5 +1,9 @@
 package bio.terra.stairway;
 
+/**
+ * Debug information for a flight. Parameters here change how flights run to ensure debugability/
+ * testability. Designed to be easily extensible,
+ */
 public class FlightDebugInfo {
   private boolean restartEachStep; // true - restart the flight at each step
 

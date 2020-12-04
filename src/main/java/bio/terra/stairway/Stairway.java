@@ -53,8 +53,6 @@ public class Stairway {
   private Queue workQueue;
   private Thread workQueueListenerThread;
 
-  private FlightDebugInfo flightDebugInfo;
-
   public static class Builder {
     private Integer maxParallelFlights;
     private Integer maxQueuedFlights;
@@ -591,7 +589,7 @@ public class Stairway {
           "Must supply non-null flightClass and inputParameters to submit");
     }
     Flight flight =
-        flightFactory.makeFlight(flightClass, inputParameters, applicationContext, flightDebugInfo);
+        flightFactory.makeFlight(flightClass, inputParameters, applicationContext, debugInfo);
     FlightContext context = flight.context();
     context.setFlightId(flightId);
 
