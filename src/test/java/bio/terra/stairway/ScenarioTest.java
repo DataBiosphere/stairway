@@ -35,13 +35,11 @@ public class ScenarioTest {
   private Stairway stairway;
   private Logger logger = LoggerFactory.getLogger(ScenarioTest.class);
   private String stairwayName;
-  FlightDebugInfo debugInfo;
 
   @BeforeEach
   public void setup() throws Exception {
     stairwayName = TestUtil.randomStairwayName();
     stairway = TestUtil.setupStairway(stairwayName, false);
-    debugInfo = FlightDebugInfo.newBuilder().restartEachStep(true).build();
   }
 
   @Test
@@ -56,8 +54,7 @@ public class ScenarioTest {
     inputParameters.put("text", "testing 1 2 3");
 
     String flightId = "simpleTest";
-
-    stairway.submitWithDebugInfo(flightId, TestFlight.class, inputParameters, false, debugInfo);
+    stairway.submit(flightId, TestFlight.class, inputParameters);
     logger.debug("Submitted flight id: " + flightId);
 
     // Test for done
@@ -88,7 +85,7 @@ public class ScenarioTest {
     inputParameters.put("text", "testing 1 2 3");
 
     String flightId = "fileTest";
-    stairway.submitWithDebugInfo(flightId, TestFlight.class, inputParameters, false, debugInfo);
+    stairway.submit(flightId, TestFlight.class, inputParameters);
 
     // Poll waiting for done
     while (!TestUtil.isDone(stairway, flightId)) {
@@ -127,7 +124,7 @@ public class ScenarioTest {
     inputParameters.put("text", "testing 1 2 3");
 
     String flightId = "undoTest";
-    stairway.submitWithDebugInfo(flightId, TestFlightUndo.class, inputParameters, false, debugInfo);
+    stairway.submit(flightId, TestFlightUndo.class, inputParameters);
 
     // Wait for done
     FlightState result = stairway.waitForFlight(flightId, null, null);
@@ -154,9 +151,7 @@ public class ScenarioTest {
     TestPauseController.setControl(0);
     String flightId = stairway.createFlightId();
 
-    stairway.submitWithDebugInfo(
-        flightId, TestFlightQuietDown.class, inputParameters, false, debugInfo);
-
+    stairway.submit(flightId, TestFlightQuietDown.class, inputParameters);
     // Allow time for the flight thread to go to sleep
     TimeUnit.SECONDS.sleep(5);
 
@@ -197,8 +192,8 @@ public class ScenarioTest {
     inputParameters.put(MapKey.RESULT, inResult);
 
     String flightId = stairway.createFlightId();
-    stairway.submitWithDebugInfo(flightId, TestFlightWait.class, inputParameters, false, debugInfo);
 
+    stairway.submit(flightId, TestFlightWait.class, inputParameters);
     // Allow time for the flight thread to start up and yield
     TimeUnit.SECONDS.sleep(5);
 
@@ -228,9 +223,8 @@ public class ScenarioTest {
 
     TestPauseController.setControl(0);
     String flightId = stairway.createFlightId();
-    stairway.submitWithDebugInfo(
-        flightId, TestFlightQuietDown.class, inputParameters, false, debugInfo);
 
+    stairway.submit(flightId, TestFlightQuietDown.class, inputParameters);
     // Allow time for the flight thread to go to sleep
     TimeUnit.SECONDS.sleep(5);
 
@@ -262,9 +256,7 @@ public class ScenarioTest {
     inputParameters.put(MapKey.RESULT, inResult);
 
     String flightId = stairway.createFlightId();
-    stairway.submitWithDebugInfo(
-        flightId, TestFlightRerun.class, inputParameters, false, debugInfo);
-
+    stairway.submit(flightId, TestFlightRerun.class, inputParameters);
     FlightState state = stairway.waitForFlight(flightId, null, null);
     assertThat("State is success", state.getFlightStatus(), equalTo(FlightStatus.SUCCESS));
     FlightMap resultMap = state.getResultMap().orElse(null);
@@ -287,9 +279,7 @@ public class ScenarioTest {
 
     TestPauseController.setControl(0); // have the flight sleep at COUNTER_STOP
     String flightId = stairway.createFlightId();
-    stairway.submitWithDebugInfo(
-        flightId, TestFlightRerun.class, inputParameters, false, debugInfo);
-
+    stairway.submit(flightId, TestFlightRerun.class, inputParameters);
     // Allow time for the flight thread to go to sleep
     TimeUnit.SECONDS.sleep(5);
 
@@ -326,9 +316,7 @@ public class ScenarioTest {
       inputParameters.put(MapKey.RESULT, inResult);
       inputParameters.put(MapKey.COUNTER_STOP, stopCounter);
       String flightId = stairway.createFlightId();
-      stairway.submitWithDebugInfo(
-          flightId, TestFlightRerunUndo.class, inputParameters, false, debugInfo);
-
+      stairway.submit(flightId, TestFlightRerunUndo.class, inputParameters);
       FlightState state = stairway.waitForFlight(flightId, null, null);
       assertThat("State is error", state.getFlightStatus(), equalTo(FlightStatus.ERROR));
       FlightMap resultMap = state.getResultMap().orElse(null);
