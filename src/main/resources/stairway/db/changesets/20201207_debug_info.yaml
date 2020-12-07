@@ -1,0 +1,12 @@
+databaseChangeLog:
+- changeSet:
+    id: flight_debug_info
+    author: tn
+    changes:
+    - addColumn:
+        tableName: flight
+        columns:
+        - column:
+            name: debug_info
+            type: text
+            remarks: JSON of FlightDebugInfo

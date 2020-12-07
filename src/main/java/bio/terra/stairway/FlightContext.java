@@ -1,9 +1,8 @@
 package bio.terra.stairway;
 
+import java.util.List;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.commons.lang3.builder.ToStringBuilder;
-
-import java.util.List;
 
 /**
  * Context for a flight. This contains the full state for a flight. It is what is held in the
@@ -22,10 +21,14 @@ public class FlightContext {
   private StepResult result; // current step status
   private FlightStatus flightStatus;
   private List<String> stepClassNames;
+  private FlightDebugInfo debugInfo;
 
   // Construct the context with defaults
   public FlightContext(
-      FlightMap inputParameters, String flightClassName, List<String> stepClassNames) {
+      FlightMap inputParameters,
+      String flightClassName,
+      List<String> stepClassNames,
+      FlightDebugInfo debugInfo) {
     this.inputParameters = inputParameters;
     this.inputParameters.makeImmutable();
     this.flightClassName = flightClassName;
@@ -35,6 +38,7 @@ public class FlightContext {
     this.result = StepResult.getStepResultSuccess();
     this.flightStatus = FlightStatus.RUNNING;
     this.stepClassNames = stepClassNames;
+    this.debugInfo = debugInfo;
   }
 
   public String getFlightId() {
@@ -127,6 +131,14 @@ public class FlightContext {
     return stepClassNames.get(stepIndex);
   }
 
+  public void setDebugInfo(FlightDebugInfo debugInfo) {
+    this.debugInfo = debugInfo;
+  }
+
+  public FlightDebugInfo getDebugInfo() {
+    return debugInfo;
+  }
+
   /**
    * Set the step index to the next step. If we are doing, then we progress forwards. If we are
    * undoing, we progress backwards.
@@ -192,6 +204,7 @@ public class FlightContext {
         .append("direction", direction)
         .append("result", result)
         .append("flightStatus", flightStatus)
+        .append("debugInfo", debugInfo.toString())
         .toString();
   }
 }

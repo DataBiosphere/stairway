@@ -1,10 +1,15 @@
 package bio.terra.stairway;
 
+import com.fasterxml.jackson.core.JsonProcessingException;
+import com.fasterxml.jackson.databind.ObjectMapper;
+
 /**
  * Debug information for a flight. Parameters here change how flights run to ensure debugability/
  * testability. Designed to be easily extensible,
  */
 public class FlightDebugInfo {
+
+  private static ObjectMapper objectMapper;
   private boolean restartEachStep; // true - restart the flight at each step
 
   // Use a builder so it is easy to add new fields
@@ -39,5 +44,22 @@ public class FlightDebugInfo {
 
   public void setRestartEachStep(boolean restart) {
     this.restartEachStep = restart;
+  }
+
+  static ObjectMapper getObjectMapper() {
+    if (objectMapper == null) {
+      objectMapper = new ObjectMapper();
+    }
+    return objectMapper;
+  }
+
+  @Override
+  public String toString() {
+    // Is it better to store the ObjectMapper for some reason?
+    try {
+      return getObjectMapper().writeValueAsString(this);
+    } catch (JsonProcessingException e) {
+      throw new AssertionError(e);
+    }
   }
 }

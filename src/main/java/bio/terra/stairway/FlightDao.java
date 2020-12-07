@@ -6,11 +6,8 @@ import bio.terra.stairway.exception.DuplicateFlightIdSubmittedException;
 import bio.terra.stairway.exception.FlightException;
 import bio.terra.stairway.exception.FlightFilterException;
 import bio.terra.stairway.exception.FlightNotFoundException;
+import com.fasterxml.jackson.core.JsonProcessingException;
 import edu.umd.cs.findbugs.annotations.SuppressFBWarnings;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
-
-import javax.sql.DataSource;
 import java.sql.Connection;
 import java.sql.ResultSet;
 import java.sql.SQLException;
@@ -19,6 +16,9 @@ import java.util.Collections;
 import java.util.List;
 import java.util.concurrent.ThreadLocalRandom;
 import java.util.concurrent.TimeUnit;
+import javax.sql.DataSource;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 /**
  * The general layout of the stairway database tables is:
@@ -187,8 +187,8 @@ class FlightDao {
     final String sqlInsertFlight =
         "INSERT INTO "
             + FLIGHT_TABLE
-            + " (flightId, submit_time, class_name, status, stairway_id)"
-            + "VALUES (:flightId, CURRENT_TIMESTAMP, :className, :status, :stairwayId)";
+            + " (flightId, submit_time, class_name, status, stairway_id, debug_info)"
+            + "VALUES (:flightId, CURRENT_TIMESTAMP, :className, :status, :stairwayId, :debugInfo)";
 
     try (Connection connection = dataSource.getConnection();
         NamedParameterPreparedStatement statement =
@@ -204,6 +204,7 @@ class FlightDao {
       } else {
         statement.setString("stairwayId", flightContext.getStairway().getStairwayId());
       }
+      statement.setString("debugInfo", flightContext.getDebugInfo().toString());
       statement.getPreparedStatement().executeUpdate();
 
       storeInputParameters(
@@ -554,7 +555,7 @@ class FlightDao {
   FlightContext resume(String stairwayId, String flightId)
       throws DatabaseOperationException, InterruptedException {
     final String sqlUnownedFlight =
-        "SELECT class_name "
+        "SELECT class_name, debug_info "
             + " FROM "
             + FLIGHT_TABLE
             + " WHERE (status = 'WAITING' OR status = 'READY' OR status = 'QUEUED')"
@@ -582,9 +583,17 @@ class FlightDao {
           if (rs.next()) {
             List<FlightInput> inputList = retrieveInputParameters(connection, flightId);
             FlightMap inputParameters = new FlightMap(inputList);
+            FlightDebugInfo debugInfo = null;
+            try {
+              debugInfo =
+                  FlightDebugInfo.getObjectMapper()
+                      .readValue(rs.getString("debug_info"), FlightDebugInfo.class);
+            } catch (JsonProcessingException e) {
+              throw new DatabaseOperationException(e);
+            }
             flightContext =
                 new FlightContext(
-                    inputParameters, rs.getString("class_name"), Collections.EMPTY_LIST);
+                    inputParameters, rs.getString("class_name"), Collections.EMPTY_LIST, debugInfo);
             flightContext.setFlightId(flightId);
 
             fillFlightContexts(connection, Collections.singletonList(flightContext));

@@ -38,14 +38,13 @@ public class Flight implements Runnable {
   private FlightDao flightDao;
   private FlightContext flightContext;
   private final Object applicationContext;
-  private FlightDebugInfo debugInfo;
 
   public Flight(FlightMap inputParameters, Object applicationContext, FlightDebugInfo debugInfo) {
     this.applicationContext = applicationContext;
-    this.debugInfo = debugInfo;
     steps = new LinkedList<>();
     stepClassNames = new LinkedList<>();
-    flightContext = new FlightContext(inputParameters, this.getClass().getName(), stepClassNames);
+    flightContext =
+        new FlightContext(inputParameters, this.getClass().getName(), stepClassNames, debugInfo);
   }
 
   public HookWrapper hookWrapper() {
@@ -203,10 +202,10 @@ public class Flight implements Runnable {
         context().setDirection(Direction.UNDO);
       }
 
-      if (this.debugInfo != null && this.debugInfo.getRestartEachStep()) {
+      if (this.context().getDebugInfo() != null
+          && this.context().getDebugInfo().getRestartEachStep()) {
         StepResult newResult =
-            new StepResult(StepStatus.STEP_RESULT_STOP,
-                result.getException().orElse(null));
+            new StepResult(StepStatus.STEP_RESULT_STOP, result.getException().orElse(null));
         flightDao.step(context());
         return newResult;
       }

@@ -666,7 +666,7 @@ public class Stairway {
             flightContext.getFlightClassName(),
             flightContext.getInputParameters(),
             applicationContext,
-            null); // TODO(tovanadler): Replace this once we have implemented persistence.
+            flightContext.getDebugInfo());
     flightContext.setStairway(this);
     flight.setFlightContext(flightContext);
     launchFlight(flight);

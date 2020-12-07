@@ -6,4 +6,5 @@
     <include file="changesets/20200211_library.yaml" relativeToChangelogFile="true"/>
     <include file="changesets/20200310_scale.yaml" relativeToChangelogFile="true"/>
     <include file="changesets/20200421_doing_control.yaml" relativeToChangelogFile="true"/>
+    <include file="changesets/20201207_debug_info.yaml" relativeToChangelogFile="true"/>
 </databaseChangeLog>

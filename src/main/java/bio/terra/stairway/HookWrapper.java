@@ -46,7 +46,11 @@ public class HookWrapper {
 
   private FlightContext makeCopy(FlightContext fc) {
     FlightContext fc_new =
-        new FlightContext(fc.getInputParameters(), fc.getFlightClassName(), fc.getStepClassNames());
+        new FlightContext(
+            fc.getInputParameters(),
+            fc.getFlightClassName(),
+            fc.getStepClassNames(),
+            fc.getDebugInfo());
     fc_new.setDirection(fc.getDirection());
     fc_new.setFlightId(fc.getFlightId());
     fc_new.setFlightStatus(fc.getFlightStatus());
