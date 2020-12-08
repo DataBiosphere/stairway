@@ -1,6 +1,7 @@
 package bio.terra.stairway;
 
 import static bio.terra.stairway.FlightStatus.READY;
+import static bio.terra.stairway.FlightStatus.READY_TO_RESTART;
 import static bio.terra.stairway.FlightStatus.WAITING;
 
 import bio.terra.stairway.exception.DatabaseOperationException;
@@ -39,12 +40,15 @@ public class Flight implements Runnable {
   private FlightContext flightContext;
   private final Object applicationContext;
 
-  public Flight(FlightMap inputParameters, Object applicationContext, FlightDebugInfo debugInfo) {
+  public Flight(FlightMap inputParameters, Object applicationContext) {
     this.applicationContext = applicationContext;
     steps = new LinkedList<>();
     stepClassNames = new LinkedList<>();
-    flightContext =
-        new FlightContext(inputParameters, this.getClass().getName(), stepClassNames, debugInfo);
+    flightContext = new FlightContext(inputParameters, this.getClass().getName(), stepClassNames);
+  }
+
+  public void setDebugInfo(FlightDebugInfo debugInfo) {
+    this.context().setDebugInfo(debugInfo);
   }
 
   public HookWrapper hookWrapper() {
@@ -132,6 +136,9 @@ public class Flight implements Runnable {
           if (doResult.getStepStatus() == StepStatus.STEP_RESULT_WAIT) {
             return WAITING;
           }
+          if (doResult.getStepStatus() == StepStatus.STEP_RESULT_RESTART_FLIGHT) {
+            return READY_TO_RESTART;
+          }
           return FlightStatus.SUCCESS;
         }
 
@@ -202,12 +209,24 @@ public class Flight implements Runnable {
         context().setDirection(Direction.UNDO);
       }
 
-      if (this.context().getDebugInfo() != null
-          && this.context().getDebugInfo().getRestartEachStep()) {
-        StepResult newResult =
-            new StepResult(StepStatus.STEP_RESULT_STOP, result.getException().orElse(null));
-        flightDao.step(context());
-        return newResult;
+      if (context().getDebugInfo() != null) {
+        if (context().getDebugInfo().getFailAtSteps() != null
+            && context().getDirection() == Direction.DO
+            && context().getDebugInfo().getFailAtSteps().containsKey(context().getStepIndex())) {
+          StepResult newResult =
+              new StepResult(
+                  this.context().getDebugInfo().getFailAtSteps().get(context().getStepIndex()),
+                  result.getException().orElse(null));
+          flightDao.step(context());
+          return newResult;
+        }
+        if (this.context().getDebugInfo().getRestartEachStep()) {
+          StepResult newResult =
+              new StepResult(
+                  StepStatus.STEP_RESULT_RESTART_FLIGHT, result.getException().orElse(null));
+          flightDao.step(context());
+          return newResult;
+        }
       }
       switch (result.getStepStatus()) {
         case STEP_RESULT_SUCCESS:
@@ -291,6 +310,7 @@ public class Flight implements Runnable {
         case STEP_RESULT_FAILURE_FATAL:
         case STEP_RESULT_STOP:
         case STEP_RESULT_WAIT:
+        case STEP_RESULT_RESTART_FLIGHT:
           return result;
 
         case STEP_RESULT_FAILURE_RETRY:

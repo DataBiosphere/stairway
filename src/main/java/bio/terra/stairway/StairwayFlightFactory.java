@@ -19,9 +19,9 @@ public class StairwayFlightFactory implements FlightFactory {
     try {
       // Find the flightClass constructor that takes the input parameter map and
       // use it to make the flight.
-      Constructor constructor =
-          flightClass.getConstructor(FlightMap.class, Object.class, FlightDebugInfo.class);
-      Flight flight = (Flight) constructor.newInstance(inputParameters, context, debugInfo);
+      Constructor constructor = flightClass.getConstructor(FlightMap.class, Object.class);
+      Flight flight = (Flight) constructor.newInstance(inputParameters, context);
+      flight.setDebugInfo(debugInfo);
       return flight;
     } catch (InvocationTargetException
         | NoSuchMethodException

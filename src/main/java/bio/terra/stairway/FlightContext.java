@@ -25,10 +25,7 @@ public class FlightContext {
 
   // Construct the context with defaults
   public FlightContext(
-      FlightMap inputParameters,
-      String flightClassName,
-      List<String> stepClassNames,
-      FlightDebugInfo debugInfo) {
+      FlightMap inputParameters, String flightClassName, List<String> stepClassNames) {
     this.inputParameters = inputParameters;
     this.inputParameters.makeImmutable();
     this.flightClassName = flightClassName;
@@ -38,7 +35,6 @@ public class FlightContext {
     this.result = StepResult.getStepResultSuccess();
     this.flightStatus = FlightStatus.RUNNING;
     this.stepClassNames = stepClassNames;
-    this.debugInfo = debugInfo;
   }
 
   public String getFlightId() {
@@ -193,6 +189,7 @@ public class FlightContext {
 
   @Override
   public String toString() {
+    String debugString = debugInfo == null ? "" : debugInfo.toString();
     return new ToStringBuilder(this)
         .append("stairway", stairway)
         .append("flightId", flightId)
@@ -204,7 +201,7 @@ public class FlightContext {
         .append("direction", direction)
         .append("result", result)
         .append("flightStatus", flightStatus)
-        .append("debugInfo", debugInfo.toString())
+        .append("debugInfo", debugString)
         .toString();
   }
 }

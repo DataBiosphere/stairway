@@ -1,14 +1,12 @@
 package bio.terra.stairway.flights;
 
 import bio.terra.stairway.Flight;
-import bio.terra.stairway.FlightDebugInfo;
 import bio.terra.stairway.FlightMap;
 
 public class TestFlightRecoveryUndo extends Flight {
 
-  public TestFlightRecoveryUndo(
-      FlightMap inputParameters, Object applicationContext, FlightDebugInfo debugInfo) {
-    super(inputParameters, applicationContext, debugInfo);
+  public TestFlightRecoveryUndo(FlightMap inputParameters, Object applicationContext) {
+    super(inputParameters, applicationContext);
 
     // Step 0 - increment
     addStep(new TestStepIncrement());

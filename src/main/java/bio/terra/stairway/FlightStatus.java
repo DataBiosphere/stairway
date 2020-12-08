@@ -7,5 +7,6 @@ public enum FlightStatus {
   FATAL, // flight had errors and was unable to clean up
   WAITING, // flight was yielded and is waiting to be resumed
   READY, // flight is unowned and ready to execute
-  QUEUED // flight is in the work queue awaiting execution
+  QUEUED, // flight is in the work queue awaiting execution
+  READY_TO_RESTART // flight is running in restartEachStep mode and needs to be restarted.
 }

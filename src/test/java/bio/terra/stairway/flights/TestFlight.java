@@ -1,14 +1,12 @@
 package bio.terra.stairway.flights;
 
 import bio.terra.stairway.Flight;
-import bio.terra.stairway.FlightDebugInfo;
 import bio.terra.stairway.FlightMap;
 
 public class TestFlight extends Flight {
 
-  public TestFlight(
-      FlightMap inputParameters, Object applicationContext, FlightDebugInfo debugInfo) {
-    super(inputParameters, applicationContext, debugInfo);
+  public TestFlight(FlightMap inputParameters, Object applicationContext) {
+    super(inputParameters, applicationContext);
 
     // Pull out our parameters and feed them in to the step classes.
     String filename = inputParameters.get("filename", String.class);

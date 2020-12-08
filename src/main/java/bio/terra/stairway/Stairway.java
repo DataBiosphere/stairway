@@ -803,6 +803,13 @@ public class Stairway {
     if (context.getFlightStatus() == FlightStatus.READY && workQueueEnabled) {
       queueFlight(context.getFlightId());
     }
+    if (context.getFlightStatus() == FlightStatus.READY_TO_RESTART) {
+      if (workQueueEnabled) {
+        queueFlight(context.getFlightId());
+      } else {
+        resume(context.getFlightId());
+      }
+    }
   }
 
   private void queueFlight(String flightId)
