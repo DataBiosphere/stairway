@@ -6,8 +6,6 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import bio.terra.stairway.fixtures.TestUtil;
 import bio.terra.stairway.flights.TestFlightRestarting;
-import java.util.HashMap;
-import java.util.Map;
 import java.util.concurrent.TimeUnit;
 import org.hamcrest.Matchers;
 import org.junit.jupiter.api.Tag;
@@ -50,65 +48,5 @@ public class DebugInfoTest {
     assertTrue(result.getResultMap().isPresent());
     Integer value = result.getResultMap().get().get("value", Integer.class);
     assertThat(value, is(Matchers.equalTo(3)));
-  }
-
-  @Test
-  public void failAtStepsRetryable() throws Exception {
-    final String stairwayName = "failAtStepsRetryable";
-    String flightId = "failAtStepsRetryable";
-
-    Map<Integer, StepStatus> failures = new HashMap<>();
-    failures.put(2, StepStatus.STEP_RESULT_FAILURE_RETRY);
-    FlightDebugInfo debugInfo = FlightDebugInfo.newBuilder().failAtSteps(failures).build();
-
-    Stairway stairway = TestUtil.setupStairway(stairwayName, false);
-    FlightMap inputs = new FlightMap();
-
-    Integer initialValue = 0;
-    inputs.put("initialValue", initialValue);
-
-    stairway.submitWithDebugInfo(flightId, TestFlightRestarting.class, inputs, true, debugInfo);
-
-    // Allow time for the flight thread to run
-    TimeUnit.SECONDS.sleep(5);
-
-    assertThat(TestUtil.isDone(stairway, flightId), is(Matchers.equalTo(true)));
-
-    FlightState result = stairway.getFlightState(flightId);
-    // We should have an error but not a Dismal Failure.
-    assertThat(result.getFlightStatus(), is(Matchers.equalTo(FlightStatus.ERROR)));
-    assertTrue(result.getResultMap().isPresent());
-    // Should have properly decremented.
-    Integer value = result.getResultMap().get().get("value", Integer.class);
-    assertThat(value, is(Matchers.equalTo(0)));
-  }
-
-  @Test
-  public void failAtStepsFatal() throws Exception {
-    final String stairwayName = "failAtStepsFatal";
-    String flightId = "failAtStepsFatal";
-
-    Map<Integer, StepStatus> failures = new HashMap<>();
-    failures.put(2, StepStatus.STEP_RESULT_FAILURE_FATAL);
-    FlightDebugInfo debugInfo = FlightDebugInfo.newBuilder().failAtSteps(failures).build();
-
-    Stairway stairway = TestUtil.setupStairway(stairwayName, false);
-    FlightMap inputs = new FlightMap();
-
-    Integer initialValue = 0;
-    inputs.put("initialValue", initialValue);
-
-    stairway.submitWithDebugInfo(flightId, TestFlightRestarting.class, inputs, true, debugInfo);
-
-    // Allow time for the flight thread to run
-    TimeUnit.SECONDS.sleep(5);
-
-    assertThat(TestUtil.isDone(stairway, flightId), is(Matchers.equalTo(true)));
-
-    FlightState result = stairway.getFlightState(flightId);
-    // We should have an error but not a Dismal Failure.
-    assertThat(result.getFlightStatus(), is(Matchers.equalTo(FlightStatus.ERROR)));
-    // Not sure what the right behavior is here.
-    //assertTrue(result.getException().isPresent());
   }
 }
