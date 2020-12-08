@@ -209,24 +209,12 @@ public class Flight implements Runnable {
         context().setDirection(Direction.UNDO);
       }
 
-      if (context().getDebugInfo() != null) {
-        if (context().getDebugInfo().getFailAtSteps() != null
-            && context().getDirection() == Direction.DO
-            && context().getDebugInfo().getFailAtSteps().containsKey(context().getStepIndex())) {
-          StepResult newResult =
-              new StepResult(
-                  this.context().getDebugInfo().getFailAtSteps().get(context().getStepIndex()),
-                  result.getException().orElse(null));
-          flightDao.step(context());
-          return newResult;
-        }
-        if (this.context().getDebugInfo().getRestartEachStep()) {
-          StepResult newResult =
-              new StepResult(
-                  StepStatus.STEP_RESULT_RESTART_FLIGHT, result.getException().orElse(null));
-          flightDao.step(context());
-          return newResult;
-        }
+      if (context().getDebugInfo() != null && this.context().getDebugInfo().getRestartEachStep()) {
+        StepResult newResult =
+            new StepResult(
+                StepStatus.STEP_RESULT_RESTART_FLIGHT, result.getException().orElse(null));
+        flightDao.step(context());
+        return newResult;
       }
       switch (result.getStepStatus()) {
         case STEP_RESULT_SUCCESS:

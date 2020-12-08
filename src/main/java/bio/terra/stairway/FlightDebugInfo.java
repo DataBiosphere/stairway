@@ -2,7 +2,6 @@ package bio.terra.stairway;
 
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
-import java.util.Map;
 
 /**
  * Debug information for a flight. Parameters here change how flights run to ensure debugability/
@@ -10,23 +9,15 @@ import java.util.Map;
  */
 public class FlightDebugInfo {
 
-  private static ObjectMapper objectMapper;
+  private static final ObjectMapper objectMapper = new ObjectMapper();
   private boolean restartEachStep; // if true - restart the flight at each step
-  private Map<Integer, StepStatus> failAtSteps; // For each entry, the flight will return a given
-  // StepStatus for the step at the given position.
 
   // Use a builder so it is easy to add new fields
   public static class Builder {
     private boolean restartEachStep;
-    private Map<Integer, StepStatus> failAtSteps;
 
     public Builder restartEachStep(boolean restart) {
       this.restartEachStep = restart;
-      return this;
-    }
-
-    public Builder failAtSteps(Map<Integer, StepStatus> failures) {
-      this.failAtSteps = failures;
       return this;
     }
     /**
@@ -45,7 +36,6 @@ public class FlightDebugInfo {
 
   public FlightDebugInfo(FlightDebugInfo.Builder builder) {
     this.restartEachStep = builder.restartEachStep;
-    this.failAtSteps = builder.failAtSteps;
   }
 
   public FlightDebugInfo() {
@@ -60,18 +50,7 @@ public class FlightDebugInfo {
     this.restartEachStep = restart;
   }
 
-  public Map<Integer, StepStatus> getFailAtSteps() {
-    return this.failAtSteps;
-  }
-
-  public void setFailAtSteps(Map<Integer, StepStatus> failures) {
-    this.failAtSteps = failures;
-  }
-
   static ObjectMapper getObjectMapper() {
-    if (objectMapper == null) {
-      objectMapper = new ObjectMapper();
-    }
     return objectMapper;
   }
 
