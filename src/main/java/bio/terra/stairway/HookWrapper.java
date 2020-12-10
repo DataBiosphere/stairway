@@ -54,6 +54,7 @@ public class HookWrapper {
     fc_new.setStepIndex(fc.getStepIndex());
     fc_new.setResult(fc.getResult());
     fc_new.setRerun(fc.isRerun());
+    fc_new.setDebugInfo(fc.getDebugInfo());
     return fc_new;
   }
 }

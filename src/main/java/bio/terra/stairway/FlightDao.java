@@ -6,11 +6,8 @@ import bio.terra.stairway.exception.DuplicateFlightIdSubmittedException;
 import bio.terra.stairway.exception.FlightException;
 import bio.terra.stairway.exception.FlightFilterException;
 import bio.terra.stairway.exception.FlightNotFoundException;
+import com.fasterxml.jackson.core.JsonProcessingException;
 import edu.umd.cs.findbugs.annotations.SuppressFBWarnings;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
-
-import javax.sql.DataSource;
 import java.sql.Connection;
 import java.sql.ResultSet;
 import java.sql.SQLException;
@@ -19,6 +16,9 @@ import java.util.Collections;
 import java.util.List;
 import java.util.concurrent.ThreadLocalRandom;
 import java.util.concurrent.TimeUnit;
+import javax.sql.DataSource;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 /**
  * The general layout of the stairway database tables is:
@@ -187,8 +187,8 @@ class FlightDao {
     final String sqlInsertFlight =
         "INSERT INTO "
             + FLIGHT_TABLE
-            + " (flightId, submit_time, class_name, status, stairway_id)"
-            + "VALUES (:flightId, CURRENT_TIMESTAMP, :className, :status, :stairwayId)";
+            + " (flightId, submit_time, class_name, status, stairway_id, debug_info)"
+            + "VALUES (:flightId, CURRENT_TIMESTAMP, :className, :status, :stairwayId, :debugInfo)";
 
     try (Connection connection = dataSource.getConnection();
         NamedParameterPreparedStatement statement =
@@ -198,11 +198,17 @@ class FlightDao {
       statement.setString("flightId", flightContext.getFlightId());
       statement.setString("className", flightContext.getFlightClassName());
       statement.setString("status", flightContext.getFlightStatus().name());
-      if (flightContext.getFlightStatus() == FlightStatus.READY) {
+      if (flightContext.getFlightStatus() == FlightStatus.READY
+          || flightContext.getFlightStatus() == FlightStatus.READY_TO_RESTART) {
         // If we are submitting to ready, then we don't own the flight
         statement.setString("stairwayId", null);
       } else {
         statement.setString("stairwayId", flightContext.getStairway().getStairwayId());
+      }
+      if (flightContext.getDebugInfo() != null) {
+        statement.setString("debugInfo", flightContext.getDebugInfo().toString());
+      } else {
+        statement.setString("debugInfo", "{}");
       }
       statement.getPreparedStatement().executeUpdate();
 
@@ -276,6 +282,7 @@ class FlightDao {
         complete(flightContext);
         break;
 
+      case READY_TO_RESTART:
       case WAITING:
       case READY:
         disown(flightContext);
@@ -420,8 +427,10 @@ class FlightDao {
    */
   List<String> getReadyFlights() throws DatabaseOperationException, InterruptedException {
     final String sql =
-        "SELECT flightid FROM " + FLIGHT_TABLE + " WHERE stairway_id IS NULL AND status = 'READY'";
-
+        "SELECT flightid FROM "
+            + FLIGHT_TABLE
+            + " WHERE stairway_id IS NULL AND "
+            + "(status = 'READY' OR status = 'READY_TO_RESTART')";
     List<String> flightList = new ArrayList<>();
 
     try (Connection connection = dataSource.getConnection();
@@ -554,10 +563,10 @@ class FlightDao {
   FlightContext resume(String stairwayId, String flightId)
       throws DatabaseOperationException, InterruptedException {
     final String sqlUnownedFlight =
-        "SELECT class_name "
+        "SELECT class_name, debug_info "
             + " FROM "
             + FLIGHT_TABLE
-            + " WHERE (status = 'WAITING' OR status = 'READY' OR status = 'QUEUED')"
+            + " WHERE (status = 'WAITING' OR status = 'READY' OR status = 'QUEUED' OR status = 'READY_TO_RESTART')"
             + " AND stairway_id IS NULL AND flightid = :flightId";
 
     final String sqlTakeOwnership =
@@ -582,9 +591,18 @@ class FlightDao {
           if (rs.next()) {
             List<FlightInput> inputList = retrieveInputParameters(connection, flightId);
             FlightMap inputParameters = new FlightMap(inputList);
+            FlightDebugInfo debugInfo = null;
+            try {
+              debugInfo =
+                  FlightDebugInfo.getObjectMapper()
+                      .readValue(rs.getString("debug_info"), FlightDebugInfo.class);
+            } catch (JsonProcessingException e) {
+              throw new DatabaseOperationException(e);
+            }
             flightContext =
                 new FlightContext(
                     inputParameters, rs.getString("class_name"), Collections.EMPTY_LIST);
+            flightContext.setDebugInfo(debugInfo);
             flightContext.setFlightId(flightId);
 
             fillFlightContexts(connection, Collections.singletonList(flightContext));

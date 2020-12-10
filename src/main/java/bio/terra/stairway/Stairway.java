@@ -539,7 +539,7 @@ public class Stairway {
       String flightId, Class<? extends Flight> flightClass, FlightMap inputParameters)
       throws DatabaseOperationException, StairwayExecutionException, InterruptedException,
           DuplicateFlightIdSubmittedException {
-    submitWorker(flightId, flightClass, inputParameters, false);
+    submitWorker(flightId, flightClass, inputParameters, false, null);
   }
 
   /**
@@ -561,14 +561,26 @@ public class Stairway {
       String flightId, Class<? extends Flight> flightClass, FlightMap inputParameters)
       throws DatabaseOperationException, StairwayExecutionException, InterruptedException,
           DuplicateFlightIdSubmittedException {
-    submitWorker(flightId, flightClass, inputParameters, true);
+    submitWorker(flightId, flightClass, inputParameters, true, null);
+  }
+
+  public void submitWithDebugInfo(
+      String flightId,
+      Class<? extends Flight> flightClass,
+      FlightMap inputParameters,
+      boolean shouldQueue,
+      FlightDebugInfo debugInfo)
+      throws DatabaseOperationException, StairwayExecutionException, InterruptedException,
+          DuplicateFlightIdSubmittedException {
+    submitWorker(flightId, flightClass, inputParameters, shouldQueue, debugInfo);
   }
 
   private void submitWorker(
       String flightId,
       Class<? extends Flight> flightClass,
       FlightMap inputParameters,
-      boolean shouldQueue)
+      boolean shouldQueue,
+      FlightDebugInfo debugInfo)
       throws DatabaseOperationException, StairwayExecutionException, InterruptedException,
           DuplicateFlightIdSubmittedException {
 
@@ -576,7 +588,8 @@ public class Stairway {
       throw new MakeFlightException(
           "Must supply non-null flightClass and inputParameters to submit");
     }
-    Flight flight = flightFactory.makeFlight(flightClass, inputParameters, applicationContext);
+    Flight flight =
+        flightFactory.makeFlight(flightClass, inputParameters, applicationContext, debugInfo);
     FlightContext context = flight.context();
     context.setFlightId(flightId);
 
@@ -652,7 +665,8 @@ public class Stairway {
         flightFactory.makeFlightFromName(
             flightContext.getFlightClassName(),
             flightContext.getInputParameters(),
-            applicationContext);
+            applicationContext,
+            flightContext.getDebugInfo());
     flightContext.setStairway(this);
     flight.setFlightContext(flightContext);
     launchFlight(flight);
@@ -788,6 +802,13 @@ public class Stairway {
 
     if (context.getFlightStatus() == FlightStatus.READY && workQueueEnabled) {
       queueFlight(context.getFlightId());
+    }
+    if (context.getFlightStatus() == FlightStatus.READY_TO_RESTART) {
+      if (workQueueEnabled) {
+        queueFlight(context.getFlightId());
+      } else {
+        resume(context.getFlightId());
+      }
     }
   }
 
