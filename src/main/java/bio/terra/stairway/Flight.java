@@ -7,8 +7,10 @@ import static bio.terra.stairway.FlightStatus.WAITING;
 import bio.terra.stairway.exception.DatabaseOperationException;
 import bio.terra.stairway.exception.RetryException;
 import bio.terra.stairway.exception.StairwayExecutionException;
+import java.util.HashSet;
 import java.util.LinkedList;
 import java.util.List;
+import java.util.Set;
 import org.apache.commons.lang3.builder.ToStringBuilder;
 import org.apache.commons.lang3.builder.ToStringStyle;
 import org.slf4j.Logger;
@@ -40,11 +42,16 @@ public class Flight implements Runnable {
   private FlightContext flightContext;
   private final Object applicationContext;
 
+  // This list will only be populated if debugInfo.FailAtSteps is populated. If so, this
+  // keeps track of which steps have already been failed so we do not infinitely retry.
+  private Set<Integer> debugStepsFailed;
+
   public Flight(FlightMap inputParameters, Object applicationContext) {
     this.applicationContext = applicationContext;
     steps = new LinkedList<>();
     stepClassNames = new LinkedList<>();
     flightContext = new FlightContext(inputParameters, this.getClass().getName(), stepClassNames);
+    debugStepsFailed = new HashSet<>();
   }
 
   public void setDebugInfo(FlightDebugInfo debugInfo) {
@@ -263,8 +270,23 @@ public class Flight implements Runnable {
       try {
         // Do or undo based on direction we are headed
         hookWrapper().startStep(flightContext);
+
         if (context().isDoing()) {
           result = currentStep.step.doStep(context());
+
+          // If we are in debug mode and a failure is set for this step AND we have not already
+          // failed here, then insert a failure. We do this right after the step completes but
+          // before the flight logs it so that we can look for dangerous UNDOs.
+          if (context().getDebugInfo() != null
+              && context().getDebugInfo().getFailAtSteps() != null
+              && context().isDoing()
+              && context().getDebugInfo().getFailAtSteps().containsKey(context().getStepIndex())
+              && !debugStepsFailed.contains(context().getStepIndex())) {
+            result =
+                new StepResult(
+                    this.context().getDebugInfo().getFailAtSteps().get(context().getStepIndex()));
+            debugStepsFailed.add(context().getStepIndex());
+          }
         } else {
           result = currentStep.step.undoStep(context());
         }

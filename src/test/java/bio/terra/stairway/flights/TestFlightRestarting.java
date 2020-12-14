@@ -10,7 +10,7 @@ public class TestFlightRestarting extends Flight {
     // Step 1 - increment
     addStep(new TestStepIncrement());
 
-    // Step 2 - stop - allow for failure
+    // Step 2 - increment
     addStep(new TestStepIncrement());
 
     // Step 3 - increment
