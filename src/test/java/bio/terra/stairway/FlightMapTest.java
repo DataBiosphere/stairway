@@ -19,6 +19,7 @@ public class FlightMapTest {
   @Test
   public void recreateFromSerializedString_uuidClass() throws Exception {
     String key = "key";
+    // UUID class
     UUID uuid = UUID.randomUUID();
     String strValue = objectMapper.writeValueAsString(uuid);
     FlightInput flightInput = new FlightInput(key, strValue);
