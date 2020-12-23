@@ -22,7 +22,7 @@ class StairwayMapper {
               .configure(DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES, false)
               // TODO: replace with new method; the problem is we need to be promiscuous, because
               //  Stairway does not control what objects are serialized into the map.
-              .enableDefaultTyping(ObjectMapper.DefaultTyping.NON_FINAL);
+              .enableDefaultTyping(ObjectMapper.DefaultTyping.EVERYTHING);
     }
     return objectMapper;
   }

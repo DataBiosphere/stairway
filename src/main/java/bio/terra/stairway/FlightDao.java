@@ -6,10 +6,6 @@ import bio.terra.stairway.exception.FlightException;
 import bio.terra.stairway.exception.FlightFilterException;
 import bio.terra.stairway.exception.FlightNotFoundException;
 import edu.umd.cs.findbugs.annotations.SuppressFBWarnings;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
-
-import javax.sql.DataSource;
 import java.sql.Connection;
 import java.sql.ResultSet;
 import java.sql.SQLException;
@@ -18,6 +14,9 @@ import java.util.Collections;
 import java.util.List;
 import java.util.concurrent.ThreadLocalRandom;
 import java.util.concurrent.TimeUnit;
+import javax.sql.DataSource;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 /**
  * The general layout of the stairway database tables is:
@@ -419,8 +418,10 @@ class FlightDao {
         NamedParameterPreparedStatement statement =
             new NamedParameterPreparedStatement(connection, sql)) {
 
-      // My concern, maybe unfounded, is that the snapshot transaction would be reading out of date data,
-      // because there would be too many other transactions writing to the table. Making this a serialized
+      // My concern, maybe unfounded, is that the snapshot transaction would be reading out of date
+      // data,
+      // because there would be too many other transactions writing to the table. Making this a
+      // serialized
       // transaction makes sure that the read transaction is ordered with the write transactions.
       startTransaction(connection);
 
