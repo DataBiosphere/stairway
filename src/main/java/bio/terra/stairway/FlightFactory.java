@@ -15,7 +15,11 @@ public interface FlightFactory {
    * @param context application context for the flight - as supplied to the Stairway builder
    * @return Subclass of the Flight class
    */
-  Flight makeFlight(Class<? extends Flight> flightClass, FlightMap inputParameters, Object context);
+  Flight makeFlight(
+      Class<? extends Flight> flightClass,
+      FlightMap inputParameters,
+      Object context,
+      FlightDebugInfo debugInfo);
 
   /**
    * Create a flight object given the class name of the flight.
@@ -25,5 +29,6 @@ public interface FlightFactory {
    * @param context application context for the flight - as supplied to the Stairway builder
    * @return Subclass of the Flight class
    */
-  Flight makeFlightFromName(String className, FlightMap inputMap, Object context);
+  Flight makeFlightFromName(
+      String className, FlightMap inputMap, Object context, FlightDebugInfo debugInfo);
 }

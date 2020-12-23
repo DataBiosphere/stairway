@@ -39,13 +39,14 @@ public class HookWrapper {
     try {
       return hookMethod.hook(contextCopy);
     } catch (Exception ex) {
-      logger.info("Stairway Hook failed with exception: {}", ex);
+      logger.info("Stairway Hook failed with exception", ex);
     }
     return HookAction.CONTINUE;
   }
 
   private FlightContext makeCopy(FlightContext fc) {
-    FlightContext fc_new = new FlightContext(fc.getInputParameters(), fc.getFlightClassName());
+    FlightContext fc_new =
+        new FlightContext(fc.getInputParameters(), fc.getFlightClassName(), fc.getStepClassNames());
     fc_new.setDirection(fc.getDirection());
     fc_new.setFlightId(fc.getFlightId());
     fc_new.setFlightStatus(fc.getFlightStatus());
@@ -53,6 +54,7 @@ public class HookWrapper {
     fc_new.setStepIndex(fc.getStepIndex());
     fc_new.setResult(fc.getResult());
     fc_new.setRerun(fc.isRerun());
+    fc_new.setDebugInfo(fc.getDebugInfo());
     return fc_new;
   }
 }

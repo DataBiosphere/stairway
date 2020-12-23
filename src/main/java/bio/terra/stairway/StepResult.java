@@ -57,7 +57,8 @@ public class StepResult {
     return (stepStatus == StepStatus.STEP_RESULT_SUCCESS
         || stepStatus == StepStatus.STEP_RESULT_RERUN
         || stepStatus == StepStatus.STEP_RESULT_STOP
-        || stepStatus == StepStatus.STEP_RESULT_WAIT);
+        || stepStatus == StepStatus.STEP_RESULT_WAIT
+        || stepStatus == StepStatus.STEP_RESULT_RESTART_FLIGHT);
   }
 
   @Override

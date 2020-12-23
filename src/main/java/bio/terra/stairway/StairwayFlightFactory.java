@@ -12,12 +12,16 @@ public class StairwayFlightFactory implements FlightFactory {
 
   @Override
   public Flight makeFlight(
-      Class<? extends Flight> flightClass, FlightMap inputParameters, Object context) {
+      Class<? extends Flight> flightClass,
+      FlightMap inputParameters,
+      Object context,
+      FlightDebugInfo debugInfo) {
     try {
       // Find the flightClass constructor that takes the input parameter map and
       // use it to make the flight.
       Constructor constructor = flightClass.getConstructor(FlightMap.class, Object.class);
       Flight flight = (Flight) constructor.newInstance(inputParameters, context);
+      flight.setDebugInfo(debugInfo);
       return flight;
     } catch (InvocationTargetException
         | NoSuchMethodException
@@ -28,12 +32,13 @@ public class StairwayFlightFactory implements FlightFactory {
   }
 
   @Override
-  public Flight makeFlightFromName(String className, FlightMap inputMap, Object context) {
+  public Flight makeFlightFromName(
+      String className, FlightMap inputMap, Object context, FlightDebugInfo debugInfo) {
     try {
       Class<?> someClass = Class.forName(className);
       if (Flight.class.isAssignableFrom(someClass)) {
         Class<? extends Flight> flightClass = (Class<? extends Flight>) someClass;
-        return makeFlight(flightClass, inputMap, context);
+        return makeFlight(flightClass, inputMap, context, debugInfo);
       }
       // Error case
       throw new MakeFlightException(
