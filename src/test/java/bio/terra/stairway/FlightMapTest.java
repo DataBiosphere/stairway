@@ -42,7 +42,6 @@ public class FlightMapTest {
     assertEquals(nonFinalClass, map.get(key, NonFinalClass.class));
   }
 
-  /** I tried to write a test for customized final class, */
   private static final class FinalClass implements java.io.Serializable {
     private int value;
 
@@ -62,7 +61,6 @@ public class FlightMapTest {
     }
   }
 
-  /** I tried to write a test for customized final class, */
   private static class NonFinalClass implements java.io.Serializable {
     private int value;
 

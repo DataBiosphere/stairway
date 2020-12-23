@@ -1,24 +1,16 @@
 package bio.terra.stairway;
 
 import static bio.terra.stairway.FlightStatus.READY;
-<<<<<<< HEAD
-=======
 import static bio.terra.stairway.FlightStatus.READY_TO_RESTART;
->>>>>>> origin
 import static bio.terra.stairway.FlightStatus.WAITING;
 
 import bio.terra.stairway.exception.DatabaseOperationException;
 import bio.terra.stairway.exception.RetryException;
 import bio.terra.stairway.exception.StairwayExecutionException;
-<<<<<<< HEAD
-import java.util.LinkedList;
-import java.util.List;
-=======
 import java.util.HashSet;
 import java.util.LinkedList;
 import java.util.List;
 import java.util.Set;
->>>>>>> origin
 import org.apache.commons.lang3.builder.ToStringBuilder;
 import org.apache.commons.lang3.builder.ToStringStyle;
 import org.slf4j.Logger;
