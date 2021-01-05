@@ -340,6 +340,7 @@ public class Flight implements Runnable {
       }
     } while (currentStep.retryRule
         .retrySleep()); // retry rule decides if we should try again or not
+    logger.info("No longer retrying - retry rule has reached it's limit");
     return result;
   }
 
