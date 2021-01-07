@@ -1,9 +1,10 @@
 package bio.terra.stairway;
 
-import java.util.concurrent.ThreadLocalRandom;
-import java.util.concurrent.TimeUnit;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+
+import java.util.concurrent.ThreadLocalRandom;
+import java.util.concurrent.TimeUnit;
 
 public class RetryRuleRandomBackoff implements RetryRule {
   private static final Logger logger = LoggerFactory.getLogger(RetryRule.class);
@@ -39,21 +40,21 @@ public class RetryRuleRandomBackoff implements RetryRule {
 
   @Override
   public boolean retrySleep() throws InterruptedException {
-    if (retryCount >= maxCount) {
-      logger.info("Retry rule random: try {} of {} - not retrying", retryCount, maxCount);
+    retryCount++;
+    if (retryCount > maxCount) {
+      logger.info("Retry rule random: retried {} times - not retrying", maxCount);
       return false;
     }
 
     int sleepUnits = ThreadLocalRandom.current().nextInt(0, maxConcurrency);
     long ms = sleepUnits * operationIncrementMilliseconds;
     logger.info(
-        "Retry rule random: try {} of {} - retrying after sleep of {} milliseconds",
+        "Retry rule random: starting retry {} of {} after sleep of {} milliseconds",
         retryCount,
         maxCount,
         ms);
 
     TimeUnit.MILLISECONDS.sleep(ms);
-    retryCount++;
     return true;
   }
 }

@@ -1,8 +1,9 @@
 package bio.terra.stairway;
 
-import java.util.concurrent.TimeUnit;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+
+import java.util.concurrent.TimeUnit;
 
 public class RetryRuleFixedInterval implements RetryRule {
   private static final Logger logger = LoggerFactory.getLogger(RetryRule.class);
@@ -33,19 +34,19 @@ public class RetryRuleFixedInterval implements RetryRule {
 
   @Override
   public boolean retrySleep() throws InterruptedException {
-    if (retryCount >= maxCount) {
-      logger.info("Retry rule fixed: try {} of {} - not retrying", retryCount, maxCount);
+    retryCount++;
+    if (retryCount > maxCount) {
+      logger.info("Retry rule fixed: retried {} times - not retrying", maxCount);
       return false;
     }
 
     logger.info(
-        "Retry rule fixed: try {} of {} - retrying after sleep of {} seconds",
+        "Retry rule fixed: starting retry {} of {} after sleep of {} seconds",
         retryCount,
         maxCount,
         intervalSeconds);
 
     TimeUnit.SECONDS.sleep(intervalSeconds);
-    retryCount++;
     return true;
   }
 }
