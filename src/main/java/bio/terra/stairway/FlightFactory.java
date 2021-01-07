@@ -13,6 +13,7 @@ public interface FlightFactory {
    * @param flightClass class of the flight to create
    * @param inputParameters input FlightMap for the constructor - as supplied on the submit call
    * @param context application context for the flight - as supplied to the Stairway builder
+   * @param debugInfo optional debug information for flight testing
    * @return Subclass of the Flight class
    */
   Flight makeFlight(
@@ -27,6 +28,7 @@ public interface FlightFactory {
    * @param className string name of the class to construct
    * @param inputMap input FlightMap for the constructor
    * @param context application context for the flight - as supplied to the Stairway builder
+   * @param debugInfo optional debug information for flight testing
    * @return Subclass of the Flight class
    */
   Flight makeFlightFromName(

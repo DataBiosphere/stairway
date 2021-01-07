@@ -5,6 +5,7 @@ import bio.terra.stairway.FlightMap;
 import bio.terra.stairway.RetryRule;
 import bio.terra.stairway.RetryRuleExponentialBackoff;
 import bio.terra.stairway.RetryRuleFixedInterval;
+import bio.terra.stairway.RetryRuleRandomBackoff;
 import org.apache.commons.lang3.StringUtils;
 
 public class TestFlightRetry extends Flight {
@@ -29,11 +30,15 @@ public class TestFlightRetry extends Flight {
       retryRule =
           new RetryRuleExponentialBackoff(
               initialIntervalSeconds, maxIntervalSeconds, maxOperationTimeSeconds);
+    } else if (StringUtils.equals("random", retryType)) {
+      long operationMilliseconds = inputParameters.get("operationMilliseconds", Long.class);
+      int maxConcurrency = inputParameters.get("maxConcurrency", Integer.class);
+      int maxCount = inputParameters.get("maxCount", Integer.class);
+      retryRule = new RetryRuleRandomBackoff(operationMilliseconds, maxConcurrency, maxCount);
     } else {
       throw new IllegalArgumentException("Invalid inputParameter retryType");
     }
 
-    // Step 1 - test file existence
     addStep(new TestStepRetry(failCount), retryRule);
   }
 }

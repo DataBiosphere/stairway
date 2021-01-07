@@ -328,7 +328,7 @@ public class Flight implements Runnable {
             logger.info("Quieting down - not retrying: " + context().prettyStepState());
             return result;
           }
-          logger.info("Retrying: " + context().prettyStepState());
+          logger.info("Invoking retry rule: " + context().prettyStepState());
           break;
 
         default:

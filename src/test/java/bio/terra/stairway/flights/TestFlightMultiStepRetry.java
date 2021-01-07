@@ -15,7 +15,6 @@ public class TestFlightMultiStepRetry extends Flight {
 
     // Pull out our parameters and feed them in to the step classes.
     String retryType = inputParameters.get("retryType", String.class);
-    Integer failCount = inputParameters.get("failCount", Integer.class);
 
     if (StringUtils.equals("fixed", retryType)) {
       Integer intervalSeconds = inputParameters.get("intervalSeconds", Integer.class);
