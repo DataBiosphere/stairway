@@ -1,15 +1,19 @@
 package bio.terra.stairway;
 
 import java.time.Duration;
-import java.time.LocalDateTime;
+import java.time.Instant;
 import java.util.concurrent.TimeUnit;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 public class RetryRuleExponentialBackoff implements RetryRule {
+  private static final Logger logger = LoggerFactory.getLogger(RetryRule.class);
+
   private final long initialIntervalSeconds;
   private final long maxIntervalSeconds;
   private final long maxOperationTimeSeconds;
 
-  private LocalDateTime endTime;
+  private Instant endTime;
   private long intervalSeconds;
 
   /**
@@ -29,14 +33,23 @@ public class RetryRuleExponentialBackoff implements RetryRule {
   @Override
   public void initialize() {
     intervalSeconds = initialIntervalSeconds;
-    endTime = LocalDateTime.now().plus(Duration.ofSeconds(maxOperationTimeSeconds));
+    endTime = Instant.now().plus(Duration.ofSeconds(maxOperationTimeSeconds));
   }
 
   @Override
   public boolean retrySleep() throws InterruptedException {
-    if (LocalDateTime.now().isAfter(endTime)) {
+    Instant now = Instant.now();
+    if (now.isAfter(endTime)) {
+      logger.info(
+          "Retry rule exponential: now ({}) is past max time {} - not retrying", now, endTime);
       return false;
     }
+
+    logger.info(
+        "Retry rule exponential: now ({}) is before {} - retrying after sleep of {} seconds",
+        now,
+        endTime,
+        intervalSeconds);
 
     TimeUnit.SECONDS.sleep(intervalSeconds);
     intervalSeconds = intervalSeconds + intervalSeconds;

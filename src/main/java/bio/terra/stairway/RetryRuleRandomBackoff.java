@@ -1,9 +1,14 @@
 package bio.terra.stairway;
 
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
 import java.util.concurrent.ThreadLocalRandom;
 import java.util.concurrent.TimeUnit;
 
 public class RetryRuleRandomBackoff implements RetryRule {
+  private static final Logger logger = LoggerFactory.getLogger(RetryRule.class);
+
   private final long operationIncrementMilliseconds;
   private final int maxConcurrency;
   private final int maxCount;
@@ -12,7 +17,7 @@ public class RetryRuleRandomBackoff implements RetryRule {
   private int retryCount;
 
   /**
-   * Retry with random backoff for concurrent threads Assume operation requires
+   * Retry with random backoff for concurrent threads. Assume operation requires
    * operationIncrementMilliseconds. We want to spread maxConcurrency threads so that we will do
    * roughly one at a time. So we get a random integer between 0 and maxConcurrency-1 and multiply
    * that by the operation time. We sleep that long and retry.
@@ -35,13 +40,21 @@ public class RetryRuleRandomBackoff implements RetryRule {
 
   @Override
   public boolean retrySleep() throws InterruptedException {
-    if (retryCount >= maxCount) {
+    retryCount++;
+    if (retryCount > maxCount) {
+      logger.info("Retry rule random: retried {} times - not retrying", maxCount);
       return false;
     }
 
     int sleepUnits = ThreadLocalRandom.current().nextInt(0, maxConcurrency);
-    TimeUnit.MILLISECONDS.sleep(sleepUnits * operationIncrementMilliseconds);
-    retryCount++;
+    long ms = sleepUnits * operationIncrementMilliseconds;
+    logger.info(
+        "Retry rule random: starting retry {} of {} after sleep of {} milliseconds",
+        retryCount,
+        maxCount,
+        ms);
+
+    TimeUnit.MILLISECONDS.sleep(ms);
     return true;
   }
 }

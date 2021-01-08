@@ -128,4 +128,22 @@ public class RetryTest {
     assertThat(result.getFlightStatus(), is(FlightStatus.SUCCESS));
     assertFalse(result.getException().isPresent());
   }
+
+  @Test
+  public void randomFailureTest() throws Exception {
+    // Should fail by running out of tries, like fixed
+    FlightMap inputParameters = new FlightMap();
+    inputParameters.put("retryType", "random");
+    inputParameters.put("failCount", 4);
+    inputParameters.put("operationMilliseconds", 500L);
+    inputParameters.put("maxConcurrency", 5);
+    inputParameters.put("maxCount", 3);
+
+    String flightId = "randomFailureTest";
+    stairway.submit(flightId, TestFlightRetry.class, inputParameters);
+
+    FlightState result = stairway.waitForFlight(flightId, null, null);
+    assertThat(result.getFlightStatus(), is(equalTo(FlightStatus.ERROR)));
+    assertTrue(result.getException().isPresent());
+  }
 }
