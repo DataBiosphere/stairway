@@ -1,8 +1,9 @@
 package bio.terra.stairway;
 
-import java.util.List;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.commons.lang3.builder.ToStringBuilder;
+
+import java.util.List;
 
 /**
  * Context for a flight. This contains the full state for a flight. It is what is held in the
@@ -11,8 +12,7 @@ import org.apache.commons.lang3.builder.ToStringBuilder;
 public class FlightContext {
   private Stairway stairway; // the stairway instance running this flight
   private String flightId; // unique id for the flight
-  private final String
-      flightClassName; // class name of the flight;  for recreating the flight object
+  private final String flightClassName; // class name of the flight
   private final FlightMap inputParameters; // allows for reconstructing the flight; set unmodifiable
   private final FlightMap workingMap; // open-ended state used by the steps
   private int stepIndex; // what step we are on
@@ -22,6 +22,7 @@ public class FlightContext {
   private FlightStatus flightStatus;
   private List<String> stepClassNames;
   private FlightDebugInfo debugInfo;
+  private List<StepHook> stepHooks;
 
   // Construct the context with defaults
   public FlightContext(
@@ -133,6 +134,14 @@ public class FlightContext {
 
   public FlightDebugInfo getDebugInfo() {
     return debugInfo;
+  }
+
+  public List<StepHook> getStepHooks() {
+    return stepHooks;
+  }
+
+  public void setStepHooks(List<StepHook> stepHooks) {
+    this.stepHooks = stepHooks;
   }
 
   /**

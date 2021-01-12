@@ -3,45 +3,123 @@ package bio.terra.stairway;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import java.util.ArrayList;
+import java.util.List;
+import java.util.Optional;
+
 public class HookWrapper {
   private static final Logger logger = LoggerFactory.getLogger(HookWrapper.class);
-  private StairwayHook stairwayHook;
+  private final List<StairwayHook> stairwayHooks;
 
-  public HookWrapper(StairwayHook stairwayHook) {
-    this.stairwayHook = stairwayHook;
+  private enum HookOperation {
+    START_FLIGHT,
+    START_STEP,
+    END_STEP,
+    END_FLIGHT,
+    STATE_TRANSITION
   }
 
-  public HookAction startFlight(FlightContext flightContext) {
-    return handleHook(flightContext, context -> stairwayHook.startFlight(context));
+  public HookWrapper(List<StairwayHook> stairwayHooks) {
+    this.stairwayHooks = stairwayHooks;
   }
 
-  public HookAction startStep(FlightContext flightContext) {
-    return handleHook(flightContext, context -> stairwayHook.startStep(context));
+  public void startFlight(FlightContext flightContext) {
+    handleHookList(flightContext, HookOperation.START_FLIGHT);
   }
 
-  public HookAction endStep(FlightContext flightContext) {
-    return handleHook(flightContext, context -> stairwayHook.endStep(context));
+  public void startStep(FlightContext flightContext) throws InterruptedException {
+    if (stairwayHooks != null) {
+      FlightContext contextCopy = makeCopy(flightContext);
+      // First handle plain step hooks
+      handleHookList(contextCopy, HookOperation.START_STEP);
+      // Use the factory to collect any step hooks for this step
+      List<StepHook> stepHooks = new ArrayList<>();
+      for (StairwayHook stairwayHook : stairwayHooks) {
+        Optional<StepHook> maybeStepHook = stairwayHook.stepFactory(contextCopy);
+        maybeStepHook.ifPresent(stepHooks::add);
+      }
+      // Then handle an step hooks list from the factory
+      handleStepHookList(stepHooks, contextCopy, HookOperation.START_STEP);
+      flightContext.setStepHooks(stepHooks);
+    }
   }
 
-  public HookAction endFlight(FlightContext flightContext) {
-    return handleHook(flightContext, context -> stairwayHook.endFlight(context));
+  public void endStep(FlightContext flightContext) {
+    if (stairwayHooks != null) {
+      FlightContext contextCopy = makeCopy(flightContext);
+      // First handle plain step hooks
+      handleHookList(contextCopy, HookOperation.END_STEP);
+      // Next handle the step hooks list from the flight context
+      handleStepHookList(flightContext.getStepHooks(), contextCopy, HookOperation.END_STEP);
+      flightContext.setStepHooks(null);
+    }
+  }
+
+  public void endFlight(FlightContext flightContext) {
+    handleHookList(flightContext, HookOperation.END_FLIGHT);
   }
 
   private interface HookInterface {
-    HookAction hook(FlightContext context) throws InterruptedException;
+    void hook(FlightContext context) throws InterruptedException;
   }
 
-  private HookAction handleHook(FlightContext context, HookInterface hookMethod) {
-    if (stairwayHook == null) {
-      return HookAction.CONTINUE;
+  private void handleHookList(FlightContext context, HookOperation operation) {
+    if (stairwayHooks != null) {
+      for (StairwayHook stairwayHook : stairwayHooks) {
+        switch (operation) {
+          case START_FLIGHT:
+            handleHook(makeCopy(context), stairwayHook::startFlight);
+            break;
+
+          case START_STEP:
+            // copy is made in the caller
+            handleHook(context, stairwayHook::startStep);
+            break;
+
+          case END_STEP:
+            // copy is made in the caller
+            handleHook(context, stairwayHook::endStep);
+            break;
+
+          case END_FLIGHT:
+            handleHook(makeCopy(context), stairwayHook::endFlight);
+            break;
+
+          case STATE_TRANSITION:
+            handleHook(makeCopy(context), stairwayHook::stateTransition);
+            break;
+        }
+      }
     }
-    FlightContext contextCopy = makeCopy(context);
+  }
+
+  private void handleStepHookList(List<StepHook> stepHooks, FlightContext context, HookOperation operation) {
+    if (stepHooks != null) {
+      for (StepHook stepHook : stepHooks) {
+        switch (operation) {
+          case START_STEP:
+            handleHook(context, stepHook::startStep);
+            break;
+
+          case END_STEP:
+            handleHook(context, stepHook::endStep);
+            break;
+
+          case END_FLIGHT:
+          case START_FLIGHT:
+          case STATE_TRANSITION:
+            break;
+        }
+      }
+    }
+  }
+
+  private void handleHook(FlightContext context, HookInterface hookMethod) {
     try {
-      return hookMethod.hook(contextCopy);
+      hookMethod.hook(context);
     } catch (Exception ex) {
       logger.info("Stairway Hook failed with exception", ex);
     }
-    return HookAction.CONTINUE;
   }
 
   private FlightContext makeCopy(FlightContext fc) {

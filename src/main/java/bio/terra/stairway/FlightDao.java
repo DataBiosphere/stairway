@@ -8,6 +8,10 @@ import bio.terra.stairway.exception.FlightFilterException;
 import bio.terra.stairway.exception.FlightNotFoundException;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import edu.umd.cs.findbugs.annotations.SuppressFBWarnings;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
+import javax.sql.DataSource;
 import java.sql.Connection;
 import java.sql.ResultSet;
 import java.sql.SQLException;
@@ -16,9 +20,6 @@ import java.util.Collections;
 import java.util.List;
 import java.util.concurrent.ThreadLocalRandom;
 import java.util.concurrent.TimeUnit;
-import javax.sql.DataSource;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 
 /**
  * The general layout of the stairway database tables is:
@@ -95,7 +96,10 @@ class FlightDao {
               + " VALUES (:stairwayId, :stairwayName)";
       try (NamedParameterPreparedStatement statement =
           new NamedParameterPreparedStatement(connection, sqlStairwayInstanceCreate)) {
-        stairwayId = ShortUUID.get();
+        // This is Step 1 of removing use of a separate stairwayId and using the name
+        // for the id everywhere. See src/main/resources/stairway/db/SCHEMA.md
+        // for the migration plan.
+        stairwayId = stairwayName;
 
         statement.setString("stairwayName", stairwayName);
         statement.setString("stairwayId", stairwayId);
@@ -228,7 +232,7 @@ class FlightDao {
     }
   }
 
-  /** Record the flight state right after a step Mark if we are re-running the step */
+  /** Record the flight state right after a step */
   void step(FlightContext flightContext) throws DatabaseOperationException, InterruptedException {
     final String sqlInsertFlightLog =
         "INSERT INTO "

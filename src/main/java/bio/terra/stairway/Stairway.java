@@ -8,20 +8,22 @@ import bio.terra.stairway.exception.MakeFlightException;
 import bio.terra.stairway.exception.MigrateException;
 import bio.terra.stairway.exception.QueueException;
 import bio.terra.stairway.exception.StairwayExecutionException;
-import java.io.IOException;
-import java.util.List;
-import java.util.UUID;
-import java.util.concurrent.LinkedBlockingQueue;
-import java.util.concurrent.ThreadPoolExecutor;
-import java.util.concurrent.TimeUnit;
-import java.util.concurrent.atomic.AtomicBoolean;
-import javax.sql.DataSource;
 import org.apache.commons.lang3.builder.EqualsBuilder;
 import org.apache.commons.lang3.builder.HashCodeBuilder;
 import org.apache.commons.lang3.builder.ToStringBuilder;
 import org.apache.commons.lang3.builder.ToStringStyle;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+
+import javax.sql.DataSource;
+import java.io.IOException;
+import java.util.ArrayList;
+import java.util.List;
+import java.util.UUID;
+import java.util.concurrent.LinkedBlockingQueue;
+import java.util.concurrent.ThreadPoolExecutor;
+import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicBoolean;
 
 /** Stairway is the object that drives execution of Flights. */
 public class Stairway {
@@ -60,7 +62,7 @@ public class Stairway {
     private ExceptionSerializer exceptionSerializer;
     private String stairwayName;
     private String stairwayClusterName;
-    private StairwayHook stairwayHook;
+    private List<StairwayHook> stairwayHooks;
     private boolean enableWorkQueue;
     private Boolean keepFlightLog;
     private FlightFactory flightFactory;
@@ -181,12 +183,18 @@ public class Stairway {
     }
 
     /**
+     * Each call to stairwayHook adds hook object to a list of hooks. The hooks are processed in
+     * the order in which they are added to the builder.
+     *
      * @param stairwayHook object containing hooks for logging at beginning and end of flight and
      *     step of stairway
      * @return this
      */
     public Builder stairwayHook(StairwayHook stairwayHook) {
-      this.stairwayHook = stairwayHook;
+      if (this.stairwayHooks == null) {
+        this.stairwayHooks = new ArrayList<>();
+      }
+      this.stairwayHooks.add(stairwayHook);
       return this;
     }
 
@@ -320,7 +328,7 @@ public class Stairway {
     this.applicationContext = builder.applicationContext;
     this.keepFlightLog = (builder.keepFlightLog == null) ? true : builder.keepFlightLog;
     this.quietingDown = new AtomicBoolean();
-    this.hookWrapper = new HookWrapper(builder.stairwayHook);
+    this.hookWrapper = new HookWrapper(builder.stairwayHooks);
   }
 
   /**

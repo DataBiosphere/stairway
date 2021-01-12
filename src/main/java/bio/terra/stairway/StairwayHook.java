@@ -1,11 +1,28 @@
 package bio.terra.stairway;
 
+import java.util.Optional;
+
 public interface StairwayHook {
-  HookAction startFlight(FlightContext context) throws InterruptedException;
+  default HookAction startFlight(FlightContext context) throws InterruptedException {
+    return HookAction.CONTINUE;
+  }
 
-  HookAction startStep(FlightContext context) throws InterruptedException;
+  default HookAction startStep(FlightContext context) throws InterruptedException {
+    return HookAction.CONTINUE;
+  }
 
-  HookAction endFlight(FlightContext context) throws InterruptedException;
+  default HookAction endFlight(FlightContext context) throws InterruptedException {
+    return HookAction.CONTINUE;
+  }
 
-  HookAction endStep(FlightContext context) throws InterruptedException;
+  default HookAction endStep(FlightContext context) throws InterruptedException {
+    return HookAction.CONTINUE;
+  }
+
+  default HookAction stateTransition(FlightContext context) throws InterruptedException {
+    return HookAction.CONTINUE;
+  }
+  default Optional<StepHook> stepFactory(FlightContext context) throws InterruptedException {
+    return Optional.empty();
+  }
 }
