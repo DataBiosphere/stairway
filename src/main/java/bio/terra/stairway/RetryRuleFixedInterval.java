@@ -1,9 +1,8 @@
 package bio.terra.stairway;
 
+import java.util.concurrent.TimeUnit;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-
-import java.util.concurrent.TimeUnit;
 
 public class RetryRuleFixedInterval implements RetryRule {
   private static final Logger logger = LoggerFactory.getLogger(RetryRule.class);

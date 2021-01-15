@@ -22,6 +22,7 @@ public interface StairwayHook {
   default HookAction stateTransition(FlightContext context) throws InterruptedException {
     return HookAction.CONTINUE;
   }
+
   default Optional<StepHook> stepFactory(FlightContext context) throws InterruptedException {
     return Optional.empty();
   }

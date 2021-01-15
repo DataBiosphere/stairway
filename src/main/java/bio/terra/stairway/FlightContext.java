@@ -1,9 +1,8 @@
 package bio.terra.stairway;
 
+import java.util.List;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.commons.lang3.builder.ToStringBuilder;
-
-import java.util.List;
 
 /**
  * Context for a flight. This contains the full state for a flight. It is what is held in the

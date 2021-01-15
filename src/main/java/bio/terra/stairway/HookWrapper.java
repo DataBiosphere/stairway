@@ -1,12 +1,11 @@
 package bio.terra.stairway;
 
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
-
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
 import java.util.Optional;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 public class HookWrapper {
   private static final Logger logger = LoggerFactory.getLogger(HookWrapper.class);
@@ -14,52 +13,65 @@ public class HookWrapper {
 
   private enum HookOperation {
     START_FLIGHT {
-      void handleHook(FlightContext context, StairwayHook stairwayHook) throws InterruptedException {
-        stairwayHook.startFlight(context);
+      void handleHook(FlightContext context, StairwayHook stairwayHook)
+          throws InterruptedException {
+        checkHookAction(stairwayHook.startFlight(context));
       }
     },
     START_STEP {
-      void handleHook(FlightContext context, StairwayHook stairwayHook) throws InterruptedException {
-        stairwayHook.startStep(context);
+      void handleHook(FlightContext context, StairwayHook stairwayHook)
+          throws InterruptedException {
+        checkHookAction(stairwayHook.startStep(context));
       }
 
       void handleStepHook(FlightContext context, StepHook stepHook) throws InterruptedException {
-        stepHook.startStep(context);
+        checkHookAction(stepHook.startStep(context));
       }
     },
     END_STEP {
-      void handleHook(FlightContext context, StairwayHook stairwayHook) throws InterruptedException {
-        stairwayHook.endStep(context);
+      void handleHook(FlightContext context, StairwayHook stairwayHook)
+          throws InterruptedException {
+        checkHookAction(stairwayHook.endStep(context));
       }
 
       void handleStepHook(FlightContext context, StepHook stepHook) throws InterruptedException {
-        stepHook.endStep(context);
+        checkHookAction(stepHook.endStep(context));
       }
     },
     END_FLIGHT {
-      void handleHook(FlightContext context, StairwayHook stairwayHook) throws InterruptedException {
-        stairwayHook.endFlight(context);
+      void handleHook(FlightContext context, StairwayHook stairwayHook)
+          throws InterruptedException {
+        checkHookAction(stairwayHook.endFlight(context));
       }
     },
     STATE_TRANSITION {
-      void handleHook(FlightContext context, StairwayHook stairwayHook) throws InterruptedException {
-        stairwayHook.stateTransition(context);
+      void handleHook(FlightContext context, StairwayHook stairwayHook)
+          throws InterruptedException {
+        checkHookAction(stairwayHook.stateTransition(context));
       }
     };
 
-    abstract void handleHook(FlightContext context, StairwayHook stairwayHook) throws InterruptedException;
-    void handleStepHook(FlightContext context, StepHook stepHook) throws InterruptedException { }
+    abstract void handleHook(FlightContext context, StairwayHook stairwayHook)
+        throws InterruptedException;
+
+    void handleStepHook(FlightContext context, StepHook stepHook) throws InterruptedException {}
+
+    void checkHookAction(HookAction action) {
+      if (action != HookAction.CONTINUE) {
+        logger.warn("Unexpected hook action: {}", action.name());
+      }
+    }
   }
 
-  public HookWrapper(List<StairwayHook> stairwayHooks) {
+  HookWrapper(List<StairwayHook> stairwayHooks) {
     this.stairwayHooks = stairwayHooks != null ? stairwayHooks : Collections.emptyList();
   }
 
-  public void startFlight(FlightContext flightContext) {
+  void startFlight(FlightContext flightContext) {
     handleHookList(flightContext, HookOperation.START_FLIGHT);
   }
 
-  public void startStep(FlightContext flightContext) throws InterruptedException {
+  void startStep(FlightContext flightContext) throws InterruptedException {
     // First handle plain step hooks
     handleHookList(flightContext, HookOperation.START_STEP);
     // Use the factory to collect any step hooks for this step
@@ -73,7 +85,7 @@ public class HookWrapper {
     flightContext.setStepHooks(stepHooks);
   }
 
-  public void endStep(FlightContext flightContext) {
+  void endStep(FlightContext flightContext) {
     // First handle plain step hooks
     handleHookList(flightContext, HookOperation.END_STEP);
     // Next handle the step hooks list from the flight context
@@ -81,8 +93,12 @@ public class HookWrapper {
     flightContext.setStepHooks(null);
   }
 
-  public void endFlight(FlightContext flightContext) {
+  void endFlight(FlightContext flightContext) {
     handleHookList(flightContext, HookOperation.END_FLIGHT);
+  }
+
+  void stateTransition(FlightContext flightContext) {
+    handleHookList(flightContext, HookOperation.STATE_TRANSITION);
   }
 
   private void handleHookList(FlightContext context, HookOperation operation) {
@@ -95,7 +111,8 @@ public class HookWrapper {
     }
   }
 
-  private void handleStepHookList(List<StepHook> stepHooks, FlightContext context, HookOperation operation) {
+  private void handleStepHookList(
+      List<StepHook> stepHooks, FlightContext context, HookOperation operation) {
     if (stepHooks != null) {
       for (StepHook stepHook : stepHooks) {
         try {

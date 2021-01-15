@@ -44,7 +44,7 @@ public class Flight implements Runnable {
 
   // This list will only be populated if debugInfo.FailAtSteps is populated. If so, this
   // keeps track of which steps have already been failed so we do not infinitely retry.
-  private Set<Integer> debugStepsFailed;
+  private final Set<Integer> debugStepsFailed;
 
   public Flight(FlightMap inputParameters, Object applicationContext) {
     this.applicationContext = applicationContext;
