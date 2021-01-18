@@ -1,15 +1,5 @@
 package bio.terra.stairway;
 
-import static org.hamcrest.CoreMatchers.containsString;
-import static org.hamcrest.CoreMatchers.equalTo;
-import static org.hamcrest.CoreMatchers.is;
-import static org.hamcrest.MatcherAssert.assertThat;
-import static org.hamcrest.Matchers.lessThan;
-import static org.junit.jupiter.api.Assertions.assertFalse;
-import static org.junit.jupiter.api.Assertions.assertNotNull;
-import static org.junit.jupiter.api.Assertions.assertNull;
-import static org.junit.jupiter.api.Assertions.assertTrue;
-
 import bio.terra.stairway.exception.FlightNotFoundException;
 import bio.terra.stairway.fixtures.MapKey;
 import bio.terra.stairway.fixtures.TestPauseController;
@@ -20,15 +10,27 @@ import bio.terra.stairway.flights.TestFlightRerun;
 import bio.terra.stairway.flights.TestFlightRerunUndo;
 import bio.terra.stairway.flights.TestFlightUndo;
 import bio.terra.stairway.flights.TestFlightWait;
-import java.io.File;
-import java.io.PrintWriter;
-import java.util.UUID;
-import java.util.concurrent.TimeUnit;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+
+import java.io.File;
+import java.io.PrintWriter;
+import java.util.Arrays;
+import java.util.UUID;
+import java.util.concurrent.TimeUnit;
+
+import static org.hamcrest.CoreMatchers.containsString;
+import static org.hamcrest.CoreMatchers.equalTo;
+import static org.hamcrest.CoreMatchers.is;
+import static org.hamcrest.MatcherAssert.assertThat;
+import static org.hamcrest.Matchers.lessThan;
+import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.junit.jupiter.api.Assertions.assertNull;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 
 @Tag("unit")
 public class ScenarioTest {
@@ -39,7 +41,7 @@ public class ScenarioTest {
   @BeforeEach
   public void setup() throws Exception {
     stairwayName = TestUtil.randomStairwayName();
-    stairway = TestUtil.setupStairway(stairwayName, false);
+    stairway = TestUtil.setupStairwayWithHooks(stairwayName, false, 1);
   }
 
   @Test
@@ -72,6 +74,22 @@ public class ScenarioTest {
     } catch (FlightNotFoundException ex) {
       assertThat(ex.getMessage(), containsString(flightId));
     }
+
+    // Validate the hook log
+    TestUtil.checkHookLog(
+        Arrays.asList(
+            "1:stateTransition:RUNNING",
+            "1:startFlight",
+            "1:startStep",
+            "1:stepHook:startStep",
+            "1:endStep",
+            "1:stepHook:endStep",
+            "1:startStep",
+            "1:stepHook:startStep",
+            "1:endStep",
+            "1:stepHook:endStep",
+            "1:stateTransition:SUCCESS",
+            "1:endFlight"));
   }
 
   @Test
@@ -99,6 +117,21 @@ public class ScenarioTest {
 
     // The error text thrown by TestStepExistence
     assertThat(result.getException().get().getMessage(), containsString("already exists"));
+
+    TestUtil.checkHookLog(
+        Arrays.asList(
+            "1:stateTransition:RUNNING",
+            "1:startFlight",
+            "1:startStep",
+            "1:stepHook:startStep",
+            "1:endStep",
+            "1:stepHook:endStep",
+            "1:startStep",
+            "1:stepHook:startStep",
+            "1:endStep",
+            "1:stepHook:endStep",
+            "1:stateTransition:ERROR",
+            "1:endFlight"));
   }
 
   @Test
@@ -139,6 +172,37 @@ public class ScenarioTest {
     // We expect the existent filename to still be there
     file = new File(existingFilename);
     assertTrue(file.exists());
+
+    TestUtil.checkHookLog(
+        Arrays.asList(
+            "1:stateTransition:RUNNING",
+            "1:startFlight",
+            "1:startStep",
+            "1:stepHook:startStep",
+            "1:endStep",
+            "1:stepHook:endStep",
+            "1:startStep",
+            "1:stepHook:startStep",
+            "1:endStep",
+            "1:stepHook:endStep",
+            "1:startStep",
+            "1:stepHook:startStep",
+            "1:endStep",
+            "1:stepHook:endStep",
+            "1:startStep",
+            "1:stepHook:startStep",
+            "1:endStep",
+            "1:stepHook:endStep",
+            "1:startStep",
+            "1:stepHook:startStep",
+            "1:endStep",
+            "1:stepHook:endStep",
+            "1:startStep",
+            "1:stepHook:startStep",
+            "1:endStep",
+            "1:stepHook:endStep",
+            "1:stateTransition:ERROR",
+            "1:endFlight"));
   }
 
   @Test
@@ -173,7 +237,7 @@ public class ScenarioTest {
     stairway.terminate(5, TimeUnit.SECONDS);
     stairway = null;
 
-    stairway = TestUtil.makeStairwayValidateRecovery(stairwayName, flightId);
+    stairway = TestUtil.makeStairwayValidateRecovery(stairwayName, flightId, 1);
 
     stairway.waitForFlight(flightId, null, null);
     state = stairway.getFlightState(flightId);
@@ -183,6 +247,25 @@ public class ScenarioTest {
     assertNotNull(resultMap, "result map is present");
     String outResult = resultMap.get(MapKey.RESULT, String.class);
     assertThat("result set properly", outResult, equalTo(inResult));
+
+    TestUtil.checkHookLog(
+        Arrays.asList(
+            "1:stateTransition:RUNNING",
+            "1:startFlight",
+            "1:startStep",
+            "1:stepHook:startStep",
+            "1:endStep",
+            "1:stepHook:endStep",
+            "1:stateTransition:READY",
+            "1:endFlight",
+            "1:stateTransition:RUNNING",
+            "1:startFlight",
+            "1:startStep",
+            "1:stepHook:startStep",
+            "1:endStep",
+            "1:stepHook:endStep",
+            "1:stateTransition:SUCCESS",
+            "1:endFlight"));
   }
 
   @Test
@@ -212,6 +295,25 @@ public class ScenarioTest {
     assertNotNull(resultMap, "result map is present");
     String outResult = resultMap.get(MapKey.RESULT, String.class);
     assertThat("result set properly", outResult, equalTo(inResult));
+
+    TestUtil.checkHookLog(
+        Arrays.asList(
+            "1:stateTransition:RUNNING",
+            "1:startFlight",
+            "1:startStep",
+            "1:stepHook:startStep",
+            "1:endStep",
+            "1:stepHook:endStep",
+            "1:stateTransition:WAITING",
+            "1:endFlight",
+            "1:stateTransition:RUNNING",
+            "1:startFlight",
+            "1:startStep",
+            "1:stepHook:startStep",
+            "1:endStep",
+            "1:stepHook:endStep",
+            "1:stateTransition:SUCCESS",
+            "1:endFlight"));
   }
 
   @Test
@@ -232,7 +334,7 @@ public class ScenarioTest {
     stairway.terminate(5, TimeUnit.SECONDS);
     stairway = null;
 
-    stairway = TestUtil.makeStairwayValidateRecovery(stairwayName, flightId);
+    stairway = TestUtil.makeStairwayValidateRecovery(stairwayName, flightId, 1);
 
     TestPauseController.setControl(1); // wake it up
     stairway.waitForFlight(flightId, null, null);
@@ -244,6 +346,28 @@ public class ScenarioTest {
     assertNotNull(resultMap, "result map is present");
     String outResult = resultMap.get(MapKey.RESULT, String.class);
     assertThat("result set properly", outResult, equalTo(inResult));
+
+    TestUtil.checkHookLog(
+        Arrays.asList(
+            "1:stateTransition:RUNNING",
+            "1:startFlight",
+            "1:startStep",
+            "1:stepHook:startStep",
+            "1:endStep",
+            "1:stepHook:endStep",
+            "1:stateTransition:READY",
+            "1:stateTransition:RUNNING",
+            "1:startFlight",
+            "1:startStep",
+            "1:stepHook:startStep",
+            "1:endStep",
+            "1:stepHook:endStep",
+            "1:startStep",
+            "1:stepHook:startStep",
+            "1:endStep",
+            "1:stepHook:endStep",
+            "1:stateTransition:SUCCESS",
+            "1:endFlight"));
   }
 
   @Test
@@ -265,6 +389,37 @@ public class ScenarioTest {
     assertThat("result set properly", outResult, equalTo(inResult));
     Integer counter = resultMap.get(MapKey.COUNTER, Integer.class);
     assertThat("counter is counterend", counter, equalTo(counterEnd));
+
+    TestUtil.checkHookLog(
+        Arrays.asList(
+            "1:stateTransition:RUNNING",
+            "1:startFlight",
+            "1:startStep",
+            "1:stepHook:startStep",
+            "1:endStep",
+            "1:stepHook:endStep",
+            "1:startStep",
+            "1:stepHook:startStep",
+            "1:endStep",
+            "1:stepHook:endStep",
+            "1:startStep",
+            "1:stepHook:startStep",
+            "1:endStep",
+            "1:stepHook:endStep",
+            "1:startStep",
+            "1:stepHook:startStep",
+            "1:endStep",
+            "1:stepHook:endStep",
+            "1:startStep",
+            "1:stepHook:startStep",
+            "1:endStep",
+            "1:stepHook:endStep",
+            "1:startStep",
+            "1:stepHook:startStep",
+            "1:endStep",
+            "1:stepHook:endStep",
+            "1:stateTransition:SUCCESS",
+            "1:endFlight"));
   }
 
   @Test
@@ -287,7 +442,7 @@ public class ScenarioTest {
     stairway.terminate(5, TimeUnit.SECONDS);
     stairway = null;
 
-    stairway = TestUtil.makeStairwayValidateRecovery(stairwayName, flightId);
+    stairway = TestUtil.makeStairwayValidateRecovery(stairwayName, flightId, 1);
 
     TestPauseController.setControl(1); // prevent the flight from re-sleeping
     stairway.waitForFlight(flightId, null, null);
@@ -300,6 +455,44 @@ public class ScenarioTest {
     assertThat("result set properly", outResult, equalTo(inResult));
     Integer counter = resultMap.get(MapKey.COUNTER, Integer.class);
     assertThat("counter is counterend", counter, equalTo(counterEnd));
+
+    TestUtil.checkHookLog(
+        Arrays.asList(
+            "1:stateTransition:RUNNING",
+            "1:startFlight",
+            "1:startStep",
+            "1:stepHook:startStep",
+            "1:endStep",
+            "1:stepHook:endStep",
+            "1:startStep",
+            "1:stepHook:startStep",
+            "1:endStep",
+            "1:stepHook:endStep",
+            "1:startStep",
+            "1:stepHook:startStep",
+            "1:endStep",
+            "1:stepHook:endStep",
+            "1:stateTransition:READY",
+            "1:stateTransition:RUNNING",
+            "1:startFlight",
+            "1:startStep",
+            "1:stepHook:startStep",
+            "1:endStep",
+            "1:stepHook:endStep",
+            "1:startStep",
+            "1:stepHook:startStep",
+            "1:endStep",
+            "1:stepHook:endStep",
+            "1:startStep",
+            "1:stepHook:startStep",
+            "1:endStep",
+            "1:stepHook:endStep",
+            "1:startStep",
+            "1:stepHook:startStep",
+            "1:endStep",
+            "1:stepHook:endStep",
+            "1:stateTransition:SUCCESS",
+            "1:endFlight"));
   }
 
   @Test
@@ -330,10 +523,150 @@ public class ScenarioTest {
         assertThat("counter is counterstart", counter, lessThan(counterStart));
       }
     }
-  }
 
-  @Test
-  public void testStop() throws Exception {}
+    TestUtil.checkHookLog(
+        Arrays.asList(
+            "1:stateTransition:RUNNING",
+            "1:startFlight",
+            "1:startStep",
+            "1:stepHook:startStep",
+            "1:endStep",
+            "1:stepHook:endStep",
+            "1:startStep",
+            "1:stepHook:startStep",
+            "1:endStep",
+            "1:stepHook:endStep",
+            "1:stateTransition:ERROR",
+            "1:endFlight",
+            "1:stateTransition:RUNNING",
+            "1:startFlight",
+            "1:startStep",
+            "1:stepHook:startStep",
+            "1:endStep",
+            "1:stepHook:endStep",
+            "1:startStep",
+            "1:stepHook:startStep",
+            "1:endStep",
+            "1:stepHook:endStep",
+            "1:startStep",
+            "1:stepHook:startStep",
+            "1:endStep",
+            "1:stepHook:endStep",
+            "1:startStep",
+            "1:stepHook:startStep",
+            "1:endStep",
+            "1:stepHook:endStep",
+            "1:stateTransition:ERROR",
+            "1:endFlight",
+            "1:stateTransition:RUNNING",
+            "1:startFlight",
+            "1:startStep",
+            "1:stepHook:startStep",
+            "1:endStep",
+            "1:stepHook:endStep",
+            "1:startStep",
+            "1:stepHook:startStep",
+            "1:endStep",
+            "1:stepHook:endStep",
+            "1:startStep",
+            "1:stepHook:startStep",
+            "1:endStep",
+            "1:stepHook:endStep",
+            "1:startStep",
+            "1:stepHook:startStep",
+            "1:endStep",
+            "1:stepHook:endStep",
+            "1:startStep",
+            "1:stepHook:startStep",
+            "1:endStep",
+            "1:stepHook:endStep",
+            "1:startStep",
+            "1:stepHook:startStep",
+            "1:endStep",
+            "1:stepHook:endStep",
+            "1:stateTransition:ERROR",
+            "1:endFlight",
+            "1:stateTransition:RUNNING",
+            "1:startFlight",
+            "1:startStep",
+            "1:stepHook:startStep",
+            "1:endStep",
+            "1:stepHook:endStep",
+            "1:startStep",
+            "1:stepHook:startStep",
+            "1:endStep",
+            "1:stepHook:endStep",
+            "1:startStep",
+            "1:stepHook:startStep",
+            "1:endStep",
+            "1:stepHook:endStep",
+            "1:startStep",
+            "1:stepHook:startStep",
+            "1:endStep",
+            "1:stepHook:endStep",
+            "1:startStep",
+            "1:stepHook:startStep",
+            "1:endStep",
+            "1:stepHook:endStep",
+            "1:startStep",
+            "1:stepHook:startStep",
+            "1:endStep",
+            "1:stepHook:endStep",
+            "1:startStep",
+            "1:stepHook:startStep",
+            "1:endStep",
+            "1:stepHook:endStep",
+            "1:startStep",
+            "1:stepHook:startStep",
+            "1:endStep",
+            "1:stepHook:endStep",
+            "1:stateTransition:ERROR",
+            "1:endFlight",
+            "1:stateTransition:RUNNING",
+            "1:startFlight",
+            "1:startStep",
+            "1:stepHook:startStep",
+            "1:endStep",
+            "1:stepHook:endStep",
+            "1:startStep",
+            "1:stepHook:startStep",
+            "1:endStep",
+            "1:stepHook:endStep",
+            "1:startStep",
+            "1:stepHook:startStep",
+            "1:endStep",
+            "1:stepHook:endStep",
+            "1:startStep",
+            "1:stepHook:startStep",
+            "1:endStep",
+            "1:stepHook:endStep",
+            "1:startStep",
+            "1:stepHook:startStep",
+            "1:endStep",
+            "1:stepHook:endStep",
+            "1:startStep",
+            "1:stepHook:startStep",
+            "1:endStep",
+            "1:stepHook:endStep",
+            "1:startStep",
+            "1:stepHook:startStep",
+            "1:endStep",
+            "1:stepHook:endStep",
+            "1:startStep",
+            "1:stepHook:startStep",
+            "1:endStep",
+            "1:stepHook:endStep",
+            "1:startStep",
+            "1:stepHook:startStep",
+            "1:endStep",
+            "1:stepHook:endStep",
+            "1:startStep",
+            "1:stepHook:startStep",
+            "1:endStep",
+            "1:stepHook:endStep",
+            "1:stateTransition:ERROR",
+            "1:endFlight"));
+  }
 
   private String makeExistingFile() throws Exception {
     // Generate a filename and create the file

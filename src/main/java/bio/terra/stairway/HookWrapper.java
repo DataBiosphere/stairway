@@ -80,7 +80,7 @@ public class HookWrapper {
       Optional<StepHook> maybeStepHook = stairwayHook.stepFactory(flightContext);
       maybeStepHook.ifPresent(stepHooks::add);
     }
-    // Then handle an step hooks list from the factory
+    // Then handle any step hooks list from the factory
     handleStepHookList(stepHooks, flightContext, HookOperation.START_STEP);
     flightContext.setStepHooks(stepHooks);
   }

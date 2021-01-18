@@ -163,7 +163,7 @@ public class Stairway {
      * @return this
      */
     public Builder keepFlightLog(boolean keepFlightLog) {
-      this.keepFlightLog = Boolean.valueOf(keepFlightLog);
+      this.keepFlightLog = keepFlightLog;
       return this;
     }
 
