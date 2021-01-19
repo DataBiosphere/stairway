@@ -61,9 +61,9 @@ public class Stairway {
     private ExceptionSerializer exceptionSerializer;
     private String stairwayName;
     private String stairwayClusterName;
-    private List<StairwayHook> stairwayHooks;
+    private List<StairwayHook> stairwayHooks = new ArrayList<>();
     private boolean enableWorkQueue;
-    private Boolean keepFlightLog;
+    private boolean keepFlightLog = true;
     private FlightFactory flightFactory;
     private String workQueueProjectId;
     private String workQueueTopicId;
@@ -190,9 +190,6 @@ public class Stairway {
      * @return this
      */
     public Builder stairwayHook(StairwayHook stairwayHook) {
-      if (this.stairwayHooks == null) {
-        this.stairwayHooks = new ArrayList<>();
-      }
       this.stairwayHooks.add(stairwayHook);
       return this;
     }
@@ -325,7 +322,7 @@ public class Stairway {
     }
 
     this.applicationContext = builder.applicationContext;
-    this.keepFlightLog = (builder.keepFlightLog == null) ? true : builder.keepFlightLog;
+    this.keepFlightLog = builder.keepFlightLog;
     this.quietingDown = new AtomicBoolean();
     this.hookWrapper = new HookWrapper(builder.stairwayHooks);
   }

@@ -9,18 +9,56 @@ import org.apache.commons.lang3.builder.ToStringBuilder;
  * database for the flight and it is passed into the steps
  */
 public class FlightContext {
-  private Stairway stairway; // the stairway instance running this flight
-  private String flightId; // unique id for the flight
-  private final String flightClassName; // class name of the flight
-  private final FlightMap inputParameters; // allows for reconstructing the flight; set unmodifiable
-  private final FlightMap workingMap; // open-ended state used by the steps
-  private int stepIndex; // what step we are on
-  private boolean rerun; // true - rerun the current step
+  /** The stairway instance running this flight */
+  private Stairway stairway;
+
+  /**
+   * Identifier for the flight. The caller is expected to ensure that these are unique within this
+   * Stairway.
+   */
+  private String flightId;
+
+  /**
+   * Full class name of the flight. This is used to reconstruct the flight from its persisted state.
+   */
+  private final String flightClassName;
+
+  /** Unmodifiable flight map of the input parameters to the flight */
+  private final FlightMap inputParameters;
+
+  /**
+   * Modifiable flight map used to communicate state between steps and convey output of the flight.
+   */
+  private final FlightMap workingMap;
+
+  /** Index into the flight's step array of the step we are */
+  private int stepIndex;
+
+  /** Control flag to tell the flight runner to rerun the current step */
+  private boolean rerun;
+
+  /** Direction of execution: do, undo, switch. */
   private Direction direction;
-  private StepResult result; // current step status
+
+  /** Returned status of the current step */
+  private StepResult result;
+
+  /** State of this flight */
   private FlightStatus flightStatus;
+
+  /**
+   * List of the class names of the steps. This is not used by the flight execution code. It is here
+   * to allow more meaningful log messages by hooks.
+   */
   private List<String> stepClassNames;
+
+  /** Debug control of this flight. */
   private FlightDebugInfo debugInfo;
+
+  /**
+   * Dynamic list of step hooks defined for the current step, created using {@link
+   * StairwayHook#stepFactory(FlightContext)}
+   */
   private List<StepHook> stepHooks;
 
   // Construct the context with defaults

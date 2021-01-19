@@ -1,9 +1,5 @@
 package bio.terra.stairway.fixtures;
 
-import static org.hamcrest.CoreMatchers.equalTo;
-import static org.hamcrest.MatcherAssert.assertThat;
-import static org.junit.jupiter.api.Assertions.assertNull;
-
 import bio.terra.stairway.FlightState;
 import bio.terra.stairway.FlightStatus;
 import bio.terra.stairway.ShortUUID;
@@ -14,22 +10,27 @@ import bio.terra.stairway.exception.MigrateException;
 import bio.terra.stairway.exception.QueueException;
 import bio.terra.stairway.exception.StairwayException;
 import bio.terra.stairway.exception.StairwayExecutionException;
-import java.util.List;
-import java.util.concurrent.TimeUnit;
-import javax.sql.DataSource;
 import org.apache.commons.dbcp2.BasicDataSource;
 import org.apache.commons.lang3.StringUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+
+import javax.sql.DataSource;
+import java.util.List;
+import java.util.concurrent.TimeUnit;
+
+import static org.hamcrest.CoreMatchers.equalTo;
+import static org.hamcrest.MatcherAssert.assertThat;
+import static org.junit.jupiter.api.Assertions.assertNull;
 
 public final class TestUtil {
   private static final Logger logger = LoggerFactory.getLogger(TestUtil.class);
 
   private TestUtil() {}
 
-  public static final Integer intValue = 22;
+  public static final int intValue = 22;
   public static final String strValue = "testing 1 2 3";
-  public static final Double dubValue = Math.PI;
+  public static final double dubValue = Math.PI;
   public static final String errString = "Something bad happened";
   public static final String flightId = "aaa111";
   public static final String ikey = "ikey";
@@ -112,7 +113,7 @@ public final class TestUtil {
 
     for (int i = 0; i < hooks; i++) {
       int hookId = i + 1;
-      TestHook hook = new TestHook(Integer.toString(hookId));
+      TestHook hook = new TestHook(String.valueOf(hookId));
       builder.stairwayHook(hook);
     }
     TestHook.clearHookLog();

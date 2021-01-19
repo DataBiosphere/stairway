@@ -370,7 +370,7 @@ class FlightDao {
           throw new DatabaseOperationException(
               String.format(
                   "Failed to update status to %s for flight: %s",
-                  flightContext.getFlightStatus().name(), flightContext.getFlightId()),
+                  flightContext.getFlightStatus(), flightContext.getFlightId()),
               ex);
         }
       }

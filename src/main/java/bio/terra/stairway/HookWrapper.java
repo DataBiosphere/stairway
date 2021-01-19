@@ -1,7 +1,6 @@
 package bio.terra.stairway;
 
 import java.util.ArrayList;
-import java.util.Collections;
 import java.util.List;
 import java.util.Optional;
 import org.slf4j.Logger;
@@ -64,7 +63,7 @@ public class HookWrapper {
   }
 
   HookWrapper(List<StairwayHook> stairwayHooks) {
-    this.stairwayHooks = stairwayHooks != null ? stairwayHooks : Collections.emptyList();
+    this.stairwayHooks = stairwayHooks;
   }
 
   void startFlight(FlightContext flightContext) {
