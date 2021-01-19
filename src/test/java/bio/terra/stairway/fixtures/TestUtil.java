@@ -1,9 +1,5 @@
 package bio.terra.stairway.fixtures;
 
-import static org.hamcrest.CoreMatchers.equalTo;
-import static org.hamcrest.MatcherAssert.assertThat;
-import static org.junit.jupiter.api.Assertions.assertNull;
-
 import bio.terra.stairway.FlightState;
 import bio.terra.stairway.FlightStatus;
 import bio.terra.stairway.ShortUUID;
@@ -14,21 +10,27 @@ import bio.terra.stairway.exception.MigrateException;
 import bio.terra.stairway.exception.QueueException;
 import bio.terra.stairway.exception.StairwayException;
 import bio.terra.stairway.exception.StairwayExecutionException;
-import java.util.List;
-import java.util.concurrent.TimeUnit;
-import javax.sql.DataSource;
 import org.apache.commons.dbcp2.BasicDataSource;
+import org.apache.commons.lang3.StringUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import javax.sql.DataSource;
+import java.util.List;
+import java.util.concurrent.TimeUnit;
+
+import static org.hamcrest.CoreMatchers.equalTo;
+import static org.hamcrest.MatcherAssert.assertThat;
+import static org.junit.jupiter.api.Assertions.assertNull;
+
 public final class TestUtil {
-  private static Logger logger = LoggerFactory.getLogger(TestUtil.class);
+  private static final Logger logger = LoggerFactory.getLogger(TestUtil.class);
 
   private TestUtil() {}
 
-  public static final Integer intValue = Integer.valueOf(22);
+  public static final int intValue = 22;
   public static final String strValue = "testing 1 2 3";
-  public static final Double dubValue = new Double(Math.PI);
+  public static final double dubValue = Math.PI;
   public static final String errString = "Something bad happened";
   public static final String flightId = "aaa111";
   public static final String ikey = "ikey";
@@ -64,12 +66,22 @@ public final class TestUtil {
   }
 
   public static Stairway setupStairway(String stairwayName, boolean continuing) throws Exception {
-    return makeStairway(stairwayName, !continuing, !continuing, null);
+    return makeStairway(stairwayName, !continuing, !continuing, null, 0);
+  }
+
+  public static Stairway setupStairwayWithHooks(String stairwayName, boolean continuing, int hooks)
+      throws Exception {
+    return makeStairway(stairwayName, !continuing, !continuing, null, hooks);
   }
 
   public static Stairway setupConnectedStairway(String stairwayName, boolean continuing)
       throws Exception {
-    return makeStairway(stairwayName, !continuing, !continuing, getProjectId());
+    return makeStairway(stairwayName, !continuing, !continuing, getProjectId(), 0);
+  }
+
+  public static Stairway setupConnectedStairwayWithHooks(
+      String stairwayName, boolean continuing, int hooks) throws Exception {
+    return makeStairway(stairwayName, !continuing, !continuing, getProjectId(), hooks);
   }
 
   // Optionally pauses a flight in the middle so we can fake failures
@@ -82,19 +94,32 @@ public final class TestUtil {
   }
 
   private static Stairway makeStairway(
-      String stairwayName, boolean forceCleanStart, boolean migrateUpgrade, String projectId)
+      String stairwayName,
+      boolean forceCleanStart,
+      boolean migrateUpgrade,
+      String projectId,
+      int hooks)
       throws Exception {
     DataSource dataSource = makeDataSource();
     boolean enableWorkQueue = (projectId != null);
 
-    Stairway stairway =
+    Stairway.Builder builder =
         Stairway.newBuilder()
             .stairwayClusterName("stairway-cluster")
             .stairwayName(stairwayName)
             .workQueueProjectId(projectId)
             .enableWorkQueue(enableWorkQueue)
-            .maxParallelFlights(2)
-            .build();
+            .maxParallelFlights(2);
+
+    for (int i = 0; i < hooks; i++) {
+      int hookId = i + 1;
+      TestHook hook = new TestHook(String.valueOf(hookId));
+      builder.stairwayHook(hook);
+    }
+    TestHook.clearHookLog();
+
+    Stairway stairway = builder.build();
+
     List<String> recordedStairways =
         stairway.initialize(dataSource, forceCleanStart, migrateUpgrade);
     if (forceCleanStart) {
@@ -106,17 +131,27 @@ public final class TestUtil {
 
   // For cases where we want to validate recovery of a single stairway instance and that
   // that a specific flight is READY and unowned.
-  public static Stairway makeStairwayValidateRecovery(String stairwayName, String flightId)
+  public static Stairway makeStairwayValidateRecovery(
+      String stairwayName, String flightId, int hooks)
       throws DatabaseOperationException, QueueException, MigrateException,
           StairwayExecutionException, InterruptedException, DatabaseSetupException {
     DataSource dataSource = makeDataSource();
-    Stairway stairway =
+
+    Stairway.Builder builder =
         Stairway.newBuilder()
             .stairwayClusterName("stairway-cluster")
             .stairwayName(stairwayName)
             .workQueueProjectId(null)
-            .maxParallelFlights(2)
-            .build();
+            .maxParallelFlights(2);
+
+    for (int i = 0; i < hooks; i++) {
+      int hookId = i + 1;
+      TestHook hook = new TestHook(Integer.toString(hookId));
+      builder.stairwayHook(hook);
+    }
+
+    Stairway stairway = builder.build();
+
     List<String> recordedStairways = stairway.initialize(dataSource, false, false);
     assertThat("one stairway to recover", recordedStairways.size(), equalTo(1));
     assertThat("stairway name matches", recordedStairways.get(0), equalTo(stairwayName));
@@ -148,5 +183,14 @@ public final class TestUtil {
               + "GOOGLE_APPLICATION_CREDENTIALS envvars defined");
     }
     return projectId;
+  }
+
+  public static void checkHookLog(List<String> compareHookLog) {
+    List<String> hookLog = TestHook.getHookLog();
+    assertThat("logs are the same size", hookLog.size(), equalTo(compareHookLog.size()));
+
+    for (int i = 0; i < hookLog.size(); i++) {
+      assertThat("Log lines match", StringUtils.equals(hookLog.get(i), compareHookLog.get(i)));
+    }
   }
 }

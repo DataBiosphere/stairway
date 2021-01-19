@@ -8,6 +8,7 @@ import bio.terra.stairway.fixtures.MapKey;
 import bio.terra.stairway.fixtures.TestPauseController;
 import bio.terra.stairway.fixtures.TestUtil;
 import bio.terra.stairway.flights.TestFlightControlledSleep;
+import java.util.Arrays;
 import java.util.List;
 import java.util.concurrent.TimeUnit;
 import javax.sql.DataSource;
@@ -18,12 +19,12 @@ import org.slf4j.LoggerFactory;
 
 @Tag("connected")
 public class QueueFlightTest {
-  private Logger logger = LoggerFactory.getLogger(QueueFlightTest.class);
+  private final Logger logger = LoggerFactory.getLogger(QueueFlightTest.class);
 
   @Test
   public void queueFlightTest() throws Exception {
     // Submit directly to queue and make sure we end up in the right state
-    Stairway stairway = TestUtil.setupConnectedStairway("queueFlightTest", false);
+    Stairway stairway = TestUtil.setupConnectedStairwayWithHooks("queueFlightTest", false, 3);
 
     FlightMap inputs = new FlightMap();
     int controlValue = 1;
@@ -42,6 +43,39 @@ public class QueueFlightTest {
 
     flightState = stairway.getFlightState(queuedFlightId);
     assertThat("flight succeeded", flightState.getFlightStatus(), equalTo(FlightStatus.SUCCESS));
+
+    TestUtil.checkHookLog(
+        Arrays.asList(
+            "1:stateTransition:READY",
+            "2:stateTransition:READY",
+            "3:stateTransition:READY",
+            "1:stateTransition:QUEUED",
+            "2:stateTransition:QUEUED",
+            "3:stateTransition:QUEUED",
+            "1:stateTransition:RUNNING",
+            "2:stateTransition:RUNNING",
+            "3:stateTransition:RUNNING",
+            "1:startFlight",
+            "2:startFlight",
+            "3:startFlight",
+            "1:startStep",
+            "2:startStep",
+            "3:startStep",
+            "1:stepHook:startStep",
+            "2:stepHook:startStep",
+            "3:stepHook:startStep",
+            "1:endStep",
+            "2:endStep",
+            "3:endStep",
+            "1:stepHook:endStep",
+            "2:stepHook:endStep",
+            "3:stepHook:endStep",
+            "1:stateTransition:SUCCESS",
+            "2:stateTransition:SUCCESS",
+            "3:stateTransition:SUCCESS",
+            "1:endFlight",
+            "2:endFlight",
+            "3:endFlight"));
   }
 
   @Test

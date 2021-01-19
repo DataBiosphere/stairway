@@ -9,6 +9,7 @@ import bio.terra.stairway.exception.MigrateException;
 import bio.terra.stairway.exception.QueueException;
 import bio.terra.stairway.exception.StairwayExecutionException;
 import java.io.IOException;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.UUID;
 import java.util.concurrent.LinkedBlockingQueue;
@@ -60,9 +61,9 @@ public class Stairway {
     private ExceptionSerializer exceptionSerializer;
     private String stairwayName;
     private String stairwayClusterName;
-    private StairwayHook stairwayHook;
+    private List<StairwayHook> stairwayHooks = new ArrayList<>();
     private boolean enableWorkQueue;
-    private Boolean keepFlightLog;
+    private boolean keepFlightLog = true;
     private FlightFactory flightFactory;
     private String workQueueProjectId;
     private String workQueueTopicId;
@@ -162,7 +163,7 @@ public class Stairway {
      * @return this
      */
     public Builder keepFlightLog(boolean keepFlightLog) {
-      this.keepFlightLog = Boolean.valueOf(keepFlightLog);
+      this.keepFlightLog = keepFlightLog;
       return this;
     }
 
@@ -181,12 +182,15 @@ public class Stairway {
     }
 
     /**
+     * Each call to stairwayHook adds hook object to a list of hooks. The hooks are processed in the
+     * order in which they are added to the builder.
+     *
      * @param stairwayHook object containing hooks for logging at beginning and end of flight and
      *     step of stairway
      * @return this
      */
     public Builder stairwayHook(StairwayHook stairwayHook) {
-      this.stairwayHook = stairwayHook;
+      this.stairwayHooks.add(stairwayHook);
       return this;
     }
 
@@ -318,9 +322,9 @@ public class Stairway {
     }
 
     this.applicationContext = builder.applicationContext;
-    this.keepFlightLog = (builder.keepFlightLog == null) ? true : builder.keepFlightLog;
+    this.keepFlightLog = builder.keepFlightLog;
     this.quietingDown = new AtomicBoolean();
-    this.hookWrapper = new HookWrapper(builder.stairwayHook);
+    this.hookWrapper = new HookWrapper(builder.stairwayHooks);
   }
 
   /**
@@ -346,7 +350,7 @@ public class Stairway {
       throw new StairwayExecutionException("Stairway is shut down and cannot be initialized");
     }
 
-    flightDao = new FlightDao(dataSource, exceptionSerializer, keepFlightLog);
+    flightDao = new FlightDao(dataSource, exceptionSerializer, hookWrapper, keepFlightLog);
 
     if (forceCleanStart) {
       // Drop all tables and recreate the database
@@ -608,7 +612,7 @@ public class Stairway {
       // Submit to the queue
       context.setFlightStatus(FlightStatus.READY);
       flightDao.submit(context);
-      queueFlight(context.getFlightId());
+      queueFlight(context);
     } else {
       // Submit directly - not allowed if we are shutting down
       if (isQuietingDown()) {
@@ -801,18 +805,18 @@ public class Stairway {
     flightDao.exit(context);
 
     if (context.getFlightStatus() == FlightStatus.READY && workQueueEnabled) {
-      queueFlight(context.getFlightId());
+      queueFlight(context);
     }
     if (context.getFlightStatus() == FlightStatus.READY_TO_RESTART) {
       if (workQueueEnabled) {
-        queueFlight(context.getFlightId());
+        queueFlight(context);
       } else {
         resume(context.getFlightId());
       }
     }
   }
 
-  private void queueFlight(String flightId)
+  private void queueFlight(FlightContext flightContext)
       throws DatabaseOperationException, StairwayExecutionException, InterruptedException {
     // If the flight state is READY, then we put the flight on the queue and mark it queued in the
     // database. We cannot go directly from RUNNING to QUEUED. Suppose we put the flight in
@@ -821,13 +825,11 @@ public class Stairway {
     // we marked it QUEUED. Then if we fail before we put it on the queue, no one knows it should
     // be queued. To close that window, we use the READY state to decouple the flight from RUNNING.
     // Then we queue, then we mark as queued. Another Stairway looking for orphans, will find the
-    // READY
-    // and queue it. Putting a flight on the queue twice is not a problem. Stairway instances race
-    // to
-    // see who gets to run it.
-    String message = QueueMessage.serialize(new QueueMessageReady(flightId));
+    // READY and queue it. Putting a flight on the queue twice is not a problem. Stairway
+    // instances race to see who gets to run it.
+    String message = QueueMessage.serialize(new QueueMessageReady(flightContext.getFlightId()));
     workQueue.queueMessage(message);
-    flightDao.queued(flightId);
+    flightDao.queued(flightContext);
   }
 
   /**
@@ -878,7 +880,8 @@ public class Stairway {
     List<String> readyFlightList = flightDao.getReadyFlights();
     for (String flightId : readyFlightList) {
       if (workQueueEnabled) {
-        queueFlight(flightId);
+        FlightContext flightContext = flightDao.makeFlightContextById(flightId);
+        queueFlight(flightContext);
       } else {
         resume(flightId);
       }

@@ -33,12 +33,12 @@ public class StairwayThreadPool extends ThreadPoolExecutor {
   protected void beforeExecute(Thread t, Runnable r) {
     super.beforeExecute(t, r);
     int active = activeTasks.incrementAndGet();
-    logger.info("before: " + active);
+    logger.debug("before: " + active);
   }
 
   protected void afterExecute(Runnable r, Throwable t) {
     super.afterExecute(r, t);
     int active = activeTasks.decrementAndGet();
-    logger.info("after: " + active);
+    logger.debug("after: " + active);
   }
 }

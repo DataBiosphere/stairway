@@ -1,10 +1,9 @@
 package bio.terra.stairway;
 
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
-
 import java.util.concurrent.ThreadLocalRandom;
 import java.util.concurrent.TimeUnit;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 public class RetryRuleRandomBackoff implements RetryRule {
   private static final Logger logger = LoggerFactory.getLogger(RetryRule.class);
