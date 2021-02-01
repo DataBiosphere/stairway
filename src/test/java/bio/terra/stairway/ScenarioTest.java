@@ -34,12 +34,11 @@ import org.slf4j.LoggerFactory;
 @Tag("unit")
 public class ScenarioTest {
   private Stairway stairway;
-  private Logger logger = LoggerFactory.getLogger(ScenarioTest.class);
-  private String stairwayName;
+  private final Logger logger = LoggerFactory.getLogger(ScenarioTest.class);
 
   @BeforeEach
   public void setup() throws Exception {
-    stairwayName = TestUtil.randomStairwayName();
+    String stairwayName = TestUtil.randomStairwayName();
     stairway = TestUtil.setupStairwayWithHooks(stairwayName, false, 1);
   }
 
@@ -79,6 +78,7 @@ public class ScenarioTest {
         Arrays.asList(
             "1:stateTransition:RUNNING",
             "1:startFlight",
+            "1:flightHook:startFlight",
             "1:startStep",
             "1:stepHook:startStep",
             "1:endStep",
@@ -88,7 +88,8 @@ public class ScenarioTest {
             "1:endStep",
             "1:stepHook:endStep",
             "1:stateTransition:SUCCESS",
-            "1:endFlight"));
+            "1:endFlight",
+            "1:flightHook:endFlight"));
   }
 
   @Test
@@ -121,6 +122,7 @@ public class ScenarioTest {
         Arrays.asList(
             "1:stateTransition:RUNNING",
             "1:startFlight",
+            "1:flightHook:startFlight",
             "1:startStep",
             "1:stepHook:startStep",
             "1:endStep",
@@ -130,7 +132,8 @@ public class ScenarioTest {
             "1:endStep",
             "1:stepHook:endStep",
             "1:stateTransition:ERROR",
-            "1:endFlight"));
+            "1:endFlight",
+            "1:flightHook:endFlight"));
   }
 
   @Test
@@ -176,6 +179,7 @@ public class ScenarioTest {
         Arrays.asList(
             "1:stateTransition:RUNNING",
             "1:startFlight",
+            "1:flightHook:startFlight",
             "1:startStep",
             "1:stepHook:startStep",
             "1:endStep",
@@ -201,7 +205,8 @@ public class ScenarioTest {
             "1:endStep",
             "1:stepHook:endStep",
             "1:stateTransition:ERROR",
-            "1:endFlight"));
+            "1:endFlight",
+            "1:flightHook:endFlight"));
   }
 
   @Test
@@ -251,20 +256,24 @@ public class ScenarioTest {
         Arrays.asList(
             "1:stateTransition:RUNNING",
             "1:startFlight",
+            "1:flightHook:startFlight",
             "1:startStep",
             "1:stepHook:startStep",
             "1:endStep",
             "1:stepHook:endStep",
             "1:stateTransition:READY",
             "1:endFlight",
+            "1:flightHook:endFlight",
             "1:stateTransition:RUNNING",
             "1:startFlight",
+            "1:flightHook:startFlight",
             "1:startStep",
             "1:stepHook:startStep",
             "1:endStep",
             "1:stepHook:endStep",
             "1:stateTransition:SUCCESS",
-            "1:endFlight"));
+            "1:endFlight",
+            "1:flightHook:endFlight"));
   }
 
   @Test
@@ -299,20 +308,24 @@ public class ScenarioTest {
         Arrays.asList(
             "1:stateTransition:RUNNING",
             "1:startFlight",
+            "1:flightHook:startFlight",
             "1:startStep",
             "1:stepHook:startStep",
             "1:endStep",
             "1:stepHook:endStep",
             "1:stateTransition:WAITING",
             "1:endFlight",
+            "1:flightHook:endFlight",
             "1:stateTransition:RUNNING",
             "1:startFlight",
+            "1:flightHook:startFlight",
             "1:startStep",
             "1:stepHook:startStep",
             "1:endStep",
             "1:stepHook:endStep",
             "1:stateTransition:SUCCESS",
-            "1:endFlight"));
+            "1:endFlight",
+            "1:flightHook:endFlight"));
   }
 
   @Test
@@ -350,6 +363,7 @@ public class ScenarioTest {
         Arrays.asList(
             "1:stateTransition:RUNNING",
             "1:startFlight",
+            "1:flightHook:startFlight",
             "1:startStep",
             "1:stepHook:startStep",
             "1:endStep",
@@ -357,6 +371,7 @@ public class ScenarioTest {
             "1:stateTransition:READY",
             "1:stateTransition:RUNNING",
             "1:startFlight",
+            "1:flightHook:startFlight",
             "1:startStep",
             "1:stepHook:startStep",
             "1:endStep",
@@ -366,7 +381,8 @@ public class ScenarioTest {
             "1:endStep",
             "1:stepHook:endStep",
             "1:stateTransition:SUCCESS",
-            "1:endFlight"));
+            "1:endFlight",
+            "1:flightHook:endFlight"));
   }
 
   @Test
@@ -393,6 +409,7 @@ public class ScenarioTest {
         Arrays.asList(
             "1:stateTransition:RUNNING",
             "1:startFlight",
+            "1:flightHook:startFlight",
             "1:startStep",
             "1:stepHook:startStep",
             "1:endStep",
@@ -418,7 +435,8 @@ public class ScenarioTest {
             "1:endStep",
             "1:stepHook:endStep",
             "1:stateTransition:SUCCESS",
-            "1:endFlight"));
+            "1:endFlight",
+            "1:flightHook:endFlight"));
   }
 
   @Test
@@ -459,6 +477,7 @@ public class ScenarioTest {
         Arrays.asList(
             "1:stateTransition:RUNNING",
             "1:startFlight",
+            "1:flightHook:startFlight",
             "1:startStep",
             "1:stepHook:startStep",
             "1:endStep",
@@ -474,6 +493,7 @@ public class ScenarioTest {
             "1:stateTransition:READY",
             "1:stateTransition:RUNNING",
             "1:startFlight",
+            "1:flightHook:startFlight",
             "1:startStep",
             "1:stepHook:startStep",
             "1:endStep",
@@ -491,7 +511,8 @@ public class ScenarioTest {
             "1:endStep",
             "1:stepHook:endStep",
             "1:stateTransition:SUCCESS",
-            "1:endFlight"));
+            "1:endFlight",
+            "1:flightHook:endFlight"));
   }
 
   @Test
@@ -527,6 +548,7 @@ public class ScenarioTest {
         Arrays.asList(
             "1:stateTransition:RUNNING",
             "1:startFlight",
+            "1:flightHook:startFlight",
             "1:startStep",
             "1:stepHook:startStep",
             "1:endStep",
@@ -537,36 +559,10 @@ public class ScenarioTest {
             "1:stepHook:endStep",
             "1:stateTransition:ERROR",
             "1:endFlight",
+            "1:flightHook:endFlight",
             "1:stateTransition:RUNNING",
             "1:startFlight",
-            "1:startStep",
-            "1:stepHook:startStep",
-            "1:endStep",
-            "1:stepHook:endStep",
-            "1:startStep",
-            "1:stepHook:startStep",
-            "1:endStep",
-            "1:stepHook:endStep",
-            "1:startStep",
-            "1:stepHook:startStep",
-            "1:endStep",
-            "1:stepHook:endStep",
-            "1:startStep",
-            "1:stepHook:startStep",
-            "1:endStep",
-            "1:stepHook:endStep",
-            "1:stateTransition:ERROR",
-            "1:endFlight",
-            "1:stateTransition:RUNNING",
-            "1:startFlight",
-            "1:startStep",
-            "1:stepHook:startStep",
-            "1:endStep",
-            "1:stepHook:endStep",
-            "1:startStep",
-            "1:stepHook:startStep",
-            "1:endStep",
-            "1:stepHook:endStep",
+            "1:flightHook:startFlight",
             "1:startStep",
             "1:stepHook:startStep",
             "1:endStep",
@@ -585,16 +581,10 @@ public class ScenarioTest {
             "1:stepHook:endStep",
             "1:stateTransition:ERROR",
             "1:endFlight",
+            "1:flightHook:endFlight",
             "1:stateTransition:RUNNING",
             "1:startFlight",
-            "1:startStep",
-            "1:stepHook:startStep",
-            "1:endStep",
-            "1:stepHook:endStep",
-            "1:startStep",
-            "1:stepHook:startStep",
-            "1:endStep",
-            "1:stepHook:endStep",
+            "1:flightHook:startFlight",
             "1:startStep",
             "1:stepHook:startStep",
             "1:endStep",
@@ -621,8 +611,48 @@ public class ScenarioTest {
             "1:stepHook:endStep",
             "1:stateTransition:ERROR",
             "1:endFlight",
+            "1:flightHook:endFlight",
             "1:stateTransition:RUNNING",
             "1:startFlight",
+            "1:flightHook:startFlight",
+            "1:startStep",
+            "1:stepHook:startStep",
+            "1:endStep",
+            "1:stepHook:endStep",
+            "1:startStep",
+            "1:stepHook:startStep",
+            "1:endStep",
+            "1:stepHook:endStep",
+            "1:startStep",
+            "1:stepHook:startStep",
+            "1:endStep",
+            "1:stepHook:endStep",
+            "1:startStep",
+            "1:stepHook:startStep",
+            "1:endStep",
+            "1:stepHook:endStep",
+            "1:startStep",
+            "1:stepHook:startStep",
+            "1:endStep",
+            "1:stepHook:endStep",
+            "1:startStep",
+            "1:stepHook:startStep",
+            "1:endStep",
+            "1:stepHook:endStep",
+            "1:startStep",
+            "1:stepHook:startStep",
+            "1:endStep",
+            "1:stepHook:endStep",
+            "1:startStep",
+            "1:stepHook:startStep",
+            "1:endStep",
+            "1:stepHook:endStep",
+            "1:stateTransition:ERROR",
+            "1:endFlight",
+            "1:flightHook:endFlight",
+            "1:stateTransition:RUNNING",
+            "1:startFlight",
+            "1:flightHook:startFlight",
             "1:startStep",
             "1:stepHook:startStep",
             "1:endStep",
@@ -664,7 +694,8 @@ public class ScenarioTest {
             "1:endStep",
             "1:stepHook:endStep",
             "1:stateTransition:ERROR",
-            "1:endFlight"));
+            "1:endFlight",
+            "1:flightHook:endFlight"));
   }
 
   private String makeExistingFile() throws Exception {

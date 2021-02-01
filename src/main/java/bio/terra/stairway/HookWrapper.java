@@ -16,6 +16,11 @@ public class HookWrapper {
           throws InterruptedException {
         checkHookAction(stairwayHook.startFlight(context));
       }
+
+      void handleFlightHook(FlightContext context, FlightHook flightHook)
+          throws InterruptedException {
+        checkHookAction(flightHook.startFlight(context));
+      }
     },
     START_STEP {
       void handleHook(FlightContext context, StairwayHook stairwayHook)
@@ -42,6 +47,11 @@ public class HookWrapper {
           throws InterruptedException {
         checkHookAction(stairwayHook.endFlight(context));
       }
+
+      void handleFlightHook(FlightContext context, FlightHook flightHook)
+          throws InterruptedException {
+        checkHookAction(flightHook.endFlight(context));
+      }
     },
     STATE_TRANSITION {
       void handleHook(FlightContext context, StairwayHook stairwayHook)
@@ -55,6 +65,9 @@ public class HookWrapper {
 
     void handleStepHook(FlightContext context, StepHook stepHook) throws InterruptedException {}
 
+    void handleFlightHook(FlightContext context, FlightHook flightHook)
+        throws InterruptedException {}
+
     void checkHookAction(HookAction action) {
       if (action != HookAction.CONTINUE) {
         logger.warn("Unexpected hook action: {}", action.name());
@@ -66,8 +79,18 @@ public class HookWrapper {
     this.stairwayHooks = stairwayHooks;
   }
 
-  void startFlight(FlightContext flightContext) {
+  void startFlight(FlightContext flightContext) throws InterruptedException {
+    // First handle plain flight hooks
     handleHookList(flightContext, HookOperation.START_FLIGHT);
+    // Use the factory to collect any flight hooks for this flight
+    List<FlightHook> flightHooks = new ArrayList<>();
+    for (StairwayHook stairwayHook : stairwayHooks) {
+      Optional<FlightHook> maybeFlightHook = stairwayHook.flightFactory(flightContext);
+      maybeFlightHook.ifPresent(flightHooks::add);
+    }
+    // Then handle any flight hooks list from the factory
+    handleFlightHookList(flightHooks, flightContext, HookOperation.START_FLIGHT);
+    flightContext.setFlightHooks(flightHooks);
   }
 
   void startStep(FlightContext flightContext) throws InterruptedException {
@@ -93,7 +116,11 @@ public class HookWrapper {
   }
 
   void endFlight(FlightContext flightContext) {
+    // First handle plain flight hooks
     handleHookList(flightContext, HookOperation.END_FLIGHT);
+    // Next handle the flight hooks list from the flight context
+    handleFlightHookList(flightContext.getFlightHooks(), flightContext, HookOperation.END_FLIGHT);
+    flightContext.setFlightHooks(null);
   }
 
   void stateTransition(FlightContext flightContext) {
@@ -118,6 +145,19 @@ public class HookWrapper {
           operation.handleStepHook(context, stepHook);
         } catch (Exception ex) {
           logger.warn("Step Hook failed with exception", ex);
+        }
+      }
+    }
+  }
+
+  private void handleFlightHookList(
+      List<FlightHook> flightHooks, FlightContext context, HookOperation operation) {
+    if (flightHooks != null) {
+      for (FlightHook flightHook : flightHooks) {
+        try {
+          operation.handleFlightHook(context, flightHook);
+        } catch (Exception ex) {
+          logger.warn("Flight Hook failed with exception", ex);
         }
       }
     }

@@ -26,4 +26,8 @@ public interface StairwayHook {
   default Optional<StepHook> stepFactory(FlightContext context) throws InterruptedException {
     return Optional.empty();
   }
+
+  default Optional<FlightHook> flightFactory(FlightContext context) throws InterruptedException {
+    return Optional.empty();
+  }
 }

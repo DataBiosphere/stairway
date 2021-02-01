@@ -91,8 +91,9 @@ public class Flight implements Runnable {
    * direction.
    */
   public void run() {
-    hookWrapper().startFlight(flightContext);
     try {
+      hookWrapper().startFlight(flightContext);
+
       // We use flightDao all over the place, so we put it in a private to avoid passing it through
       // all of the method argument lists.
       flightDao = context().getStairway().getFlightDao();

@@ -61,6 +61,12 @@ public class FlightContext {
    */
   private List<StepHook> stepHooks;
 
+  /**
+   * Dynamic list of light hooks defined for the current flight, created using {@link
+   * StairwayHook#flightFactory(FlightContext)}
+   */
+  private List<FlightHook> flightHooks;
+
   // Construct the context with defaults
   public FlightContext(
       FlightMap inputParameters, String flightClassName, List<String> stepClassNames) {
@@ -179,6 +185,14 @@ public class FlightContext {
 
   public void setStepHooks(List<StepHook> stepHooks) {
     this.stepHooks = stepHooks;
+  }
+
+  public List<FlightHook> getFlightHooks() {
+    return flightHooks;
+  }
+
+  public void setFlightHooks(List<FlightHook> flightHooks) {
+    this.flightHooks = flightHooks;
   }
 
   /**

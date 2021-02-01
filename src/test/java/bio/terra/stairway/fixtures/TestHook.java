@@ -1,6 +1,7 @@
 package bio.terra.stairway.fixtures;
 
 import bio.terra.stairway.FlightContext;
+import bio.terra.stairway.FlightHook;
 import bio.terra.stairway.HookAction;
 import bio.terra.stairway.StairwayHook;
 import bio.terra.stairway.StepHook;
@@ -68,5 +69,10 @@ public class TestHook implements StairwayHook {
   @Override
   public Optional<StepHook> stepFactory(FlightContext context) throws InterruptedException {
     return Optional.of(new TestStepHook(hookId, this));
+  }
+
+  @Override
+  public Optional<FlightHook> flightFactory(FlightContext context) throws InterruptedException {
+    return Optional.of(new TestFlightHook(hookId, this));
   }
 }
