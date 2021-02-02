@@ -59,13 +59,13 @@ public class FlightContext {
    * Dynamic list of step hooks defined for the current step, created using {@link
    * StairwayHook#stepFactory(FlightContext)}
    */
-  private List<StepHook> stepHooks;
+  private List<DynamicHook> stepHooks;
 
   /**
-   * Dynamic list of light hooks defined for the current flight, created using {@link
+   * Dynamic list of flight hooks defined for the current flight, created using {@link
    * StairwayHook#flightFactory(FlightContext)}
    */
-  private List<FlightHook> flightHooks;
+  private List<DynamicHook> flightHooks;
 
   // Construct the context with defaults
   public FlightContext(
@@ -179,19 +179,19 @@ public class FlightContext {
     return debugInfo;
   }
 
-  public List<StepHook> getStepHooks() {
+  public List<DynamicHook> getStepHooks() {
     return stepHooks;
   }
 
-  public void setStepHooks(List<StepHook> stepHooks) {
+  public void setStepHooks(List<DynamicHook> stepHooks) {
     this.stepHooks = stepHooks;
   }
 
-  public List<FlightHook> getFlightHooks() {
+  public List<DynamicHook> getFlightHooks() {
     return flightHooks;
   }
 
-  public void setFlightHooks(List<FlightHook> flightHooks) {
+  public void setFlightHooks(List<DynamicHook> flightHooks) {
     this.flightHooks = flightHooks;
   }
 

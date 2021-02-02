@@ -1,10 +1,9 @@
 package bio.terra.stairway.fixtures;
 
+import bio.terra.stairway.DynamicHook;
 import bio.terra.stairway.FlightContext;
-import bio.terra.stairway.FlightHook;
 import bio.terra.stairway.HookAction;
 import bio.terra.stairway.StairwayHook;
-import bio.terra.stairway.StepHook;
 import java.util.Collections;
 import java.util.LinkedList;
 import java.util.List;
@@ -67,12 +66,12 @@ public class TestHook implements StairwayHook {
   }
 
   @Override
-  public Optional<StepHook> stepFactory(FlightContext context) throws InterruptedException {
+  public Optional<DynamicHook> stepFactory(FlightContext context) throws InterruptedException {
     return Optional.of(new TestStepHook(hookId, this));
   }
 
   @Override
-  public Optional<FlightHook> flightFactory(FlightContext context) throws InterruptedException {
+  public Optional<DynamicHook> flightFactory(FlightContext context) throws InterruptedException {
     return Optional.of(new TestFlightHook(hookId, this));
   }
 }

@@ -107,7 +107,6 @@ public class Flight implements Runnable {
       logger.debug("Executing: " + context().toString());
       FlightStatus flightStatus = fly();
       flightExit(flightStatus);
-      hookWrapper().endFlight(flightContext);
     } catch (InterruptedException ex) {
       // Shutdown - try disowning the flight
       logger.warn("Flight interrupted: " + context().getFlightId());
@@ -115,6 +114,7 @@ public class Flight implements Runnable {
     } catch (Exception ex) {
       logger.error("Flight failed with exception", ex);
     }
+    hookWrapper().endFlight(flightContext);
   }
 
   private void flightExit(FlightStatus flightStatus) {

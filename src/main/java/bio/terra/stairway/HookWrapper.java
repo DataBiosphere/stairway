@@ -17,9 +17,9 @@ public class HookWrapper {
         checkHookAction(stairwayHook.startFlight(context));
       }
 
-      void handleFlightHook(FlightContext context, FlightHook flightHook)
+      void handleDynamicHook(FlightContext context, DynamicHook flightHook)
           throws InterruptedException {
-        checkHookAction(flightHook.startFlight(context));
+        checkHookAction(flightHook.start(context));
       }
     },
     START_STEP {
@@ -28,8 +28,9 @@ public class HookWrapper {
         checkHookAction(stairwayHook.startStep(context));
       }
 
-      void handleStepHook(FlightContext context, StepHook stepHook) throws InterruptedException {
-        checkHookAction(stepHook.startStep(context));
+      void handleDynamicHook(FlightContext context, DynamicHook stepHook)
+          throws InterruptedException {
+        checkHookAction(stepHook.start(context));
       }
     },
     END_STEP {
@@ -38,8 +39,9 @@ public class HookWrapper {
         checkHookAction(stairwayHook.endStep(context));
       }
 
-      void handleStepHook(FlightContext context, StepHook stepHook) throws InterruptedException {
-        checkHookAction(stepHook.endStep(context));
+      void handleDynamicHook(FlightContext context, DynamicHook stepHook)
+          throws InterruptedException {
+        checkHookAction(stepHook.end(context));
       }
     },
     END_FLIGHT {
@@ -48,9 +50,9 @@ public class HookWrapper {
         checkHookAction(stairwayHook.endFlight(context));
       }
 
-      void handleFlightHook(FlightContext context, FlightHook flightHook)
+      void handleDynamicHook(FlightContext context, DynamicHook flightHook)
           throws InterruptedException {
-        checkHookAction(flightHook.endFlight(context));
+        checkHookAction(flightHook.end(context));
       }
     },
     STATE_TRANSITION {
@@ -63,9 +65,7 @@ public class HookWrapper {
     abstract void handleHook(FlightContext context, StairwayHook stairwayHook)
         throws InterruptedException;
 
-    void handleStepHook(FlightContext context, StepHook stepHook) throws InterruptedException {}
-
-    void handleFlightHook(FlightContext context, FlightHook flightHook)
+    void handleDynamicHook(FlightContext context, DynamicHook stepHook)
         throws InterruptedException {}
 
     void checkHookAction(HookAction action) {
@@ -83,13 +83,13 @@ public class HookWrapper {
     // First handle plain flight hooks
     handleHookList(flightContext, HookOperation.START_FLIGHT);
     // Use the factory to collect any flight hooks for this flight
-    List<FlightHook> flightHooks = new ArrayList<>();
+    List<DynamicHook> flightHooks = new ArrayList<>();
     for (StairwayHook stairwayHook : stairwayHooks) {
-      Optional<FlightHook> maybeFlightHook = stairwayHook.flightFactory(flightContext);
+      Optional<DynamicHook> maybeFlightHook = stairwayHook.flightFactory(flightContext);
       maybeFlightHook.ifPresent(flightHooks::add);
     }
     // Then handle any flight hooks list from the factory
-    handleFlightHookList(flightHooks, flightContext, HookOperation.START_FLIGHT);
+    handleDynamicHookList(flightHooks, flightContext, HookOperation.START_FLIGHT);
     flightContext.setFlightHooks(flightHooks);
   }
 
@@ -97,13 +97,13 @@ public class HookWrapper {
     // First handle plain step hooks
     handleHookList(flightContext, HookOperation.START_STEP);
     // Use the factory to collect any step hooks for this step
-    List<StepHook> stepHooks = new ArrayList<>();
+    List<DynamicHook> stepHooks = new ArrayList<>();
     for (StairwayHook stairwayHook : stairwayHooks) {
-      Optional<StepHook> maybeStepHook = stairwayHook.stepFactory(flightContext);
+      Optional<DynamicHook> maybeStepHook = stairwayHook.stepFactory(flightContext);
       maybeStepHook.ifPresent(stepHooks::add);
     }
     // Then handle any step hooks list from the factory
-    handleStepHookList(stepHooks, flightContext, HookOperation.START_STEP);
+    handleDynamicHookList(stepHooks, flightContext, HookOperation.START_STEP);
     flightContext.setStepHooks(stepHooks);
   }
 
@@ -111,7 +111,7 @@ public class HookWrapper {
     // First handle plain step hooks
     handleHookList(flightContext, HookOperation.END_STEP);
     // Next handle the step hooks list from the flight context
-    handleStepHookList(flightContext.getStepHooks(), flightContext, HookOperation.END_STEP);
+    handleDynamicHookList(flightContext.getStepHooks(), flightContext, HookOperation.END_STEP);
     flightContext.setStepHooks(null);
   }
 
@@ -119,7 +119,7 @@ public class HookWrapper {
     // First handle plain flight hooks
     handleHookList(flightContext, HookOperation.END_FLIGHT);
     // Next handle the flight hooks list from the flight context
-    handleFlightHookList(flightContext.getFlightHooks(), flightContext, HookOperation.END_FLIGHT);
+    handleDynamicHookList(flightContext.getFlightHooks(), flightContext, HookOperation.END_FLIGHT);
     flightContext.setFlightHooks(null);
   }
 
@@ -137,27 +137,14 @@ public class HookWrapper {
     }
   }
 
-  private void handleStepHookList(
-      List<StepHook> stepHooks, FlightContext context, HookOperation operation) {
-    if (stepHooks != null) {
-      for (StepHook stepHook : stepHooks) {
+  private void handleDynamicHookList(
+      List<DynamicHook> dynamicHooks, FlightContext context, HookOperation operation) {
+    if (dynamicHooks != null) {
+      for (DynamicHook dynamicHook : dynamicHooks) {
         try {
-          operation.handleStepHook(context, stepHook);
+          operation.handleDynamicHook(context, dynamicHook);
         } catch (Exception ex) {
-          logger.warn("Step Hook failed with exception", ex);
-        }
-      }
-    }
-  }
-
-  private void handleFlightHookList(
-      List<FlightHook> flightHooks, FlightContext context, HookOperation operation) {
-    if (flightHooks != null) {
-      for (FlightHook flightHook : flightHooks) {
-        try {
-          operation.handleFlightHook(context, flightHook);
-        } catch (Exception ex) {
-          logger.warn("Flight Hook failed with exception", ex);
+          logger.warn("Dynamic Hook failed with exception", ex);
         }
       }
     }
