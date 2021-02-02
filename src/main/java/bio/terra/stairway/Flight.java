@@ -1,20 +1,21 @@
 package bio.terra.stairway;
 
-import static bio.terra.stairway.FlightStatus.READY;
-import static bio.terra.stairway.FlightStatus.READY_TO_RESTART;
-import static bio.terra.stairway.FlightStatus.WAITING;
-
 import bio.terra.stairway.exception.DatabaseOperationException;
 import bio.terra.stairway.exception.RetryException;
 import bio.terra.stairway.exception.StairwayExecutionException;
-import java.util.HashSet;
-import java.util.LinkedList;
-import java.util.List;
-import java.util.Set;
 import org.apache.commons.lang3.builder.ToStringBuilder;
 import org.apache.commons.lang3.builder.ToStringStyle;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+
+import java.util.HashSet;
+import java.util.LinkedList;
+import java.util.List;
+import java.util.Set;
+
+import static bio.terra.stairway.FlightStatus.READY;
+import static bio.terra.stairway.FlightStatus.READY_TO_RESTART;
+import static bio.terra.stairway.FlightStatus.WAITING;
 
 /**
  * Manage the atomic execution of a series of Steps This base class has the mechanisms for executing
@@ -91,8 +92,9 @@ public class Flight implements Runnable {
    * direction.
    */
   public void run() {
-    hookWrapper().startFlight(flightContext);
     try {
+      hookWrapper().startFlight(flightContext);
+
       // We use flightDao all over the place, so we put it in a private to avoid passing it through
       // all of the method argument lists.
       flightDao = context().getStairway().getFlightDao();
@@ -106,13 +108,17 @@ public class Flight implements Runnable {
       logger.debug("Executing: " + context().toString());
       FlightStatus flightStatus = fly();
       flightExit(flightStatus);
-      hookWrapper().endFlight(flightContext);
     } catch (InterruptedException ex) {
       // Shutdown - try disowning the flight
       logger.warn("Flight interrupted: " + context().getFlightId());
       flightExit(READY);
     } catch (Exception ex) {
       logger.error("Flight failed with exception", ex);
+    }
+    try {
+      hookWrapper().endFlight(flightContext);
+    } catch (Exception ex) {
+      logger.warn("End flight hook failed with exception", ex);
     }
   }
 
