@@ -10,11 +10,11 @@ class FlightFilterPredicate {
     TIMESTAMP
   }
 
-  private FlightFilterOp op;
-  private String key;
-  private Object value;
-  private Datatype datatype;
-  private String parameterName;
+  private final FlightFilterOp op;
+  private final String key;
+  private final Object value;
+  private final Datatype datatype;
+  private final String parameterName;
 
   /**
    * Predicate comparison constructor
