@@ -696,8 +696,10 @@ class FlightDao {
     FlightDebugInfo debugInfo = null;
     try {
       debugInfo =
-          FlightDebugInfo.getObjectMapper()
-              .readValue(rs.getString("debug_info"), FlightDebugInfo.class);
+          rs.getString("debug_info") == null
+              ? null
+              : FlightDebugInfo.getObjectMapper()
+                  .readValue(rs.getString("debug_info"), FlightDebugInfo.class);
     } catch (JsonProcessingException e) {
       throw new DatabaseOperationException(e);
     }
