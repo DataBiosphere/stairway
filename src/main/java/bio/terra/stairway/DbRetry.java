@@ -1,12 +1,11 @@
 package bio.terra.stairway;
 
 import bio.terra.stairway.exception.DatabaseOperationException;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
-
 import java.sql.SQLException;
 import java.util.concurrent.ThreadLocalRandom;
 import java.util.concurrent.TimeUnit;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 /**
  * The DbRetry class provides a common retry framework for the DAOs. A new DbRetry class is

@@ -1,24 +1,26 @@
 package bio.terra.stairway;
 
-import static bio.terra.stairway.DbUtils.commitTransaction;
-import static bio.terra.stairway.DbUtils.startReadOnlyTransaction;
-import static bio.terra.stairway.DbUtils.startTransaction;
-
 import bio.terra.stairway.exception.DatabaseOperationException;
+import bio.terra.stairway.exception.DuplicateFlightIdException;
 import bio.terra.stairway.exception.FlightException;
 import bio.terra.stairway.exception.FlightFilterException;
 import bio.terra.stairway.exception.FlightNotFoundException;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import edu.umd.cs.findbugs.annotations.SuppressFBWarnings;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
+import javax.sql.DataSource;
 import java.sql.Connection;
 import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
-import javax.sql.DataSource;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
+
+import static bio.terra.stairway.DbUtils.commitTransaction;
+import static bio.terra.stairway.DbUtils.startReadOnlyTransaction;
+import static bio.terra.stairway.DbUtils.startTransaction;
 
 /**
  * The general layout of the stairway database tables is:
@@ -128,7 +130,7 @@ class FlightDao {
       // flightId. See https://www.postgresql.org/docs/10/errcodes-appendix.html for postgres
       // error codes.
       if (ex.getSQLState().equals("23505")) {
-        throw new DatabaseOperationException(
+        throw new DuplicateFlightIdException(
             "Duplicate flightID " + flightContext.getFlightId(), ex);
       }
       throw ex;
@@ -217,6 +219,7 @@ class FlightDao {
    *
    * @param flightContext context for this flight
    * @throws DatabaseOperationException on database errors
+   * @throws InterruptedException thread shutdown
    */
   void queued(FlightContext flightContext) throws DatabaseOperationException, InterruptedException {
     final String sqlUpdateFlight =
@@ -233,6 +236,7 @@ class FlightDao {
    *
    * @param flightContext context object for the flight
    * @throws DatabaseOperationException on database errors
+   * @throws InterruptedException thread shutdown
    */
   private void disown(FlightContext flightContext)
       throws DatabaseOperationException, InterruptedException {
@@ -425,6 +429,7 @@ class FlightDao {
    *
    * @param flightId flight to remove
    * @throws DatabaseOperationException on any database error
+   * @throws InterruptedException thread shutdown
    */
   void delete(String flightId) throws DatabaseOperationException, InterruptedException {
     DbRetry.retryVoid("flight.delete", () -> deleteInner(flightId));
