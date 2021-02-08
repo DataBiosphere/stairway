@@ -4,7 +4,7 @@ import java.util.concurrent.TimeUnit;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-public class WorkQueueListener implements Runnable {
+class WorkQueueListener implements Runnable {
   private static final Logger logger = LoggerFactory.getLogger(WorkQueueListener.class);
   private static final int MAX_MESSAGES_PER_PULL = 2;
   private static final int NO_PULL_SLEEP_SECONDS = 5;

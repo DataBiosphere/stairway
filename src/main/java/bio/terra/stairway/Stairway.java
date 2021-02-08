@@ -2,20 +2,11 @@ package bio.terra.stairway;
 
 import bio.terra.stairway.exception.DatabaseOperationException;
 import bio.terra.stairway.exception.DatabaseSetupException;
-import bio.terra.stairway.exception.DuplicateFlightIdSubmittedException;
 import bio.terra.stairway.exception.FlightException;
 import bio.terra.stairway.exception.MakeFlightException;
 import bio.terra.stairway.exception.MigrateException;
 import bio.terra.stairway.exception.QueueException;
 import bio.terra.stairway.exception.StairwayExecutionException;
-import org.apache.commons.lang3.builder.EqualsBuilder;
-import org.apache.commons.lang3.builder.HashCodeBuilder;
-import org.apache.commons.lang3.builder.ToStringBuilder;
-import org.apache.commons.lang3.builder.ToStringStyle;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
-
-import javax.sql.DataSource;
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.List;
@@ -24,6 +15,13 @@ import java.util.concurrent.LinkedBlockingQueue;
 import java.util.concurrent.ThreadPoolExecutor;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
+import javax.sql.DataSource;
+import org.apache.commons.lang3.builder.EqualsBuilder;
+import org.apache.commons.lang3.builder.HashCodeBuilder;
+import org.apache.commons.lang3.builder.ToStringBuilder;
+import org.apache.commons.lang3.builder.ToStringStyle;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 /** Stairway is the object that drives execution of Flights. */
 public class Stairway {
@@ -543,12 +541,10 @@ public class Stairway {
    *     database or launching
    * @throws StairwayExecutionException failure queuing the flight
    * @throws InterruptedException this thread was interrupted
-   * @throws DuplicateFlightIdSubmittedException provided flightId is already in use
    */
   public void submit(
       String flightId, Class<? extends Flight> flightClass, FlightMap inputParameters)
-      throws DatabaseOperationException, StairwayExecutionException, InterruptedException,
-          DuplicateFlightIdSubmittedException {
+      throws DatabaseOperationException, StairwayExecutionException, InterruptedException {
     submitWorker(flightId, flightClass, inputParameters, false, null);
   }
 
@@ -565,12 +561,10 @@ public class Stairway {
    *     database or launching
    * @throws StairwayExecutionException failure queuing the flight
    * @throws InterruptedException this thread was interrupted
-   * @throws DuplicateFlightIdSubmittedException provided flightId is already in use
    */
   public void submitToQueue(
       String flightId, Class<? extends Flight> flightClass, FlightMap inputParameters)
-      throws DatabaseOperationException, StairwayExecutionException, InterruptedException,
-          DuplicateFlightIdSubmittedException {
+      throws DatabaseOperationException, StairwayExecutionException, InterruptedException {
     submitWorker(flightId, flightClass, inputParameters, true, null);
   }
 
@@ -580,8 +574,7 @@ public class Stairway {
       FlightMap inputParameters,
       boolean shouldQueue,
       FlightDebugInfo debugInfo)
-      throws DatabaseOperationException, StairwayExecutionException, InterruptedException,
-          DuplicateFlightIdSubmittedException {
+      throws DatabaseOperationException, StairwayExecutionException, InterruptedException {
     submitWorker(flightId, flightClass, inputParameters, shouldQueue, debugInfo);
   }
 
@@ -591,8 +584,7 @@ public class Stairway {
       FlightMap inputParameters,
       boolean shouldQueue,
       FlightDebugInfo debugInfo)
-      throws DatabaseOperationException, StairwayExecutionException, InterruptedException,
-          DuplicateFlightIdSubmittedException {
+      throws DatabaseOperationException, StairwayExecutionException, InterruptedException {
 
     if (flightClass == null || inputParameters == null) {
       throw new MakeFlightException(
@@ -711,8 +703,9 @@ public class Stairway {
 
   /**
    * Wait for a flight to complete
-   * <p> This is a very simple polling method to help you get started with Stairway.
-   * It is probably not what you want for production code.
+   *
+   * <p>This is a very simple polling method to help you get started with Stairway. It is probably
+   * not what you want for production code.
    *
    * @param flightId the flight to wait for
    * @param pollSeconds sleep time for each poll cycle; if null, defaults to 10 seconds

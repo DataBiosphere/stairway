@@ -2,7 +2,7 @@ package bio.terra.stairway;
 
 import com.fasterxml.jackson.annotation.JsonIgnore;
 
-public enum QueueMessageEnum {
+enum QueueMessageEnum {
   QUEUE_MESSAGE_READY(QueueMessageReady.class); // flight is ready to run
 
   @JsonIgnore private final Class<? extends QueueMessage> messageClass;
@@ -11,7 +11,7 @@ public enum QueueMessageEnum {
     this.messageClass = messageClass;
   }
 
-  public Class<? extends QueueMessage> getMessageClass() {
+  Class<? extends QueueMessage> getMessageClass() {
     return messageClass;
   }
 }

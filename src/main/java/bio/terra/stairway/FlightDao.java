@@ -5,7 +5,6 @@ import static bio.terra.stairway.DbUtils.startReadOnlyTransaction;
 import static bio.terra.stairway.DbUtils.startTransaction;
 
 import bio.terra.stairway.exception.DatabaseOperationException;
-import bio.terra.stairway.exception.DuplicateFlightIdSubmittedException;
 import bio.terra.stairway.exception.FlightException;
 import bio.terra.stairway.exception.FlightFilterException;
 import bio.terra.stairway.exception.FlightNotFoundException;
@@ -85,13 +84,11 @@ class FlightDao {
    * @throws DatabaseOperationException database error
    * @throws InterruptedException thread shutdown
    */
-  void submit(FlightContext flightContext)
-      throws DatabaseOperationException, InterruptedException, DuplicateFlightIdSubmittedException {
-    DbRetry dbRetry = new DbRetry("flight.submit");
-    dbRetry.perform(() -> submitInner(flightContext));
+  void submit(FlightContext flightContext) throws DatabaseOperationException, InterruptedException {
+    DbRetry.retryVoid("flight.submit", () -> submitInner(flightContext));
   }
 
-  private Void submitInner(FlightContext flightContext)
+  private void submitInner(FlightContext flightContext)
       throws SQLException, DatabaseOperationException, InterruptedException {
     final String sqlInsertFlight =
         "INSERT INTO "
@@ -136,23 +133,20 @@ class FlightDao {
       }
       throw ex;
     }
-
-    return null;
   }
 
   /**
    * Record the flight state right after a step
    *
    * @param flightContext description of the flight
-   * @throws DatabaseOperationException
+   * @throws DatabaseOperationException database error
    * @throws InterruptedException thread shutdown
    */
   void step(FlightContext flightContext) throws DatabaseOperationException, InterruptedException {
-    DbRetry dbRetry = new DbRetry("flight.step");
-    dbRetry.perform(() -> stepInner(flightContext));
+    DbRetry.retryVoid("flight.step", () -> stepInner(flightContext));
   }
 
-  private Void stepInner(FlightContext flightContext) throws SQLException {
+  private void stepInner(FlightContext flightContext) throws SQLException {
     final String sqlInsertFlightLog =
         "INSERT INTO "
             + FLIGHT_LOG_TABLE
@@ -180,7 +174,6 @@ class FlightDao {
       statement.getPreparedStatement().executeUpdate();
       commitTransaction(connection);
     }
-    return null;
   }
 
   /**
@@ -232,8 +225,7 @@ class FlightDao {
             + " SET status = :status"
             + " WHERE stairway_id IS NULL AND flightid = :flightId AND status = 'READY'";
     flightContext.setFlightStatus(FlightStatus.QUEUED);
-    DbRetry dbRetry = new DbRetry("flight.queued");
-    dbRetry.perform(() -> updateFlightState(sqlUpdateFlight, flightContext));
+    DbRetry.retryVoid("flight.queued", () -> updateFlightState(sqlUpdateFlight, flightContext));
   }
 
   /**
@@ -250,11 +242,10 @@ class FlightDao {
             + " SET status = :status,"
             + " stairway_id = NULL"
             + " WHERE flightid = :flightId AND status = 'RUNNING'";
-    DbRetry dbRetry = new DbRetry("flight.disown");
-    dbRetry.perform(() -> updateFlightState(sqlUpdateFlight, flightContext));
+    DbRetry.retryVoid("flight.disown", () -> updateFlightState(sqlUpdateFlight, flightContext));
   }
 
-  private Void updateFlightState(String sql, FlightContext flightContext) throws SQLException {
+  private void updateFlightState(String sql, FlightContext flightContext) throws SQLException {
 
     try (Connection connection = dataSource.getConnection();
         NamedParameterPreparedStatement statement =
@@ -267,7 +258,6 @@ class FlightDao {
       commitTransaction(connection);
       hookWrapper.stateTransition(flightContext);
     }
-    return null;
   }
 
   /**
@@ -280,11 +270,10 @@ class FlightDao {
    * @throws InterruptedException interruption of the retry loop
    */
   void disownRecovery(String stairwayId) throws DatabaseOperationException, InterruptedException {
-    DbRetry dbRetry = new DbRetry("flight.disownRecovery");
-    dbRetry.perform(() -> disownRecoveryInner(stairwayId));
+    DbRetry.retryVoid("flight.disownRecovery", () -> disownRecoveryInner(stairwayId));
   }
 
-  private Void disownRecoveryInner(String stairwayId)
+  private void disownRecoveryInner(String stairwayId)
       throws SQLException, DatabaseOperationException, InterruptedException {
     final String sqlGet =
         "SELECT flightid, class_name, debug_info, status FROM "
@@ -329,7 +318,6 @@ class FlightDao {
         hookWrapper.stateTransition(flightContext);
       }
     }
-    return null;
   }
 
   /**
@@ -341,8 +329,7 @@ class FlightDao {
    * @throws InterruptedException thread we are on is shutting down
    */
   List<String> getReadyFlights() throws DatabaseOperationException, InterruptedException {
-    DbRetry dbRetry = new DbRetry("flight.getReadyFlights");
-    return dbRetry.perform(this::getReadyFlightsInner);
+    return DbRetry.retry("flight.getReadyFlights", this::getReadyFlightsInner);
   }
 
   private List<String> getReadyFlightsInner() throws SQLException {
@@ -387,11 +374,10 @@ class FlightDao {
    */
   private void complete(FlightContext flightContext)
       throws DatabaseOperationException, InterruptedException {
-    DbRetry dbRetry = new DbRetry("flight.complete");
-    dbRetry.perform(() -> completeInner(flightContext));
+    DbRetry.retryVoid("flight.complete", () -> completeInner(flightContext));
   }
 
-  private Void completeInner(FlightContext flightContext) throws SQLException {
+  private void completeInner(FlightContext flightContext) throws SQLException {
     // Make the update idempotent; that is, only do it if the status is RUNNING
     final String sqlUpdateFlight =
         "UPDATE "
@@ -432,7 +418,6 @@ class FlightDao {
       commitTransaction(connection);
       hookWrapper.stateTransition(flightContext);
     }
-    return null;
   }
 
   /**
@@ -442,11 +427,10 @@ class FlightDao {
    * @throws DatabaseOperationException on any database error
    */
   void delete(String flightId) throws DatabaseOperationException, InterruptedException {
-    DbRetry dbRetry = new DbRetry("flight.delete");
-    dbRetry.perform(() -> deleteInner(flightId));
+    DbRetry.retryVoid("flight.delete", () -> deleteInner(flightId));
   }
 
-  private Void deleteInner(String flightId) throws SQLException {
+  private void deleteInner(String flightId) throws SQLException {
     final String sqlDeleteFlightLog =
         "DELETE FROM " + FLIGHT_LOG_TABLE + " WHERE flightid = :flightId";
     final String sqlDeleteFlight = "DELETE FROM " + FLIGHT_TABLE + " WHERE flightid = :flightId";
@@ -474,7 +458,6 @@ class FlightDao {
 
       commitTransaction(connection);
     }
-    return null;
   }
 
   /**
@@ -489,8 +472,7 @@ class FlightDao {
    */
   FlightContext resume(String stairwayId, String flightId)
       throws DatabaseOperationException, InterruptedException {
-    DbRetry dbRetry = new DbRetry("flight.resume");
-    return dbRetry.perform(() -> resumeInner(stairwayId, flightId));
+    return DbRetry.retry("flight.resume", () -> resumeInner(stairwayId, flightId));
   }
 
   private FlightContext resumeInner(String stairwayId, String flightId)
@@ -552,8 +534,8 @@ class FlightDao {
    */
   FlightContext makeFlightContextById(String flightId)
       throws DatabaseOperationException, InterruptedException {
-    DbRetry dbRetry = new DbRetry("flight.makeFlightcontextById");
-    return dbRetry.perform(() -> makeFlightContextByIdInner(flightId));
+    return DbRetry.retry(
+        "flight.makeFlightcontextById", () -> makeFlightContextByIdInner(flightId));
   }
 
   private FlightContext makeFlightContextByIdInner(String flightId)
@@ -670,8 +652,7 @@ class FlightDao {
    */
   FlightState getFlightState(String flightId)
       throws DatabaseOperationException, InterruptedException {
-    DbRetry dbRetry = new DbRetry("flight.getFlightState");
-    return dbRetry.perform(() -> getFlightStateInner(flightId));
+    return DbRetry.retry("flight.getFlightState", () -> getFlightStateInner(flightId));
   }
 
   private FlightState getFlightStateInner(String flightId)
@@ -766,8 +747,7 @@ class FlightDao {
     // Make an empty filter if one is not provided
     FlightFilter filter = (inFilter != null) ? inFilter : new FlightFilter();
 
-    DbRetry dbRetry = new DbRetry("flight.getFlights");
-    return dbRetry.perform(() -> getFlightsInner(offset, limit, filter));
+    return DbRetry.retry("flight.getFlights", () -> getFlightsInner(offset, limit, filter));
   }
 
   private List<FlightState> getFlightsInner(int offset, int limit, FlightFilter filter)

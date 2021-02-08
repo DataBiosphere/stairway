@@ -12,7 +12,7 @@ import org.openapitools.jackson.nullable.JsonNullableModule;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-public abstract class QueueMessage {
+abstract class QueueMessage {
   private static final Logger logger = LoggerFactory.getLogger(QueueMessage.class);
 
   private static final ObjectMapper objectMapper =
@@ -25,9 +25,9 @@ public abstract class QueueMessage {
 
   protected static final String FORMAT_VERSION = "1";
 
-  public abstract void process(Stairway stairway) throws InterruptedException;
+  abstract void process(Stairway stairway) throws InterruptedException;
 
-  public static String serialize(QueueMessage message) throws StairwayExecutionException {
+  static String serialize(QueueMessage message) throws StairwayExecutionException {
     try {
       return objectMapper.writeValueAsString(message);
     } catch (JsonProcessingException ex) {
@@ -35,8 +35,7 @@ public abstract class QueueMessage {
     }
   }
 
-  public static Boolean processMessage(String message, Stairway stairway)
-      throws InterruptedException {
+  static Boolean processMessage(String message, Stairway stairway) throws InterruptedException {
     QueueMessage qm = deserialize(message);
     if (qm == null) {
       return false;
@@ -45,7 +44,7 @@ public abstract class QueueMessage {
     return true;
   }
 
-  public static QueueMessage deserialize(String message) {
+  static QueueMessage deserialize(String message) {
     QueueMessageNoFields qmNoFields;
     try {
       qmNoFields = objectMapper.readValue(message, QueueMessageNoFields.class);

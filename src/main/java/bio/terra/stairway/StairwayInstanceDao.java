@@ -19,9 +19,9 @@ import org.slf4j.LoggerFactory;
 @SuppressFBWarnings(
     value = "RCN_REDUNDANT_NULLCHECK_WOULD_HAVE_BEEN_A_NPE",
     justification = "Spotbugs doesn't understand resource try construct")
-public class StairwayInstanceDao {
+class StairwayInstanceDao {
   private static final Logger logger = LoggerFactory.getLogger(StairwayInstanceDao.class);
-  static final String STAIRWAY_INSTANCE_TABLE = "stairwayinstance";
+  private static final String STAIRWAY_INSTANCE_TABLE = "stairwayinstance";
 
   private final DataSource dataSource;
 
@@ -45,8 +45,7 @@ public class StairwayInstanceDao {
    * @throws InterruptedException on thread shutdown
    */
   String findOrCreate(String stairwayName) throws DatabaseOperationException, InterruptedException {
-    DbRetry dbRetry = new DbRetry("stairwayInstance.findOrCreate");
-    return dbRetry.perform(() -> findOrCreateInner(stairwayName));
+    return DbRetry.retry("stairwayInstance.findOrCreate", () -> findOrCreateInner(stairwayName));
   }
 
   private String findOrCreateInner(String stairwayName)
@@ -90,8 +89,7 @@ public class StairwayInstanceDao {
    * @throws InterruptedException on thread shutdown
    */
   String lookupId(String stairwayName) throws DatabaseOperationException, InterruptedException {
-    DbRetry dbRetry = new DbRetry("stairwayInstance.lookupId");
-    return dbRetry.perform(() -> lookupIdInner(stairwayName));
+    return DbRetry.retry("stairwayInstance.lookupId", () -> lookupIdInner(stairwayName));
   }
 
   private String lookupIdInner(String stairwayName)
@@ -117,8 +115,7 @@ public class StairwayInstanceDao {
    * @throws InterruptedException on thread shutdown
    */
   List<String> getList() throws DatabaseOperationException, InterruptedException {
-    DbRetry dbRetry = new DbRetry("stairwayInstance.getList");
-    return dbRetry.perform(this::getListInner);
+    return DbRetry.retry("stairwayInstance.getList", this::getListInner);
   }
 
   private List<String> getListInner() throws SQLException {
