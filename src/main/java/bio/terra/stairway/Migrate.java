@@ -8,7 +8,6 @@ import liquibase.Contexts;
 import liquibase.Liquibase;
 import liquibase.database.jvm.JdbcConnection;
 import liquibase.exception.LiquibaseException;
-import liquibase.lockservice.DatabaseChangeLogLock;
 import liquibase.resource.ClassLoaderResourceAccessor;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -16,8 +15,8 @@ import org.slf4j.LoggerFactory;
 // TODO: This is a cut'n'paste of the template project Migrate. I don't know a good way to share
 // that code
 //  at this point in time. It seems like it should be shared though.
-public class Migrate {
-  private Logger logger = LoggerFactory.getLogger(Migrate.class);
+class Migrate {
+  private final Logger logger = LoggerFactory.getLogger(Migrate.class);
 
   /**
    * Initialize drops existing tables in the database and reinitializes it with the changeset. This
@@ -51,23 +50,6 @@ public class Migrate {
       Liquibase liquibase =
           new Liquibase(
               changesetFile, new ClassLoaderResourceAccessor(), new JdbcConnection(connection));
-      DatabaseChangeLogLock[] locks = liquibase.listLocks();
-      for (DatabaseChangeLogLock lock : locks) {
-        logger.info(
-            String.format(
-                "DatabaseChangeLogLock changeSet: %s, id: %s, lockedBy: %s, granted: %s",
-                changesetFile, lock.getId(), lock.getLockedBy(), lock.getLockGranted()));
-
-        // We can get into this state where one of the APIs is running migrations and gets shut down
-        // so that
-        // another API container can run. It will result in a lock that doesn't get released. This
-        // is similar
-        // to the problems we will have from deploying multiple containers at once that try to run
-        // migrations.
-        logger.warn("Forcing lock release");
-        liquibase.forceReleaseLocks();
-      }
-
       if (initialize) {
         logger.info("Initializing all tables in the database");
         liquibase.dropAll();

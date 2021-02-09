@@ -6,7 +6,7 @@ import java.util.Optional;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-public class HookWrapper {
+class HookWrapper {
   private static final Logger logger = LoggerFactory.getLogger(HookWrapper.class);
   private final List<StairwayHook> stairwayHooks;
 

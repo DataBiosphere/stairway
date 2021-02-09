@@ -1,24 +1,26 @@
 package bio.terra.stairway;
 
 import bio.terra.stairway.exception.DatabaseOperationException;
-import bio.terra.stairway.exception.DatabaseSetupException;
-import bio.terra.stairway.exception.DuplicateFlightIdSubmittedException;
+import bio.terra.stairway.exception.DuplicateFlightIdException;
 import bio.terra.stairway.exception.FlightException;
 import bio.terra.stairway.exception.FlightFilterException;
 import bio.terra.stairway.exception.FlightNotFoundException;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import edu.umd.cs.findbugs.annotations.SuppressFBWarnings;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
+import javax.sql.DataSource;
 import java.sql.Connection;
 import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
-import java.util.concurrent.ThreadLocalRandom;
-import java.util.concurrent.TimeUnit;
-import javax.sql.DataSource;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
+
+import static bio.terra.stairway.DbUtils.commitTransaction;
+import static bio.terra.stairway.DbUtils.startReadOnlyTransaction;
+import static bio.terra.stairway.DbUtils.startTransaction;
 
 /**
  * The general layout of the stairway database tables is:
@@ -55,144 +57,41 @@ class FlightDao {
   static final String FLIGHT_TABLE = "flight";
   static final String FLIGHT_LOG_TABLE = "flightlog";
   static final String FLIGHT_INPUT_TABLE = "flightinput";
-  static final String STAIRWAY_INSTANCE_TABLE = "stairwayinstance";
+
   private static final String UNKNOWN = "<unknown>";
 
   private final DataSource dataSource;
+  private final StairwayInstanceDao stairwayInstanceDao;
   private final ExceptionSerializer exceptionSerializer;
   private final boolean keepFlightLog;
   private final HookWrapper hookWrapper;
 
   FlightDao(
       DataSource dataSource,
+      StairwayInstanceDao stairwayInstanceDao,
       ExceptionSerializer exceptionSerializer,
       HookWrapper hookWrapper,
       boolean keepFlightLog) {
     this.dataSource = dataSource;
+    this.stairwayInstanceDao = stairwayInstanceDao;
     this.exceptionSerializer = exceptionSerializer;
     this.hookWrapper = hookWrapper;
     this.keepFlightLog = keepFlightLog;
   }
 
   /**
-   * Find or create a stairway instance. It is allowable to destroy and recreate a stairway instance
-   * of the same name. It will recover flights that it owns.
+   * Record a new flight
    *
-   * @param stairwayName string name of this stairway instance; must be unique across stairways in
-   *     the database
-   * @return short UUID for this stairway instance
-   * @throws DatabaseOperationException on database errors
+   * @param flightContext description of the flight
+   * @throws DatabaseOperationException database error
+   * @throws InterruptedException thread shutdown
    */
-  String findOrCreateStairwayInstance(String stairwayName)
-      throws DatabaseSetupException, DatabaseOperationException {
-
-    try (Connection connection = dataSource.getConnection()) {
-      startTransaction(connection);
-
-      String stairwayId = lookupStairwayInstanceQuery(connection, stairwayName);
-      if (stairwayId != null) {
-        return stairwayId;
-      }
-
-      final String sqlStairwayInstanceCreate =
-          "INSERT INTO "
-              + STAIRWAY_INSTANCE_TABLE
-              + " (stairway_id, stairway_name)"
-              + " VALUES (:stairwayId, :stairwayName)";
-      try (NamedParameterPreparedStatement statement =
-          new NamedParameterPreparedStatement(connection, sqlStairwayInstanceCreate)) {
-        // This is Step 1 of removing use of a separate stairwayId and using the name
-        // for the id everywhere. See src/main/resources/stairway/db/SCHEMA.md
-        // for the migration plan.
-        stairwayId = stairwayName;
-
-        statement.setString("stairwayName", stairwayName);
-        statement.setString("stairwayId", stairwayId);
-        statement.getPreparedStatement().executeUpdate();
-
-        commitTransaction(connection);
-        return stairwayId;
-      }
-    } catch (SQLException ex) {
-      throw new DatabaseSetupException("Stairway instance find/create failed", ex);
-    }
+  void submit(FlightContext flightContext) throws DatabaseOperationException, InterruptedException {
+    DbRetry.retryVoid("flight.submit", () -> submitInner(flightContext));
   }
 
-  String lookupStairwayInstanceId(String stairwayName) throws DatabaseOperationException {
-    try (Connection connection = dataSource.getConnection()) {
-      startReadOnlyTransaction(connection);
-
-      String stairwayId = lookupStairwayInstanceQuery(connection, stairwayName);
-
-      commitTransaction(connection);
-      return stairwayId;
-    } catch (SQLException ex) {
-      throw new DatabaseOperationException("Stairway instance lookup failed", ex);
-    }
-  }
-
-  private String lookupStairwayInstanceQuery(Connection connection, String stairwayName)
-      throws SQLException, DatabaseOperationException {
-    final String sqlStairwayInstance =
-        "SELECT stairway_id"
-            + " FROM "
-            + STAIRWAY_INSTANCE_TABLE
-            + " WHERE stairway_name = :stairwayName";
-
-    try (NamedParameterPreparedStatement instanceStatement =
-        new NamedParameterPreparedStatement(connection, sqlStairwayInstance)) {
-
-      instanceStatement.setString("stairwayName", stairwayName);
-
-      try (ResultSet rs = instanceStatement.getPreparedStatement().executeQuery()) {
-        List<String> stairwayIdList = new ArrayList<>();
-        while (rs.next()) {
-          stairwayIdList.add(rs.getString("stairway_id"));
-        }
-
-        if (stairwayIdList.size() == 0) {
-          return null;
-        }
-        if (stairwayIdList.size() > 1) {
-          throw new DatabaseOperationException("Multiple stairways with the same name!");
-        }
-        return stairwayIdList.get(0);
-      }
-    }
-  }
-
-  /**
-   * This call can be used in conjunction with a list of the currently active stairway instances to
-   * drive recovery of orphaned flights.
-   *
-   * @return list of the stairway instances known to stairway
-   * @throws DatabaseOperationException on SQL exception
-   */
-  List<String> getStairwayInstanceList() throws DatabaseOperationException {
-    final String sql = "SELECT stairway_name FROM " + STAIRWAY_INSTANCE_TABLE;
-    List<String> instanceList = new ArrayList<>();
-
-    try (Connection connection = dataSource.getConnection()) {
-      startReadOnlyTransaction(connection);
-
-      try (NamedParameterPreparedStatement instanceStatement =
-              new NamedParameterPreparedStatement(connection, sql);
-          ResultSet rs = instanceStatement.getPreparedStatement().executeQuery()) {
-        while (rs.next()) {
-          instanceList.add(rs.getString("stairway_name"));
-        }
-      }
-
-      commitTransaction(connection);
-    } catch (SQLException ex) {
-      throw new DatabaseOperationException("Stairway instance enumeration failed", ex);
-    }
-    return instanceList;
-  }
-
-  /** Record a new flight */
-  void submit(FlightContext flightContext)
-      throws DatabaseOperationException, InterruptedException, DuplicateFlightIdSubmittedException {
+  private void submitInner(FlightContext flightContext)
+      throws SQLException, DatabaseOperationException, InterruptedException {
     final String sqlInsertFlight =
         "INSERT INTO "
             + FLIGHT_TABLE
@@ -231,15 +130,25 @@ class FlightDao {
       // flightId. See https://www.postgresql.org/docs/10/errcodes-appendix.html for postgres
       // error codes.
       if (ex.getSQLState().equals("23505")) {
-        throw new DuplicateFlightIdSubmittedException(
+        throw new DuplicateFlightIdException(
             "Duplicate flightID " + flightContext.getFlightId(), ex);
       }
-      handleSqlException("Failed to insert flight record - submit failed", ex, flightContext);
+      throw ex;
     }
   }
 
-  /** Record the flight state right after a step */
+  /**
+   * Record the flight state right after a step
+   *
+   * @param flightContext description of the flight
+   * @throws DatabaseOperationException database error
+   * @throws InterruptedException thread shutdown
+   */
   void step(FlightContext flightContext) throws DatabaseOperationException, InterruptedException {
+    DbRetry.retryVoid("flight.step", () -> stepInner(flightContext));
+  }
+
+  private void stepInner(FlightContext flightContext) throws SQLException {
     final String sqlInsertFlightLog =
         "INSERT INTO "
             + FLIGHT_LOG_TABLE
@@ -266,8 +175,6 @@ class FlightDao {
       statement.setString("status", flightContext.getFlightStatus().name());
       statement.getPreparedStatement().executeUpdate();
       commitTransaction(connection);
-    } catch (SQLException ex) {
-      handleSqlException("Failed to log step", ex, flightContext);
     }
   }
 
@@ -305,16 +212,6 @@ class FlightDao {
     }
   }
 
-  private static final int SERIALIZATION_RETRIES = 20;
-  private static final int WAIT_MIN = 250;
-  private static final int WAIT_MAX = 1000;
-
-  private void retryWait(String logTag, String flightId) throws InterruptedException {
-    int sleepMS = ThreadLocalRandom.current().nextInt(WAIT_MIN, WAIT_MAX);
-    TimeUnit.MILLISECONDS.sleep(sleepMS);
-    logger.info(logTag + " - retrying for id: " + flightId);
-  }
-
   /**
    * Record that a flight has been put in the work queue. This is best effort to minimize the
    * chances of getting multiple entries for the same flight in the queue. However, by the time we
@@ -322,6 +219,7 @@ class FlightDao {
    *
    * @param flightContext context for this flight
    * @throws DatabaseOperationException on database errors
+   * @throws InterruptedException thread shutdown
    */
   void queued(FlightContext flightContext) throws DatabaseOperationException, InterruptedException {
     final String sqlUpdateFlight =
@@ -330,7 +228,7 @@ class FlightDao {
             + " SET status = :status"
             + " WHERE stairway_id IS NULL AND flightid = :flightId AND status = 'READY'";
     flightContext.setFlightStatus(FlightStatus.QUEUED);
-    updateFlightState("queued", sqlUpdateFlight, flightContext);
+    DbRetry.retryVoid("flight.queued", () -> updateFlightState(sqlUpdateFlight, flightContext));
   }
 
   /**
@@ -338,6 +236,7 @@ class FlightDao {
    *
    * @param flightContext context object for the flight
    * @throws DatabaseOperationException on database errors
+   * @throws InterruptedException thread shutdown
    */
   private void disown(FlightContext flightContext)
       throws DatabaseOperationException, InterruptedException {
@@ -347,34 +246,21 @@ class FlightDao {
             + " SET status = :status,"
             + " stairway_id = NULL"
             + " WHERE flightid = :flightId AND status = 'RUNNING'";
-    updateFlightState("disown", sqlUpdateFlight, flightContext);
+    DbRetry.retryVoid("flight.disown", () -> updateFlightState(sqlUpdateFlight, flightContext));
   }
 
-  private void updateFlightState(String comment, String sql, FlightContext flightContext)
-      throws DatabaseOperationException, InterruptedException {
+  private void updateFlightState(String sql, FlightContext flightContext) throws SQLException {
 
-    for (int retry = 0; retry < SERIALIZATION_RETRIES; retry++) {
-      try (Connection connection = dataSource.getConnection();
-          NamedParameterPreparedStatement statement =
-              new NamedParameterPreparedStatement(connection, sql)) {
+    try (Connection connection = dataSource.getConnection();
+        NamedParameterPreparedStatement statement =
+            new NamedParameterPreparedStatement(connection, sql)) {
 
-        startTransaction(connection);
-        statement.setString("status", flightContext.getFlightStatus().name());
-        statement.setString("flightId", flightContext.getFlightId());
-        statement.getPreparedStatement().executeUpdate();
-        commitTransaction(connection);
-        hookWrapper.stateTransition(flightContext);
-        break;
-      } catch (SQLException ex) {
-        if (!retrySqlException(ex)) {
-          throw new DatabaseOperationException(
-              String.format(
-                  "Failed to update status to %s for flight: %s",
-                  flightContext.getFlightStatus(), flightContext.getFlightId()),
-              ex);
-        }
-      }
-      retryWait(comment, flightContext.getFlightId());
+      startTransaction(connection);
+      statement.setString("status", flightContext.getFlightStatus().name());
+      statement.setString("flightId", flightContext.getFlightId());
+      statement.getPreparedStatement().executeUpdate();
+      commitTransaction(connection);
+      hookWrapper.stateTransition(flightContext);
     }
   }
 
@@ -384,11 +270,15 @@ class FlightDao {
    * obsolete stairway instance from the stairway_instance table.
    *
    * @param stairwayId the id of the, presumably deleted, stairway instance
-   * @return list of the flight ids that we disowned.
    * @throws DatabaseOperationException on database error
    * @throws InterruptedException interruption of the retry loop
    */
   void disownRecovery(String stairwayId) throws DatabaseOperationException, InterruptedException {
+    DbRetry.retryVoid("flight.disownRecovery", () -> disownRecoveryInner(stairwayId));
+  }
+
+  private void disownRecoveryInner(String stairwayId)
+      throws SQLException, DatabaseOperationException, InterruptedException {
     final String sqlGet =
         "SELECT flightid, class_name, debug_info, status FROM "
             + FLIGHT_TABLE
@@ -400,53 +290,37 @@ class FlightDao {
             + " SET status = 'READY', stairway_id = NULL"
             + " WHERE stairway_id = :stairwayId AND status = 'RUNNING'";
 
-    final String sqlDelete =
-        "DELETE FROM " + STAIRWAY_INSTANCE_TABLE + " WHERE stairway_id = :stairwayId";
+    try (Connection connection = dataSource.getConnection();
+        NamedParameterPreparedStatement getStatement =
+            new NamedParameterPreparedStatement(connection, sqlGet);
+        NamedParameterPreparedStatement updateStatement =
+            new NamedParameterPreparedStatement(connection, sqlUpdate)) {
 
-    for (int retry = 0; retry < SERIALIZATION_RETRIES; retry++) {
-      try (Connection connection = dataSource.getConnection();
-          NamedParameterPreparedStatement getStatement =
-              new NamedParameterPreparedStatement(connection, sqlGet);
-          NamedParameterPreparedStatement updateStatement =
-              new NamedParameterPreparedStatement(connection, sqlUpdate);
-          NamedParameterPreparedStatement deleteStatement =
-              new NamedParameterPreparedStatement(connection, sqlDelete)) {
-
-        startTransaction(connection);
-        getStatement.setString("stairwayId", stairwayId);
-        List<FlightContext> flightList = new ArrayList<>();
-        try (ResultSet rs = getStatement.getPreparedStatement().executeQuery()) {
-          while (rs.next()) {
-            FlightContext flightContext =
-                makeFlightContext(connection, rs.getString("flightid"), rs);
-            flightContext.setFlightStatus(FlightStatus.READY);
-            flightList.add(flightContext);
-          }
-        }
-
-        if (!flightList.isEmpty()) {
-          updateStatement.setString("stairwayId", stairwayId);
-          int disownCount = updateStatement.getPreparedStatement().executeUpdate();
-          logger.info("Disowned " + disownCount + " flights for stairway: " + stairwayId);
-        }
-
-        deleteStatement.setString("stairwayId", stairwayId);
-        deleteStatement.getPreparedStatement().executeUpdate();
-
-        commitTransaction(connection);
-
-        // Call the state hook for each of the flights we found
-        for (FlightContext flightContext : flightList) {
-          hookWrapper.stateTransition(flightContext);
-        }
-        break;
-      } catch (SQLException ex) {
-        if (!retrySqlException(ex)) {
-          throw new DatabaseOperationException(
-              "Failed to disown flights owned by stairway instance: " + stairwayId, ex);
+      startTransaction(connection);
+      getStatement.setString("stairwayId", stairwayId);
+      List<FlightContext> flightList = new ArrayList<>();
+      try (ResultSet rs = getStatement.getPreparedStatement().executeQuery()) {
+        while (rs.next()) {
+          FlightContext flightContext = makeFlightContext(connection, rs.getString("flightid"), rs);
+          flightContext.setFlightStatus(FlightStatus.READY);
+          flightList.add(flightContext);
         }
       }
-      retryWait("disownRecovery", stairwayId);
+
+      if (!flightList.isEmpty()) {
+        updateStatement.setString("stairwayId", stairwayId);
+        int disownCount = updateStatement.getPreparedStatement().executeUpdate();
+        logger.info("Disowned " + disownCount + " flights for stairway: " + stairwayId);
+      }
+
+      stairwayInstanceDao.delete(connection, stairwayId);
+
+      commitTransaction(connection);
+
+      // Call the state hook for each of the flights we found
+      for (FlightContext flightContext : flightList) {
+        hookWrapper.stateTransition(flightContext);
+      }
     }
   }
 
@@ -459,6 +333,10 @@ class FlightDao {
    * @throws InterruptedException thread we are on is shutting down
    */
   List<String> getReadyFlights() throws DatabaseOperationException, InterruptedException {
+    return DbRetry.retry("flight.getReadyFlights", this::getReadyFlightsInner);
+  }
+
+  private List<String> getReadyFlightsInner() throws SQLException {
     final String sql =
         "SELECT flightid FROM "
             + FLIGHT_TABLE
@@ -470,11 +348,10 @@ class FlightDao {
         NamedParameterPreparedStatement statement =
             new NamedParameterPreparedStatement(connection, sql)) {
 
-      // My concern, maybe unfounded, is that the snapshot transaction would be reading out of date
-      // data,
-      // because there would be too many other transactions writing to the table. Making this a
-      // serialized
-      // transaction makes sure that the read transaction is ordered with the write transactions.
+      // My concern is that some snapshot transaction would be reading
+      // out of date data, because there would be other transactions writing to
+      // the table. Making this a serialized transaction makes sure that the read
+      // transaction is ordered with the write transactions.
       startTransaction(connection);
 
       try (ResultSet rs = statement.getPreparedStatement().executeQuery()) {
@@ -485,10 +362,7 @@ class FlightDao {
       logger.info("Found ready flights: " + flightList.size());
 
       commitTransaction(connection);
-    } catch (SQLException ex) {
-      handleSqlException("Failed to get ready flight list", ex);
     }
-
     return flightList;
   }
 
@@ -497,9 +371,17 @@ class FlightDao {
    * flight is ending due to a yield or a shutdown of this stairway instance.
    *
    * <p>If the flight is all done, we remove the detailed step data from the log table.
+   *
+   * @param flightContext flight description
+   * @throws DatabaseOperationException database error
+   * @throws InterruptedException thread shutdown
    */
   private void complete(FlightContext flightContext)
       throws DatabaseOperationException, InterruptedException {
+    DbRetry.retryVoid("flight.complete", () -> completeInner(flightContext));
+  }
+
+  private void completeInner(FlightContext flightContext) throws SQLException {
     // Make the update idempotent; that is, only do it if the status is RUNNING
     final String sqlUpdateFlight =
         "UPDATE "
@@ -518,36 +400,27 @@ class FlightDao {
     String serializedException =
         exceptionSerializer.serialize(flightContext.getResult().getException().orElse(null));
 
-    for (int retry = 0; retry < SERIALIZATION_RETRIES; retry++) {
-      try (Connection connection = dataSource.getConnection();
-          NamedParameterPreparedStatement statement =
-              new NamedParameterPreparedStatement(connection, sqlUpdateFlight);
-          NamedParameterPreparedStatement deleteStatement =
-              new NamedParameterPreparedStatement(connection, sqlDeleteFlightLog)) {
+    try (Connection connection = dataSource.getConnection();
+        NamedParameterPreparedStatement statement =
+            new NamedParameterPreparedStatement(connection, sqlUpdateFlight);
+        NamedParameterPreparedStatement deleteStatement =
+            new NamedParameterPreparedStatement(connection, sqlDeleteFlightLog)) {
 
-        startTransaction(connection);
+      startTransaction(connection);
 
-        statement.setString("outputParameters", flightContext.getWorkingMap().toJson());
-        statement.setString("status", flightContext.getFlightStatus().name());
-        statement.setString("serializedException", serializedException);
-        statement.setString("flightId", flightContext.getFlightId());
-        statement.getPreparedStatement().executeUpdate();
+      statement.setString("outputParameters", flightContext.getWorkingMap().toJson());
+      statement.setString("status", flightContext.getFlightStatus().name());
+      statement.setString("serializedException", serializedException);
+      statement.setString("flightId", flightContext.getFlightId());
+      statement.getPreparedStatement().executeUpdate();
 
-        if (!keepFlightLog) {
-          deleteStatement.setString("flightId", flightContext.getFlightId());
-          deleteStatement.getPreparedStatement().executeUpdate();
-        }
-
-        commitTransaction(connection);
-        hookWrapper.stateTransition(flightContext);
-        break;
-      } catch (SQLException ex) {
-        if (!retrySqlException(ex)) {
-          throw new DatabaseOperationException(
-              "Failed to complete flight: " + flightContext.getFlightId(), ex);
-        }
+      if (!keepFlightLog) {
+        deleteStatement.setString("flightId", flightContext.getFlightId());
+        deleteStatement.getPreparedStatement().executeUpdate();
       }
-      retryWait("complete", flightContext.getFlightId());
+
+      commitTransaction(connection);
+      hookWrapper.stateTransition(flightContext);
     }
   }
 
@@ -556,8 +429,13 @@ class FlightDao {
    *
    * @param flightId flight to remove
    * @throws DatabaseOperationException on any database error
+   * @throws InterruptedException thread shutdown
    */
   void delete(String flightId) throws DatabaseOperationException, InterruptedException {
+    DbRetry.retryVoid("flight.delete", () -> deleteInner(flightId));
+  }
+
+  private void deleteInner(String flightId) throws SQLException {
     final String sqlDeleteFlightLog =
         "DELETE FROM " + FLIGHT_LOG_TABLE + " WHERE flightid = :flightId";
     final String sqlDeleteFlight = "DELETE FROM " + FLIGHT_TABLE + " WHERE flightid = :flightId";
@@ -584,18 +462,26 @@ class FlightDao {
       deleteLogStatement.getPreparedStatement().executeUpdate();
 
       commitTransaction(connection);
-
-    } catch (SQLException ex) {
-      handleSqlException("Failed to delete flight", ex, UNKNOWN, flightId);
     }
   }
 
-  /*
+  /**
    * Find one unowned flight, claim ownership, and return its flight context
-   * Returns null if the flight does not exist or is not in the right state to be resumed.
+   *
+   * @param stairwayId identifier of stairway to own the resumed flight
+   * @param flightId identifier of flight to resume
+   * @return resumed flight; null if the flight does not exist or is not in the right state to be
+   *     resumed
+   * @throws DatabaseOperationException databases failure
+   * @throws InterruptedException thread shutdown
    */
   FlightContext resume(String stairwayId, String flightId)
       throws DatabaseOperationException, InterruptedException {
+    return DbRetry.retry("flight.resume", () -> resumeInner(stairwayId, flightId));
+  }
+
+  private FlightContext resumeInner(String stairwayId, String flightId)
+      throws SQLException, DatabaseOperationException, InterruptedException {
     final String sqlUnownedFlight =
         "SELECT class_name, debug_info, status "
             + " FROM "
@@ -610,81 +496,77 @@ class FlightDao {
             + " stairway_id = :stairwayId"
             + " WHERE flightid = :flightId";
 
-    for (int retry = 0; retry < SERIALIZATION_RETRIES; retry++) {
-      try (Connection connection = dataSource.getConnection();
-          NamedParameterPreparedStatement unownedFlightStatement =
-              new NamedParameterPreparedStatement(connection, sqlUnownedFlight);
-          NamedParameterPreparedStatement takeOwnershipStatement =
-              new NamedParameterPreparedStatement(connection, sqlTakeOwnership)) {
+    try (Connection connection = dataSource.getConnection();
+        NamedParameterPreparedStatement unownedFlightStatement =
+            new NamedParameterPreparedStatement(connection, sqlUnownedFlight);
+        NamedParameterPreparedStatement takeOwnershipStatement =
+            new NamedParameterPreparedStatement(connection, sqlTakeOwnership)) {
 
-        startTransaction(connection);
+      startTransaction(connection);
 
-        unownedFlightStatement.setString("flightId", flightId);
-        FlightContext flightContext = null;
-        try (ResultSet rs = unownedFlightStatement.getPreparedStatement().executeQuery()) {
-          if (rs.next()) {
-            flightContext = makeFlightContext(connection, flightId, rs);
-            flightContext.setFlightStatus(FlightStatus.RUNNING);
-          }
-        }
-
-        if (flightContext != null) {
-          logger.info("Stairway " + stairwayId + " taking ownership of flight " + flightId);
-          takeOwnershipStatement.setString("flightId", flightId);
-          takeOwnershipStatement.setString("stairwayId", stairwayId);
-          takeOwnershipStatement.getPreparedStatement().executeUpdate();
-        }
-
-        commitTransaction(connection);
-
-        if (flightContext != null) {
-          hookWrapper.stateTransition(flightContext);
-        }
-        return flightContext;
-      } catch (SQLException ex) {
-        if (!retrySqlException(ex)) {
-          handleSqlException("Failed to get flight", ex);
-          return null;
+      unownedFlightStatement.setString("flightId", flightId);
+      FlightContext flightContext = null;
+      try (ResultSet rs = unownedFlightStatement.getPreparedStatement().executeQuery()) {
+        if (rs.next()) {
+          flightContext = makeFlightContext(connection, flightId, rs);
+          flightContext.setFlightStatus(FlightStatus.RUNNING);
         }
       }
-      retryWait("resume", flightId);
+
+      if (flightContext != null) {
+        logger.info("Stairway " + stairwayId + " taking ownership of flight " + flightId);
+        takeOwnershipStatement.setString("flightId", flightId);
+        takeOwnershipStatement.setString("stairwayId", stairwayId);
+        takeOwnershipStatement.getPreparedStatement().executeUpdate();
+      }
+
+      commitTransaction(connection);
+
+      if (flightContext != null) {
+        hookWrapper.stateTransition(flightContext);
+      }
+      return flightContext;
     }
-    return null;
   }
 
+  /**
+   * Given a flightId build the flight context from the database
+   *
+   * @param flightId identifier of the flight
+   * @return constructed flight context
+   * @throws DatabaseOperationException database error
+   * @throws InterruptedException thread shutdown
+   */
   FlightContext makeFlightContextById(String flightId)
       throws DatabaseOperationException, InterruptedException {
+    return DbRetry.retry(
+        "flight.makeFlightcontextById", () -> makeFlightContextByIdInner(flightId));
+  }
+
+  private FlightContext makeFlightContextByIdInner(String flightId)
+      throws SQLException, DatabaseOperationException, InterruptedException {
     final String sqlGetFlight =
         "SELECT class_name, debug_info, status "
             + " FROM "
             + FLIGHT_TABLE
             + " WHERE flightid = :flightId";
 
-    for (int retry = 0; retry < SERIALIZATION_RETRIES; retry++) {
-      try (Connection connection = dataSource.getConnection();
-          NamedParameterPreparedStatement getFlightStatement =
-              new NamedParameterPreparedStatement(connection, sqlGetFlight)) {
+    try (Connection connection = dataSource.getConnection();
+        NamedParameterPreparedStatement getFlightStatement =
+            new NamedParameterPreparedStatement(connection, sqlGetFlight)) {
 
-        startTransaction(connection);
+      startTransaction(connection);
 
-        getFlightStatement.setString("flightId", flightId);
-        FlightContext flightContext = null;
-        try (ResultSet rs = getFlightStatement.getPreparedStatement().executeQuery()) {
-          if (rs.next()) {
-            flightContext = makeFlightContext(connection, flightId, rs);
-          }
-        }
-        commitTransaction(connection);
-        return flightContext;
-      } catch (SQLException ex) {
-        if (!retrySqlException(ex)) {
-          handleSqlException("Failed to get flight", ex);
-          return null;
+      getFlightStatement.setString("flightId", flightId);
+      FlightContext flightContext = null;
+      try (ResultSet rs = getFlightStatement.getPreparedStatement().executeQuery()) {
+        if (rs.next()) {
+          flightContext = makeFlightContext(connection, flightId, rs);
         }
       }
-      retryWait("makeFlight", flightId);
+      commitTransaction(connection);
+      return flightContext;
     }
-    return null;
   }
 
   // The results set must be positioned at a row from the flight table,
@@ -720,10 +602,10 @@ class FlightDao {
    *
    * @param connection database connection to use
    * @param flightContextList list of flight context objects to fill in
-   * @throws DatabaseOperationException on database errors
+   * @throws SQLException on database errors
    */
   private void fillFlightContexts(Connection connection, List<FlightContext> flightContextList)
-      throws DatabaseOperationException, InterruptedException {
+      throws SQLException {
 
     final String sqlLastFlightLog =
         "SELECT working_parameters, step_index, direction, rerun,"
@@ -766,8 +648,6 @@ class FlightDao {
           }
         }
       }
-    } catch (SQLException ex) {
-      handleSqlException("Failed to get flight log data", ex);
     }
   }
 
@@ -779,6 +659,12 @@ class FlightDao {
    */
   FlightState getFlightState(String flightId)
       throws DatabaseOperationException, InterruptedException {
+    return DbRetry.retry("flight.getFlightState", () -> getFlightStateInner(flightId));
+  }
+
+  private FlightState getFlightStateInner(String flightId)
+      throws SQLException, DatabaseOperationException {
+
     final String sqlOneFlight =
         "SELECT stairway_id, flightid, submit_time, "
             + " completed_time, output_parameters, status, serialized_exception"
@@ -804,10 +690,6 @@ class FlightDao {
         commitTransaction(connection);
         return flightStateList.get(0);
       }
-
-    } catch (SQLException ex) {
-      handleSqlException("Failed to get flight", ex, UNKNOWN, flightId);
-      return null;
     }
   }
 
@@ -864,12 +746,19 @@ class FlightDao {
    * @param inFilter filters to apply to the flights
    * @return list of FlightState objects for the filtered, paged flights
    * @throws DatabaseOperationException on all database issues
+   * @throws InterruptedException thread shutdown
    */
   List<FlightState> getFlights(int offset, int limit, FlightFilter inFilter)
       throws DatabaseOperationException, InterruptedException {
 
     // Make an empty filter if one is not provided
     FlightFilter filter = (inFilter != null) ? inFilter : new FlightFilter();
+
+    return DbRetry.retry("flight.getFlights", () -> getFlightsInner(offset, limit, filter));
+  }
+
+  private List<FlightState> getFlightsInner(int offset, int limit, FlightFilter filter)
+      throws SQLException, DatabaseOperationException {
     String sql = filter.makeSql();
 
     try (Connection connection = dataSource.getConnection();
@@ -889,16 +778,13 @@ class FlightDao {
 
       connection.commit();
       return flightStateList;
-    } catch (SQLException ex) {
-      handleSqlException("Failed to get flights", ex);
-      return null;
     } catch (FlightFilterException ex) {
       throw new DatabaseOperationException("Failed to get flights", ex);
     }
   }
 
   private List<FlightState> makeFlightStateList(Connection connection, ResultSet rs)
-      throws SQLException, DatabaseOperationException, InterruptedException {
+      throws SQLException {
     List<FlightState> flightStateList = new ArrayList<>();
 
     while (rs.next()) {
@@ -935,8 +821,7 @@ class FlightDao {
   }
 
   private void storeInputParameters(
-      Connection connection, String flightId, FlightMap inputParameters)
-      throws DatabaseOperationException, InterruptedException {
+      Connection connection, String flightId, FlightMap inputParameters) throws SQLException {
     List<FlightInput> inputList = inputParameters.makeFlightInputList();
 
     final String sqlInsertInput =
@@ -954,14 +839,11 @@ class FlightDao {
         statement.setString("value", input.getValue());
         statement.getPreparedStatement().executeUpdate();
       }
-
-    } catch (SQLException ex) {
-      handleSqlException("Failed to insert input", ex, UNKNOWN, flightId);
     }
   }
 
   private List<FlightInput> retrieveInputParameters(Connection connection, String flightId)
-      throws DatabaseOperationException, InterruptedException {
+      throws SQLException {
     final String sqlSelectInput =
         "SELECT flightId, key, value FROM " + FLIGHT_INPUT_TABLE + " WHERE flightId = :flightId";
 
@@ -977,84 +859,7 @@ class FlightDao {
           inputList.add(input);
         }
       }
-    } catch (SQLException ex) {
-      handleSqlException("Failed to select input", ex, UNKNOWN, flightId);
     }
-
     return inputList;
-  }
-
-  private void startTransaction(Connection connection) throws SQLException {
-    connection.setAutoCommit(false);
-    connection.setTransactionIsolation(Connection.TRANSACTION_SERIALIZABLE);
-    connection.setReadOnly(false);
-  }
-
-  private void startReadOnlyTransaction(Connection connection) throws SQLException {
-    connection.setAutoCommit(false);
-    connection.setTransactionIsolation(Connection.TRANSACTION_READ_COMMITTED);
-    connection.setReadOnly(true);
-  }
-
-  private void commitTransaction(Connection connection) throws SQLException {
-    connection.commit();
-  }
-
-  private void handleSqlException(String message, SQLException ex)
-      throws InterruptedException, DatabaseOperationException {
-    handleSqlException(message, ex, UNKNOWN, UNKNOWN);
-  }
-
-  private void handleSqlException(String message, SQLException ex, FlightContext context)
-      throws InterruptedException, DatabaseOperationException {
-    handleSqlException(message, ex, context.getStairway().getStairwayId(), context.getFlightId());
-  }
-
-  private void handleSqlException(
-      String message, SQLException ex, String stairwayId, String flightId)
-      throws InterruptedException, DatabaseOperationException {
-
-    if (ex.getCause() instanceof InterruptedException) {
-      logger.warn(
-          "Operation interrupted - stairwayId: "
-              + stairwayId
-              + " flightId: "
-              + flightId
-              + "message: "
-              + message,
-          ex);
-      String causeText = (ex.getCause() == null) ? "unknown cause" : ex.getCause().toString();
-      throw new InterruptedException(causeText);
-    }
-    logger.warn(
-        "Operation error - stairwayId: "
-            + stairwayId
-            + " flightId: "
-            + flightId
-            + "message: "
-            + message,
-        ex);
-    throw new DatabaseOperationException(message, ex);
-  }
-
-  private static final String PSQL_SERIALIZATION_FAILURE = "40001";
-  private static final String PSQL_DEADLOCK_DETECTED = "40P01";
-  private static final String PSQL_CONNECTION_ISSUE_PREFIX = "08";
-  private static final String PSQL_RESOURCE_ISSUE_PREFIX = "53";
-
-  private boolean retrySqlException(SQLException ex) {
-    final String ss = ex.getSQLState();
-
-    if (ss.equals(PSQL_SERIALIZATION_FAILURE) || ss.equals(PSQL_DEADLOCK_DETECTED)) {
-      // Serialization or deadlock
-      logger.info("Caught SQL serialization error (" + ss + ") - retrying");
-      return true;
-    }
-    if (ss.startsWith(PSQL_CONNECTION_ISSUE_PREFIX) || ss.startsWith(PSQL_RESOURCE_ISSUE_PREFIX)) {
-      // Connection or resource issue
-      logger.info("Caught SQL connection or resource error (" + ss + ") - retrying");
-      return true;
-    }
-    return false;
   }
 }

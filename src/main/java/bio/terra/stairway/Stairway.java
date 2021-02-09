@@ -2,12 +2,21 @@ package bio.terra.stairway;
 
 import bio.terra.stairway.exception.DatabaseOperationException;
 import bio.terra.stairway.exception.DatabaseSetupException;
+import bio.terra.stairway.exception.DuplicateFlightIdException;
 import bio.terra.stairway.exception.DuplicateFlightIdSubmittedException;
 import bio.terra.stairway.exception.FlightException;
 import bio.terra.stairway.exception.MakeFlightException;
 import bio.terra.stairway.exception.MigrateException;
 import bio.terra.stairway.exception.QueueException;
 import bio.terra.stairway.exception.StairwayExecutionException;
+import org.apache.commons.lang3.builder.EqualsBuilder;
+import org.apache.commons.lang3.builder.HashCodeBuilder;
+import org.apache.commons.lang3.builder.ToStringBuilder;
+import org.apache.commons.lang3.builder.ToStringStyle;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
+import javax.sql.DataSource;
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.List;
@@ -16,13 +25,6 @@ import java.util.concurrent.LinkedBlockingQueue;
 import java.util.concurrent.ThreadPoolExecutor;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
-import javax.sql.DataSource;
-import org.apache.commons.lang3.builder.EqualsBuilder;
-import org.apache.commons.lang3.builder.HashCodeBuilder;
-import org.apache.commons.lang3.builder.ToStringBuilder;
-import org.apache.commons.lang3.builder.ToStringStyle;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 
 /** Stairway is the object that drives execution of Flights. */
 public class Stairway {
@@ -50,6 +52,7 @@ public class Stairway {
   private StairwayThreadPool threadPool;
   private String stairwayId;
   private final AtomicBoolean quietingDown;
+  private StairwayInstanceDao stairwayInstanceDao;
   private FlightDao flightDao;
   private Queue workQueue;
   private Thread workQueueListenerThread;
@@ -61,7 +64,7 @@ public class Stairway {
     private ExceptionSerializer exceptionSerializer;
     private String stairwayName;
     private String stairwayClusterName;
-    private List<StairwayHook> stairwayHooks = new ArrayList<>();
+    private final List<StairwayHook> stairwayHooks = new ArrayList<>();
     private boolean enableWorkQueue;
     private boolean keepFlightLog = true;
     private FlightFactory flightFactory;
@@ -338,19 +341,23 @@ public class Stairway {
    * @throws MigrateException migration failures
    * @throws QueueException queue and queue listener setup
    * @throws StairwayExecutionException another exception
+   * @throws InterruptedException on thread shutdown
    * @return list of Stairway instances recorded in the database
    */
   public List<String> initialize(
       DataSource dataSource, boolean forceCleanStart, boolean migrateUpgrade)
       throws DatabaseOperationException, MigrateException, QueueException,
-          StairwayExecutionException {
+          StairwayExecutionException, InterruptedException {
 
     // If we have been shut down, do not restart.
     if (isQuietingDown()) {
       throw new StairwayExecutionException("Stairway is shut down and cannot be initialized");
     }
 
-    flightDao = new FlightDao(dataSource, exceptionSerializer, hookWrapper, keepFlightLog);
+    stairwayInstanceDao = new StairwayInstanceDao(dataSource);
+    flightDao =
+        new FlightDao(
+            dataSource, stairwayInstanceDao, exceptionSerializer, hookWrapper, keepFlightLog);
 
     if (forceCleanStart) {
       // Drop all tables and recreate the database
@@ -364,7 +371,7 @@ public class Stairway {
 
     createThreadPool();
     setupWorkQueue(forceCleanStart);
-    return flightDao.getStairwayInstanceList();
+    return stairwayInstanceDao.getList();
   }
 
   /**
@@ -388,14 +395,14 @@ public class Stairway {
 
     if (obsoleteStairways != null) {
       for (String instance : obsoleteStairways) {
-        String stairwayId = flightDao.lookupStairwayInstanceId(instance);
+        String stairwayId = stairwayInstanceDao.lookupId(instance);
         logger.info("Recovering stairway " + instance);
         flightDao.disownRecovery(stairwayId);
       }
     }
 
     // Start this Stairway instance up!
-    stairwayId = flightDao.findOrCreateStairwayInstance(stairwayName);
+    stairwayId = stairwayInstanceDao.findOrCreate(stairwayName);
 
     // Recover any flights in the READY state
     recoverReady();
@@ -535,9 +542,9 @@ public class Stairway {
    * @param inputParameters key-value map of parameters to the flight
    * @throws DatabaseOperationException failure during flight object creation, persisting to
    *     database or launching
-   * @throws StairwayExecutionException failure queuing the flight
+   * @throws StairwayExecutionException failure queuing the flight * @throws
+   * @throws DuplicateFlightIdSubmittedException provided flight id already exists
    * @throws InterruptedException this thread was interrupted
-   * @throws DuplicateFlightIdSubmittedException provided flightId is already in use
    */
   public void submit(
       String flightId, Class<? extends Flight> flightClass, FlightMap inputParameters)
@@ -558,8 +565,8 @@ public class Stairway {
    * @throws DatabaseOperationException failure during flight object creation, persisting to
    *     database or launching
    * @throws StairwayExecutionException failure queuing the flight
+   * @throws DuplicateFlightIdSubmittedException provided flight id already exists
    * @throws InterruptedException this thread was interrupted
-   * @throws DuplicateFlightIdSubmittedException provided flightId is already in use
    */
   public void submitToQueue(
       String flightId, Class<? extends Flight> flightClass, FlightMap inputParameters)
@@ -619,7 +626,12 @@ public class Stairway {
         throw new MakeFlightException("Stairway is shutting down and cannot accept a new flight");
       }
       context.setStairway(this);
-      flightDao.submit(context);
+      try {
+        flightDao.submit(context);
+      } catch (DuplicateFlightIdException ex) {
+        // Convert the internal runtime exception to a checked exception for clients
+        throw new DuplicateFlightIdSubmittedException(ex.getMessage(), ex);
+      }
       launchFlight(flight);
     }
   }
@@ -705,6 +717,9 @@ public class Stairway {
 
   /**
    * Wait for a flight to complete
+   *
+   * <p>This is a very simple polling method to help you get started with Stairway. It is probably
+   * not what you want for production code.
    *
    * @param flightId the flight to wait for
    * @param pollSeconds sleep time for each poll cycle; if null, defaults to 10 seconds
@@ -838,9 +853,11 @@ public class Stairway {
    *
    * @return List of stairway instance names
    * @throws DatabaseOperationException unexpected database error
+   * @throws InterruptedException thread shutdown
    */
-  public List<String> getStairwayInstanceList() throws DatabaseOperationException {
-    return flightDao.getStairwayInstanceList();
+  public List<String> getStairwayInstanceList()
+      throws DatabaseOperationException, InterruptedException {
+    return stairwayInstanceDao.getList();
   }
 
   /**
@@ -853,7 +870,7 @@ public class Stairway {
    */
   public void recoverStairway(String stairwayName)
       throws DatabaseOperationException, InterruptedException, StairwayExecutionException {
-    String stairwayId = flightDao.lookupStairwayInstanceId(stairwayName);
+    String stairwayId = stairwayInstanceDao.lookupId(stairwayName);
     flightDao.disownRecovery(stairwayId);
     recoverReady();
   }

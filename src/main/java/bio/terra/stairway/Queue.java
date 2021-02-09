@@ -39,7 +39,7 @@ import org.slf4j.LoggerFactory;
 @SuppressFBWarnings(
     value = "RCN_REDUNDANT_NULLCHECK_WOULD_HAVE_BEEN_A_NPE",
     justification = "Spotbugs doesn't understand resource try construct")
-public class Queue {
+class Queue {
   private static final Logger logger = LoggerFactory.getLogger(Queue.class);
 
   // -- Queue Parameters --

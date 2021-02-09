@@ -7,11 +7,11 @@ import java.util.concurrent.atomic.AtomicInteger;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-public class StairwayThreadPool extends ThreadPoolExecutor {
+class StairwayThreadPool extends ThreadPoolExecutor {
   private static final Logger logger = LoggerFactory.getLogger(StairwayThreadPool.class);
   AtomicInteger activeTasks;
 
-  public StairwayThreadPool(
+  StairwayThreadPool(
       int corePoolSize,
       int maximumPoolSize,
       long keepAliveTime,
@@ -21,11 +21,11 @@ public class StairwayThreadPool extends ThreadPoolExecutor {
     activeTasks = new AtomicInteger();
   }
 
-  public int getActiveFlights() {
+  int getActiveFlights() {
     return activeTasks.get();
   }
 
-  public int getQueuedFlights() {
+  int getQueuedFlights() {
     return getQueue().size();
   }
 

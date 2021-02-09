@@ -4,7 +4,7 @@ import bio.terra.stairway.exception.DatabaseOperationException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-public class QueueMessageReady extends QueueMessage {
+class QueueMessageReady extends QueueMessage {
   private static final Logger logger = LoggerFactory.getLogger(QueueMessageReady.class);
 
   private QueueMessageType type;
@@ -12,14 +12,14 @@ public class QueueMessageReady extends QueueMessage {
 
   private QueueMessageReady() {}
 
-  public QueueMessageReady(String flightId) {
+  QueueMessageReady(String flightId) {
     this.type =
         new QueueMessageType(QueueMessage.FORMAT_VERSION, QueueMessageEnum.QUEUE_MESSAGE_READY);
     this.flightId = flightId;
   }
 
   @Override
-  public void process(Stairway stairway) throws InterruptedException {
+  void process(Stairway stairway) throws InterruptedException {
     try {
       boolean resumed = stairway.resume(flightId);
       logger.info(
@@ -32,7 +32,7 @@ public class QueueMessageReady extends QueueMessage {
     }
   }
 
-  public QueueMessageType getType() {
+  QueueMessageType getType() {
     return type;
   }
 
@@ -40,11 +40,11 @@ public class QueueMessageReady extends QueueMessage {
     this.type = type;
   }
 
-  public String getFlightId() {
+  String getFlightId() {
     return flightId;
   }
 
-  public void setFlightId(String flightId) {
+  void setFlightId(String flightId) {
     this.flightId = flightId;
   }
 }
