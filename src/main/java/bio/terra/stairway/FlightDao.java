@@ -1,5 +1,9 @@
 package bio.terra.stairway;
 
+import static bio.terra.stairway.DbUtils.commitTransaction;
+import static bio.terra.stairway.DbUtils.startReadOnlyTransaction;
+import static bio.terra.stairway.DbUtils.startTransaction;
+
 import bio.terra.stairway.exception.DatabaseOperationException;
 import bio.terra.stairway.exception.DuplicateFlightIdException;
 import bio.terra.stairway.exception.FlightException;
@@ -7,20 +11,15 @@ import bio.terra.stairway.exception.FlightFilterException;
 import bio.terra.stairway.exception.FlightNotFoundException;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import edu.umd.cs.findbugs.annotations.SuppressFBWarnings;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
-
-import javax.sql.DataSource;
 import java.sql.Connection;
 import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
-
-import static bio.terra.stairway.DbUtils.commitTransaction;
-import static bio.terra.stairway.DbUtils.startReadOnlyTransaction;
-import static bio.terra.stairway.DbUtils.startTransaction;
+import javax.sql.DataSource;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 /**
  * The general layout of the stairway database tables is:
