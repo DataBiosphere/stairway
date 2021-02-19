@@ -13,7 +13,8 @@ import org.openapitools.jackson.nullable.JsonNullableModule;
 public class StairwayMapper {
   private static ObjectMapper objectMapper;
 
-  static ObjectMapper getObjectMapper() {
+  @VisibleForTesting
+  public static ObjectMapper getObjectMapper() {
     if (objectMapper == null) {
       objectMapper =
           new ObjectMapper()
