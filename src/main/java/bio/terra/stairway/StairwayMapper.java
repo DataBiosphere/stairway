@@ -5,10 +5,12 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.datatype.jdk8.Jdk8Module;
 import com.fasterxml.jackson.datatype.jsr310.JavaTimeModule;
 import com.fasterxml.jackson.module.paramnames.ParameterNamesModule;
+import com.google.common.annotations.VisibleForTesting;
 import org.openapitools.jackson.nullable.JsonNullableModule;
 
 /** Common, singleton object mapper configured for Stairway use. */
-class StairwayMapper {
+@VisibleForTesting
+public class StairwayMapper {
   private static ObjectMapper objectMapper;
 
   static ObjectMapper getObjectMapper() {
