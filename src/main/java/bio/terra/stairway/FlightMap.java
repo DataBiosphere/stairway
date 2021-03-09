@@ -5,6 +5,7 @@ import static bio.terra.stairway.StairwayMapper.getObjectMapper;
 import bio.terra.stairway.exception.JsonConversionException;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.core.type.TypeReference;
+import com.fasterxml.jackson.databind.JsonNode;
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Collections;
@@ -20,9 +21,16 @@ import java.util.stream.Collectors;
  */
 public class FlightMap {
   private Map<String, Object> map;
+  private FlightMapUpgrader upgrader;
 
   public FlightMap() {
     map = new HashMap<>();
+    upgrader = null;
+  }
+
+  public FlightMap(FlightMapUpgrader upgrader) {
+    this();
+    this.upgrader = upgrader;
   }
 
   /**
@@ -101,8 +109,21 @@ public class FlightMap {
     }
   }
 
+  private String upgrade(String json) {
+    if (upgrader == null) return json;
+
+    try {
+      JsonNode root = getObjectMapper().readTree(json);
+      upgrader.upgrade(new FlightMapUpgradeView(root));
+      return getObjectMapper().writeValueAsString(root);
+    } catch (final JsonProcessingException ex) {
+      throw new JsonConversionException("Failed to convert json string to map during upgrade", ex);
+    }
+  }
+
   public void fromJson(String json) {
     try {
+      json = upgrade(json);
       map = getObjectMapper().readValue(json, new TypeReference<Map<String, Object>>() {});
     } catch (IOException ex) {
       throw new JsonConversionException("Failed to convert json string to map", ex);
