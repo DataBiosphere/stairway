@@ -31,7 +31,7 @@ abstract class QueueMessage {
     try {
       return objectMapper.writeValueAsString(message);
     } catch (JsonProcessingException ex) {
-      throw new StairwayExecutionException("Failed to serialize message", ex);
+      throw new StairwayExecutionException("Failed to serialize message: " + message, ex);
     }
   }
 

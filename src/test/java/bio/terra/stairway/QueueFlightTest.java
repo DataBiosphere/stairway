@@ -12,6 +12,7 @@ import java.util.Arrays;
 import java.util.List;
 import java.util.concurrent.TimeUnit;
 import javax.sql.DataSource;
+import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
 import org.slf4j.Logger;
@@ -19,12 +20,23 @@ import org.slf4j.LoggerFactory;
 
 @Tag("connected")
 public class QueueFlightTest {
+  private static final int QUEUE_SETTLE_SECONDS = 3;
   private final Logger logger = LoggerFactory.getLogger(QueueFlightTest.class);
+
+  private Stairway stairway;
+
+  @AfterEach
+  public void cleanup() throws Exception {
+    if (stairway != null) {
+      stairway.terminate(5, TimeUnit.SECONDS);
+      stairway = null;
+    }
+  }
 
   @Test
   public void queueFlightTest() throws Exception {
     // Submit directly to queue and make sure we end up in the right state
-    Stairway stairway = TestUtil.setupConnectedStairwayWithHooks("queueFlightTest", false, 3);
+    stairway = TestUtil.setupConnectedStairwayWithHooks("queueFlightTest", false, 3);
 
     FlightMap inputs = new FlightMap();
     int controlValue = 1;
@@ -58,6 +70,9 @@ public class QueueFlightTest {
             "1:startFlight",
             "2:startFlight",
             "3:startFlight",
+            "1:flightHook:startFlight",
+            "2:flightHook:startFlight",
+            "3:flightHook:startFlight",
             "1:startStep",
             "2:startStep",
             "3:startStep",
@@ -75,7 +90,10 @@ public class QueueFlightTest {
             "3:stateTransition:SUCCESS",
             "1:endFlight",
             "2:endFlight",
-            "3:endFlight"));
+            "3:endFlight",
+            "1:flightHook:endFlight",
+            "2:flightHook:endFlight",
+            "3:flightHook:endFlight"));
   }
 
   @Test
@@ -87,7 +105,7 @@ public class QueueFlightTest {
     assertNotNull(projectId);
 
     DataSource dataSource = TestUtil.makeDataSource();
-    Stairway stairway =
+    stairway =
         Stairway.newBuilder()
             .stairwayClusterName("stairway-cluster")
             .stairwayName("admissionControlTest")
@@ -108,12 +126,12 @@ public class QueueFlightTest {
     TestPauseController.setControl(0);
     String runningFlightId = "runningFlight";
     stairway.submit(runningFlightId, TestFlightControlledSleep.class, inputs);
-    TimeUnit.SECONDS.sleep(1);
+    TimeUnit.SECONDS.sleep(QUEUE_SETTLE_SECONDS);
 
     // The second flight should be RUNNING, but be queued in the thread pool
     String threadQueuedFlightId = "threadQueuedFlight";
     stairway.submit(threadQueuedFlightId, TestFlightControlledSleep.class, inputs);
-    TimeUnit.SECONDS.sleep(1);
+    TimeUnit.SECONDS.sleep(QUEUE_SETTLE_SECONDS);
 
     FlightState flightState = stairway.getFlightState(threadQueuedFlightId);
     assertThat(
@@ -125,7 +143,7 @@ public class QueueFlightTest {
     // outstanding pull request.
     String workQueuedRunFlightId = "workRunQueuedFlight";
     stairway.submit(workQueuedRunFlightId, TestFlightControlledSleep.class, inputs);
-    TimeUnit.SECONDS.sleep(1);
+    TimeUnit.SECONDS.sleep(QUEUE_SETTLE_SECONDS);
 
     flightState = stairway.getFlightState(workQueuedRunFlightId);
     assertThat(
@@ -137,7 +155,7 @@ public class QueueFlightTest {
     // stops the listener from trying to pull more from the work queue.
     String workQueuedFlightId = "workQueuedFlight";
     stairway.submit(workQueuedFlightId, TestFlightControlledSleep.class, inputs);
-    TimeUnit.SECONDS.sleep(1);
+    TimeUnit.SECONDS.sleep(QUEUE_SETTLE_SECONDS);
 
     flightState = stairway.getFlightState(workQueuedFlightId);
     assertThat(
@@ -175,7 +193,7 @@ public class QueueFlightTest {
     QueueCreate.makeTopic(projectId, topicId);
     QueueCreate.makeSubscription(projectId, topicId, subscriptionId);
 
-    Stairway stairway =
+    stairway =
         Stairway.newBuilder()
             .stairwayClusterName("stairway-cluster")
             .stairwayName("admissionControlTest")
@@ -198,12 +216,12 @@ public class QueueFlightTest {
     TestPauseController.setControl(0);
     String runningFlightId = "runningFlight";
     stairway.submitToQueue(runningFlightId, TestFlightControlledSleep.class, inputs);
-    TimeUnit.SECONDS.sleep(1);
+    TimeUnit.SECONDS.sleep(QUEUE_SETTLE_SECONDS);
 
     // The second flight should get pulled from the queue and be queued in the thread pool.
     String threadQueuedFlightId = "threadQueuedFlight";
     stairway.submitToQueue(threadQueuedFlightId, TestFlightControlledSleep.class, inputs);
-    TimeUnit.SECONDS.sleep(2);
+    TimeUnit.SECONDS.sleep(QUEUE_SETTLE_SECONDS);
 
     FlightState flightState = stairway.getFlightState(threadQueuedFlightId);
     assertThat(
@@ -214,7 +232,7 @@ public class QueueFlightTest {
     // The third flight queued to the work queue and not be run
     String workQueuedRunFlightId = "workQueuedFlight1";
     stairway.submitToQueue(workQueuedRunFlightId, TestFlightControlledSleep.class, inputs);
-    TimeUnit.SECONDS.sleep(1);
+    TimeUnit.SECONDS.sleep(QUEUE_SETTLE_SECONDS);
 
     flightState = stairway.getFlightState(workQueuedRunFlightId);
     assertThat(
@@ -223,7 +241,7 @@ public class QueueFlightTest {
     // The fourth flight is queued to the work queue, and not run
     String workQueuedFlightId = "workQueuedFlight2";
     stairway.submitToQueue(workQueuedFlightId, TestFlightControlledSleep.class, inputs);
-    TimeUnit.SECONDS.sleep(1);
+    TimeUnit.SECONDS.sleep(QUEUE_SETTLE_SECONDS);
 
     flightState = stairway.getFlightState(workQueuedFlightId);
     assertThat(

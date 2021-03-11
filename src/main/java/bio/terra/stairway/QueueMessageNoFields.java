@@ -7,11 +7,11 @@ import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 class QueueMessageNoFields extends QueueMessage {
   private QueueMessageType type;
 
-  QueueMessageType getType() {
+  public QueueMessageType getType() {
     return type;
   }
 
-  void setType(QueueMessageType type) {
+  public void setType(QueueMessageType type) {
     this.type = type;
   }
 
