@@ -2,7 +2,6 @@ package bio.terra.stairway;
 
 import static org.hamcrest.CoreMatchers.equalTo;
 import static org.hamcrest.MatcherAssert.assertThat;
-import static org.junit.jupiter.api.Assertions.assertNotNull;
 
 import bio.terra.stairway.fixtures.MapKey;
 import bio.terra.stairway.fixtures.TestPauseController;
@@ -19,6 +18,7 @@ import org.slf4j.LoggerFactory;
 
 @Tag("connected")
 public class QueueFlightTest {
+  private static final int QUEUE_SETTLE_SECONDS = 3;
   private final Logger logger = LoggerFactory.getLogger(QueueFlightTest.class);
 
   @Test
@@ -58,6 +58,9 @@ public class QueueFlightTest {
             "1:startFlight",
             "2:startFlight",
             "3:startFlight",
+            "1:flightHook:startFlight",
+            "2:flightHook:startFlight",
+            "3:flightHook:startFlight",
             "1:startStep",
             "2:startStep",
             "3:startStep",
@@ -75,95 +78,10 @@ public class QueueFlightTest {
             "3:stateTransition:SUCCESS",
             "1:endFlight",
             "2:endFlight",
-            "3:endFlight"));
-  }
-
-  @Test
-  public void admissionControlTest() throws Exception {
-    // We create a one thread work queue with 0 tolerance for queued flights.
-    // Put one flight in that pauses.
-    // Put another flight in. It should arrive in the QUEUED state
-    String projectId = TestUtil.getEnvVar("GOOGLE_CLOUD_PROJECT", null);
-    assertNotNull(projectId);
-
-    DataSource dataSource = TestUtil.makeDataSource();
-    Stairway stairway =
-        Stairway.newBuilder()
-            .stairwayClusterName("stairway-cluster")
-            .stairwayName("admissionControlTest")
-            .enableWorkQueue(true)
-            .workQueueProjectId(projectId)
-            .maxParallelFlights(1)
-            .maxQueuedFlights(1)
-            .build();
-    List<String> recordedStairways = stairway.initialize(dataSource, true, true);
-    assertThat("no stairway to recover", recordedStairways.size(), equalTo(0));
-    stairway.recoverAndStart(null);
-
-    FlightMap inputs = new FlightMap();
-    Integer controlValue = 1;
-    inputs.put(MapKey.CONTROLLER_VALUE, controlValue);
-
-    // The first flight should run and get a thread
-    TestPauseController.setControl(0);
-    String runningFlightId = "runningFlight";
-    stairway.submit(runningFlightId, TestFlightControlledSleep.class, inputs);
-    TimeUnit.SECONDS.sleep(1);
-
-    // The second flight should be RUNNING, but be queued in the thread pool
-    String threadQueuedFlightId = "threadQueuedFlight";
-    stairway.submit(threadQueuedFlightId, TestFlightControlledSleep.class, inputs);
-    TimeUnit.SECONDS.sleep(1);
-
-    FlightState flightState = stairway.getFlightState(threadQueuedFlightId);
-    assertThat(
-        "2nd flight queued to thread pool ",
-        flightState.getFlightStatus(),
-        equalTo(FlightStatus.RUNNING));
-
-    // The third flight queued to the work queue, but run immediately, since there is an
-    // outstanding pull request.
-    String workQueuedRunFlightId = "workRunQueuedFlight";
-    stairway.submit(workQueuedRunFlightId, TestFlightControlledSleep.class, inputs);
-    TimeUnit.SECONDS.sleep(1);
-
-    flightState = stairway.getFlightState(workQueuedRunFlightId);
-    assertThat(
-        "3rd flight run from work queue",
-        flightState.getFlightStatus(),
-        equalTo(FlightStatus.RUNNING));
-
-    // The fourth flight is queued to the work queue, and not run, since the queue depth
-    // stops the listener from trying to pull more from the work queue.
-    String workQueuedFlightId = "workQueuedFlight";
-    stairway.submit(workQueuedFlightId, TestFlightControlledSleep.class, inputs);
-    TimeUnit.SECONDS.sleep(1);
-
-    flightState = stairway.getFlightState(workQueuedFlightId);
-    assertThat(
-        "4th flight stays in work queue",
-        flightState.getFlightStatus(),
-        equalTo(FlightStatus.QUEUED));
-
-    // Free the paused flights
-    TestPauseController.setControl(controlValue);
-    stairway.waitForFlight(workQueuedFlightId, null, null);
-
-    flightState = stairway.getFlightState(workQueuedFlightId);
-    assertThat(
-        "4th flight succeeded", flightState.getFlightStatus(), equalTo(FlightStatus.SUCCESS));
-
-    flightState = stairway.getFlightState(workQueuedRunFlightId);
-    assertThat(
-        "3rd flight succeeded", flightState.getFlightStatus(), equalTo(FlightStatus.SUCCESS));
-
-    flightState = stairway.getFlightState(threadQueuedFlightId);
-    assertThat(
-        "2nd flight succeeded", flightState.getFlightStatus(), equalTo(FlightStatus.SUCCESS));
-
-    flightState = stairway.getFlightState(runningFlightId);
-    assertThat(
-        "1st flight succeeded", flightState.getFlightStatus(), equalTo(FlightStatus.SUCCESS));
+            "3:endFlight",
+            "1:flightHook:endFlight",
+            "2:flightHook:endFlight",
+            "3:flightHook:endFlight"));
   }
 
   @Test
@@ -198,12 +116,12 @@ public class QueueFlightTest {
     TestPauseController.setControl(0);
     String runningFlightId = "runningFlight";
     stairway.submitToQueue(runningFlightId, TestFlightControlledSleep.class, inputs);
-    TimeUnit.SECONDS.sleep(1);
+    TimeUnit.SECONDS.sleep(QUEUE_SETTLE_SECONDS);
 
     // The second flight should get pulled from the queue and be queued in the thread pool.
     String threadQueuedFlightId = "threadQueuedFlight";
     stairway.submitToQueue(threadQueuedFlightId, TestFlightControlledSleep.class, inputs);
-    TimeUnit.SECONDS.sleep(2);
+    TimeUnit.SECONDS.sleep(QUEUE_SETTLE_SECONDS);
 
     FlightState flightState = stairway.getFlightState(threadQueuedFlightId);
     assertThat(
@@ -214,7 +132,7 @@ public class QueueFlightTest {
     // The third flight queued to the work queue and not be run
     String workQueuedRunFlightId = "workQueuedFlight1";
     stairway.submitToQueue(workQueuedRunFlightId, TestFlightControlledSleep.class, inputs);
-    TimeUnit.SECONDS.sleep(1);
+    TimeUnit.SECONDS.sleep(QUEUE_SETTLE_SECONDS);
 
     flightState = stairway.getFlightState(workQueuedRunFlightId);
     assertThat(
@@ -223,7 +141,7 @@ public class QueueFlightTest {
     // The fourth flight is queued to the work queue, and not run
     String workQueuedFlightId = "workQueuedFlight2";
     stairway.submitToQueue(workQueuedFlightId, TestFlightControlledSleep.class, inputs);
-    TimeUnit.SECONDS.sleep(1);
+    TimeUnit.SECONDS.sleep(QUEUE_SETTLE_SECONDS);
 
     flightState = stairway.getFlightState(workQueuedFlightId);
     assertThat(
