@@ -452,6 +452,7 @@ public class Stairway {
     if (!workQueueEnabled) {
       return;
     }
+    logger.info("Shutting down work queue listener");
     // workQueueListener will notice quietingDown and stop, but it is often
     // waiting in sleep or in pull from queue and needs to be interrupted to terminate.
     workQueueListenerThread.interrupt();
@@ -503,6 +504,7 @@ public class Stairway {
    * @return true if the thread pool cleaned up in time; false if it didn't
    */
   public boolean terminate(long waitTimeout, TimeUnit unit) throws InterruptedException {
+    quietingDown.set(true);
     terminateWorkQueueListener(0);
     List<Runnable> neverStartedFlights = threadPool.shutdownNow();
     for (Runnable flightRunnable : neverStartedFlights) {
