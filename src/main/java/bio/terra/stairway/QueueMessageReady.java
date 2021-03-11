@@ -4,7 +4,7 @@ import bio.terra.stairway.exception.DatabaseOperationException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-public class QueueMessageReady extends QueueMessage {
+class QueueMessageReady extends QueueMessage {
   private static final Logger logger = LoggerFactory.getLogger(QueueMessageReady.class);
 
   private QueueMessageType type;
