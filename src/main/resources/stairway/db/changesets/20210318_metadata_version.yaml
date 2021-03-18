@@ -1,0 +1,21 @@
+databaseChangeLog:
+  - changeSet:
+      id: metadata_version
+      author: jc
+      changes:
+        - addColumn:
+            tableName: flight
+            columns:
+              - column:
+                  name: output_parameters_version
+                  type: int
+                  defaultValue: 1
+                  remarks: Version of output parameter data
+        - addColumn:
+            tableName: flightlog
+            columns:
+              - column:
+                  name: working_parameters_version
+                  type: int
+                  defaultValue: 1
+                  remarks: Version of working parameter data

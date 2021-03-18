@@ -26,9 +26,6 @@ import org.springframework.lang.Nullable;
  * immutable.
  */
 public class FlightMap {
-
-  public static final int METADATA_VERSION = 2;
-
   @VisibleForTesting
   static final class ObjectContainer {
     private final String data;
@@ -186,11 +183,6 @@ public class FlightMap {
         throw new JsonConversionException("Failed to convert json string to map", ex);
       }
     }
-  }
-
-  @Deprecated
-  public void fromJson(String json) {
-    fromJson(json, METADATA_VERSION);
   }
 
   // Truncate working map to only print first 500 characters

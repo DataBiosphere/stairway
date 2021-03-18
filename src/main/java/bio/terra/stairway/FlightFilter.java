@@ -189,7 +189,8 @@ public class FlightFilter {
 
     // All forms start with the same select list
     sb.append("SELECT F.flightid, F.stairway_id, F.submit_time, F.completed_time,")
-        .append(" F.output_parameters, F.status, F.serialized_exception")
+        .append(" F.output_parameters, F.output_parameters_version, F.status, ")
+        .append(" F.serialized_exception")
         .append(" FROM ");
 
     // Decide which form of the query to build.

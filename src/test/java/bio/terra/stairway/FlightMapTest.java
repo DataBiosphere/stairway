@@ -50,7 +50,7 @@ public class FlightMapTest {
     logger.info("JSON: '{}'", json);
 
     FlightMap inMap = new FlightMap();
-    inMap.fromJson(json, FlightMap.METADATA_VERSION);
+    inMap.fromJson(json, FlightDao.FLIGHT_PARAMETERS_VERSION);
 
     FlightsTestPojo pojoOut = inMap.get("mykey", FlightsTestPojo.class);
     Assertions.assertEquals(pojoIn, pojoOut);

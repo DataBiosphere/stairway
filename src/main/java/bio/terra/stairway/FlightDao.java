@@ -56,6 +56,7 @@ class FlightDao {
   static final String FLIGHT_TABLE = "flight";
   static final String FLIGHT_LOG_TABLE = "flightlog";
   static final String FLIGHT_INPUT_TABLE = "flightinput";
+  static final int FLIGHT_PARAMETERS_VERSION = 2;
 
   private static final String UNKNOWN = "<unknown>";
 
@@ -94,8 +95,10 @@ class FlightDao {
     final String sqlInsertFlight =
         "INSERT INTO "
             + FLIGHT_TABLE
-            + " (flightId, submit_time, class_name, status, stairway_id, debug_info)"
-            + "VALUES (:flightId, CURRENT_TIMESTAMP, :className, :status, :stairwayId, :debugInfo)";
+            + " (flightId, submit_time, class_name, status, stairway_id, debug_info, "
+            + "    output_parameters_version)"
+            + "VALUES (:flightId, CURRENT_TIMESTAMP, :className, :status, :stairwayId, "
+            + " :debugInfo, :outputParametersVersion)";
 
     try (Connection connection = dataSource.getConnection();
         NamedParameterPreparedStatement statement =
@@ -117,6 +120,7 @@ class FlightDao {
       } else {
         statement.setString("debugInfo", "{}");
       }
+      statement.setInt("outputParametersVersion", FLIGHT_PARAMETERS_VERSION);
       statement.getPreparedStatement().executeUpdate();
 
       storeInputParameters(
@@ -151,10 +155,10 @@ class FlightDao {
     final String sqlInsertFlightLog =
         "INSERT INTO "
             + FLIGHT_LOG_TABLE
-            + "(flightid, log_time, working_parameters, step_index, rerun, direction,"
-            + " succeeded, serialized_exception, status)"
-            + " VALUES (:flightId, CURRENT_TIMESTAMP, :workingMap, :stepIndex, :rerun, :direction,"
-            + " :succeeded, :serializedException, :status)";
+            + "(flightid, log_time, working_parameters, working_parameters_version, step_index, "
+            + " rerun, direction, succeeded, serialized_exception, status)"
+            + " VALUES (:flightId, CURRENT_TIMESTAMP, :workingMap, :workingMapVersion, :stepIndex, "
+            + " :rerun, :direction, :succeeded, :serializedException, :status)";
 
     String serializedException =
         exceptionSerializer.serialize(flightContext.getResult().getException().orElse(null));
@@ -165,6 +169,7 @@ class FlightDao {
       startTransaction(connection);
       statement.setString("flightId", flightContext.getFlightId());
       statement.setString("workingMap", flightContext.getWorkingMap().toJson());
+      statement.setInt("workingMapVersion", FLIGHT_PARAMETERS_VERSION);
       statement.setInt("stepIndex", flightContext.getStepIndex());
       statement.setBoolean("rerun", flightContext.isRerun());
       statement.setString("direction", flightContext.getDirection().name());
@@ -387,6 +392,7 @@ class FlightDao {
             + FLIGHT_TABLE
             + " SET completed_time = CURRENT_TIMESTAMP,"
             + " output_parameters = :outputParameters,"
+            + " output_parameters_version = :outputParametersVersion,"
             + " status = :status,"
             + " serialized_exception = :serializedException,"
             + " stairway_id = NULL"
@@ -408,6 +414,7 @@ class FlightDao {
       startTransaction(connection);
 
       statement.setString("outputParameters", flightContext.getWorkingMap().toJson());
+      statement.setInt("outputParametersVersion", FLIGHT_PARAMETERS_VERSION);
       statement.setString("status", flightContext.getFlightStatus().name());
       statement.setString("serializedException", serializedException);
       statement.setString("flightId", flightContext.getFlightId());
@@ -607,7 +614,7 @@ class FlightDao {
       throws SQLException {
 
     final String sqlLastFlightLog =
-        "SELECT working_parameters, step_index, direction, rerun,"
+        "SELECT working_parameters, working_parameters_version, step_index, direction, rerun,"
             + " succeeded, serialized_exception, status"
             + " FROM "
             + FLIGHT_LOG_TABLE
@@ -637,7 +644,11 @@ class FlightDao {
                       exceptionSerializer.deserialize(rsflight.getString("serialized_exception")));
             }
 
-            flightContext.getWorkingMap().fromJson(rsflight.getString("working_parameters"));
+            flightContext
+                .getWorkingMap()
+                .fromJson(
+                    rsflight.getString("working_parameters"),
+                    rsflight.getInt("working_parameters_version"));
 
             flightContext.setRerun(rsflight.getBoolean("rerun"));
             flightContext.setDirection(Direction.valueOf(rsflight.getString("direction")));
@@ -666,7 +677,7 @@ class FlightDao {
 
     final String sqlOneFlight =
         "SELECT stairway_id, flightid, submit_time, "
-            + " completed_time, output_parameters, status, serialized_exception"
+            + " completed_time, output_parameters, output_parameters_version, status, serialized_exception"
             + " FROM "
             + FLIGHT_TABLE
             + " WHERE flightid = :flightId";
@@ -806,9 +817,10 @@ class FlightDao {
         flightState.setException(
             exceptionSerializer.deserialize(rs.getString("serialized_exception")));
         String outputParamsJson = rs.getString("output_parameters");
+        int outputParamsJsonVersion = rs.getInt("output_parameters_version");
         if (outputParamsJson != null) {
           FlightMap outputParameters = new FlightMap();
-          outputParameters.fromJson(outputParamsJson);
+          outputParameters.fromJson(outputParamsJson, outputParamsJsonVersion);
           flightState.setResultMap(outputParameters);
         }
       }
