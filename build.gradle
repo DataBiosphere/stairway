@@ -75,6 +75,9 @@ dependencies {
     // For log control during unit testsing
     testImplementation group: 'ch.qos.logback', name: 'logback-classic', version: '1.2.3'
     testRuntime group: 'org.codehaus.groovy', name: 'groovy', version: '2.5.7'
+
+    // Enable AutoValue in test code
+    testAnnotationProcessor group: "com.google.auto.value", name: "auto-value", version: "1.7.4"
 }
 
 test {
