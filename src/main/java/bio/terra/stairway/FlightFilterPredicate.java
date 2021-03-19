@@ -3,6 +3,7 @@ package bio.terra.stairway;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import java.sql.SQLException;
 import java.time.Instant;
+import java.util.Optional;
 
 class FlightFilterPredicate {
   public enum Datatype {
@@ -15,6 +16,7 @@ class FlightFilterPredicate {
   private final Object value;
   private final Datatype datatype;
   private final String parameterName;
+  private final Optional<FlightParameterSerializer> serializer;
 
   /**
    * Predicate comparison constructor
@@ -27,11 +29,22 @@ class FlightFilterPredicate {
    */
   FlightFilterPredicate(
       String key, FlightFilterOp op, Object value, Datatype datatype, String parameterName) {
+    this(key, op, value, datatype, parameterName, null);
+  }
+
+  FlightFilterPredicate(
+      String key,
+      FlightFilterOp op,
+      Object value,
+      Datatype datatype,
+      String parameterName,
+      FlightParameterSerializer serializer) {
     this.key = key;
     this.op = op;
     this.value = value;
     this.datatype = datatype;
     this.parameterName = parameterName;
+    this.serializer = Optional.ofNullable(serializer);
   }
 
   /**
@@ -72,7 +85,7 @@ class FlightFilterPredicate {
 
   void storeInputPredicateValue(NamedParameterPreparedStatement statement)
       throws SQLException, JsonProcessingException {
-    String jsonValue = StairwayMapper.getObjectMapper().writeValueAsString(value);
+    String jsonValue = serializer.get().serialize(value);
     statement.setString(parameterName, jsonValue);
   }
 }

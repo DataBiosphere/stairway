@@ -105,7 +105,15 @@ public class FlightFilter {
    * @return {@code this}, for fluent style
    * @throws FlightFilterException if key is not supplied
    */
+  @Deprecated
   public FlightFilter addFilterInputParameter(String key, FlightFilterOp op, Object value)
+      throws FlightFilterException {
+    return addFilterInputParameter(
+        key, op, value, new DefaultFlightParameterSerializer(StairwayMapper.getObjectMapper()));
+  }
+
+  public FlightFilter addFilterInputParameter(
+      String key, FlightFilterOp op, Object value, FlightParameterSerializer serializer)
       throws FlightFilterException {
     if (key == null) {
       throw new FlightFilterException("Key must be specified in an input filter");
@@ -189,7 +197,7 @@ public class FlightFilter {
 
     // All forms start with the same select list
     sb.append("SELECT F.flightid, F.stairway_id, F.submit_time, F.completed_time,")
-        .append(" F.output_parameters, F.output_parameters_version, F.status, ")
+        .append(" F.output_parameters, F.output_parameters_version, F.status,")
         .append(" F.serialized_exception")
         .append(" FROM ");
 
