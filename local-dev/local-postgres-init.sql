@@ -1,2 +1,0 @@
-CREATE DATABASE stairwaylib;
-CREATE ROLE stairwayuser WITH LOGIN ENCRYPTED PASSWORD 'stairwaypw';
