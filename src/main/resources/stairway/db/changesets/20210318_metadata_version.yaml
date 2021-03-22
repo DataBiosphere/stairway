@@ -1,7 +1,7 @@
 databaseChangeLog:
   - changeSet:
       id: metadata_version
-      author: jc
+      author: JCz
       changes:
         - addColumn:
             tableName: flight

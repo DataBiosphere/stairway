@@ -19,7 +19,7 @@ public class FlightMapTest {
   private static <T> void testObjectContainer(
       T in, FlightParameterSerializer serializer, FlightParameterDeserializer<T> deserializer) {
     FlightMap.ObjectContainer ocSer = new FlightMap.ObjectContainer(in, serializer);
-    String data = ocSer.getData();
+    String data = ocSer.getSerializedObjectState();
     logger.info("Serialized Data: '{}'", data);
 
     FlightMap.ObjectContainer ocDes = new FlightMap.ObjectContainer(data);

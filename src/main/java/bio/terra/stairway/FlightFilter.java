@@ -95,9 +95,10 @@ public class FlightFilter {
   }
 
   /**
-   * Filter by an input parameter. This is processed by converting the {@code value} into JSON and
-   * doing a string comparison against the input parameter stored in the database. The {@code value}
-   * object must be <b>exactly</b> the same class as the input parameter.
+   * Filter by an input parameter. This is processed by converting the {@code value} into JSON using
+   * default Jackson serialization and doing a string comparison against the input parameter stored
+   * in the database. The {@code value} object must be <b>exactly</b> the same class as the input
+   * parameter.
    *
    * @param key name of the parameter to compare
    * @param op a {@link FlightFilterOp}
@@ -105,13 +106,24 @@ public class FlightFilter {
    * @return {@code this}, for fluent style
    * @throws FlightFilterException if key is not supplied
    */
-  @Deprecated
   public FlightFilter addFilterInputParameter(String key, FlightFilterOp op, Object value)
       throws FlightFilterException {
     return addFilterInputParameter(
         key, op, value, new DefaultFlightParameterSerializer(StairwayMapper.getObjectMapper()));
   }
 
+  /**
+   * Filter by an input parameter. This is processed by converting the {@code value} into JSON using
+   * a custom serializer and doing a string comparison against the input parameter stored in the
+   * database. The {@code value} object must be <b>exactly</b> the same class as the input
+   * parameter.
+   *
+   * @param key name of the parameter to compare
+   * @param op a {@link FlightFilterOp}
+   * @param value some object for comparison
+   * @return {@code this}, for fluent style
+   * @throws FlightFilterException if key is not supplied
+   */
   public FlightFilter addFilterInputParameter(
       String key, FlightFilterOp op, Object value, FlightParameterSerializer serializer)
       throws FlightFilterException {
@@ -119,7 +131,7 @@ public class FlightFilter {
       throw new FlightFilterException("Key must be specified in an input filter");
     }
     FlightFilterPredicate predicate =
-        new FlightFilterPredicate(key, op, value, STRING, makeParameterName());
+        new FlightFilterPredicate(key, op, value, STRING, makeParameterName(), serializer);
     inputPredicates.add(predicate);
     return this;
   }

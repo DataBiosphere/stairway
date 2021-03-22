@@ -32,6 +32,15 @@ class FlightFilterPredicate {
     this(key, op, value, datatype, parameterName, null);
   }
 
+  /**
+   * Predicate comparison constructor with serialization, required for input parameter predicate
+   *
+   * @param key name of the input parameter
+   * @param op comparison operator
+   * @param value value to compare against
+   * @param datatype comparison datatype for the value
+   * @param parameterName placeholder parameter name for this predicate value
+   */
   FlightFilterPredicate(
       String key,
       FlightFilterOp op,

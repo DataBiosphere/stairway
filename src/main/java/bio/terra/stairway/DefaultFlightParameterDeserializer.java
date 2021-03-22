@@ -4,7 +4,14 @@ import bio.terra.stairway.exception.JsonConversionException;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import java.io.IOException;
 
-public class DefaultFlightParameterDeserializer<T> extends FlightParameterDeserializer<T> {
+/**
+ * This class implements default Jackson-based deserialization of classes and primitive types. It is
+ * intended for internal use by FlightMap and FlightFilter classes when a custom deserializer is not
+ * provided. It is not intended to be used directly.
+ *
+ * @param <T> Type that will be deserialized by this class.
+ */
+class DefaultFlightParameterDeserializer<T> extends FlightParameterDeserializer<T> {
 
   private ObjectMapper mapper;
 

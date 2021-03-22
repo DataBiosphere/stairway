@@ -28,40 +28,52 @@ import org.springframework.lang.Nullable;
 public class FlightMap {
   @VisibleForTesting
   static final class ObjectContainer {
-    private final String data;
-    private final Object object;
+    private final String serializedObjectState;
+    private final Object objectReference;
     private final FlightParameterSerializer serializer;
 
     public ObjectContainer(String data) {
-      this.data = data;
-      this.object = null;
+      this.serializedObjectState = data;
+      this.objectReference = null;
       this.serializer = null;
     }
 
     public ObjectContainer(Object object, FlightParameterSerializer serializer) {
-      this.data = null;
-      this.object = object;
+      this.serializedObjectState = null;
+      this.objectReference = object;
       this.serializer = serializer;
     }
 
-    public String getData() {
+    public String getSerializedObjectState() {
       // Constructors ensure that one can only have valid data OR object+serializer.
-      return (data != null) ? data : serializer.serialize(object);
+      return (serializedObjectState != null)
+          ? serializedObjectState
+          : serializer.serialize(objectReference);
     }
 
     public <T> T getObject(FlightParameterDeserializer<T> deserializer) {
-      return (object != null) ? deserializer.safeCast(object) : deserializer.deserialize(data);
+      return (objectReference != null)
+          ? deserializer.safeCast(objectReference)
+          : deserializer.deserialize(serializedObjectState);
     }
   }
 
+  /**
+   * Converter, to be registered with Jackson ObjectMapper instance, to allow direct conversion from
+   * an ObjectContainer to a String.
+   */
   private static class ObjectContainerToStringConverter
       extends StdConverter<ObjectContainer, String> {
     @Override
     public String convert(ObjectContainer value) {
-      return value.getData();
+      return value.getSerializedObjectState();
     }
   }
 
+  /**
+   * Converter, to be registered with Jackson ObjectMapper instance, to allow direct conversion from
+   * an String to an ObjectContainer.
+   */
   private static class StringToObjectContainerConverter
       extends StdConverter<String, ObjectContainer> {
     @Override
@@ -75,15 +87,23 @@ public class FlightMap {
   public FlightMap() {
     map = new HashMap<>();
 
+    // Register a module that allows direct conversion from/to a Map<String, ObjectContainer>
+    // to/from a Map<String, String>, which prevents ObjectContainer class related cruft from being
+    // added to the resulting JSON (and associated post-processing at deserialization time to work
+    // around it).
+
     SimpleModule module = new SimpleModule();
 
+    // Module serializes ObjectContainer instances as plain old Strings.
     module.addSerializer(
         ObjectContainer.class, new StdDelegatingSerializer(new ObjectContainerToStringConverter()));
 
+    // Module deserializes ObjectContainer instances as plain old Strings.
     module.addDeserializer(
         ObjectContainer.class,
         new StdDelegatingDeserializer<>(new StringToObjectContainerConverter()));
 
+    // Register module with ObjectMapper
     getObjectMapper().registerModule(module);
   }
 
@@ -108,7 +128,7 @@ public class FlightMap {
   List<FlightInput> makeFlightInputList() {
     ArrayList<FlightInput> inputList = new ArrayList<>();
     for (Map.Entry<String, ObjectContainer> entry : map.entrySet()) {
-      inputList.add(new FlightInput(entry.getKey(), entry.getValue().getData()));
+      inputList.add(new FlightInput(entry.getKey(), entry.getValue().getSerializedObjectState()));
     }
     return inputList;
   }
@@ -119,8 +139,9 @@ public class FlightMap {
   }
 
   /**
-   * Return the object from the hash map cast to the right type. Throw an exception if the Object
-   * cannot be cast to that type.
+   * Return the object from the hash map cast to the right type using default Jackson object
+   * deserialization for the passed object type. Throw an exception if the Object cannot be cast to
+   * that type.
    *
    * @param <T> - type of class to expect in the hash map
    * @param key - key to lookup in the hash map
@@ -128,7 +149,6 @@ public class FlightMap {
    * @return null if not found
    * @throws ClassCastException if found, not castable to the requested type
    */
-  @Deprecated
   @Nullable
   public <T> T get(String key, Class<T> type) {
     FlightParameterDeserializer<T> deserializer =
@@ -136,20 +156,43 @@ public class FlightMap {
     return get(key, deserializer);
   }
 
+  /**
+   * Return the object from the hash map cast to the right type using a custom deserializer. Throw
+   * an exception if the Object cannot be cast to that type.
+   *
+   * @param <T> - type of class to expect in the hash map
+   * @param key - key to lookup in the hash map
+   * @param deserializer - custom deserializer implementing interface FlightParameterDeserializer<T>
+   * @return null if not found
+   * @throws ClassCastException if found, not castable to the requested type
+   */
   @Nullable
   public <T> T get(String key, FlightParameterDeserializer<T> deserializer) {
     ObjectContainer container = map.get(key);
     return (container != null) ? container.getObject(deserializer) : null;
   }
 
-  public void put(String key, Object value, FlightParameterSerializer serializer) {
-    map.put(key, new ObjectContainer(value, serializer));
-  }
-
-  @Deprecated
+  /**
+   * Place an object into the hash map under a given key using default Jackson object serialization
+   * for the object's type.
+   *
+   * @param key - key to store object under in the hash map
+   * @param value - object to be stored
+   */
   public void put(String key, Object value) {
     FlightParameterSerializer serializer = new DefaultFlightParameterSerializer(getObjectMapper());
     put(key, value, serializer);
+  }
+
+  /**
+   * Place an object into the hash map under a given key using a custom serializer
+   *
+   * @param key - key to store object under in the hash map
+   * @param value - object to be stored
+   * @param serializer - custom serializer implementing interface FlightParameterSerializer
+   */
+  public void put(String key, Object value, FlightParameterSerializer serializer) {
+    map.put(key, new ObjectContainer(value, serializer));
   }
 
   public String toJson() {

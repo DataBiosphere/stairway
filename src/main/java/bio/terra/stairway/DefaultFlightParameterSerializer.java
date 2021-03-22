@@ -4,7 +4,12 @@ import bio.terra.stairway.exception.JsonConversionException;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
 
-public class DefaultFlightParameterSerializer implements FlightParameterSerializer {
+/**
+ * This class implements default Jackson-based serialization of classes and primitive types. It is
+ * intended for internal use by FlightMap and FlightFilter classes when a custom serializer is not
+ * provided. It is not intended to be used directly.
+ */
+class DefaultFlightParameterSerializer implements FlightParameterSerializer {
 
   private ObjectMapper mapper;
 
