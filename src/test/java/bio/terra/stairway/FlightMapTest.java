@@ -39,7 +39,7 @@ public class FlightMapTest {
     FlightsTestPojo inPojo = new FlightsTestPojo().anint(99).astring("mystring");
     testObjectContainer(inPojo, FlightsTestPojo.class);
 
-    FlightsTestNonPojo inNonPojo = FlightsTestNonPojo.create(1.99f);
+    FlightsTestNonPojo inNonPojo = new FlightsTestNonPojo(1.99f);
     testObjectContainer(
         inNonPojo, FlightsTestNonPojo.serializer(), FlightsTestNonPojo.deserializer());
 
@@ -54,7 +54,7 @@ public class FlightMapTest {
     FlightsTestPojo pojoIn = new FlightsTestPojo().anint(99).astring("mystring");
     outMap.put("mypojo", pojoIn);
 
-    FlightsTestNonPojo nonPojoIn = FlightsTestNonPojo.create(1.25f);
+    FlightsTestNonPojo nonPojoIn = new FlightsTestNonPojo(1.25f);
     outMap.put("mynonpojo", nonPojoIn, FlightsTestNonPojo.serializer());
 
     Integer intIn = 3;

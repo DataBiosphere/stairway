@@ -7,24 +7,46 @@ import com.fasterxml.jackson.core.JsonFactory;
 import com.fasterxml.jackson.core.JsonGenerator;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.json.JsonMapper;
-import com.google.auto.value.AutoValue;
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 import java.io.OutputStream;
+import java.util.Objects;
 import java.util.UUID;
 
-@AutoValue
-public abstract class FlightsTestNonPojo {
-  public abstract UUID getUuid();
+public class FlightsTestNonPojo {
 
-  public abstract float getValue();
+  private final UUID uuid;
+  private final float value;
 
-  public static FlightsTestNonPojo create(float value) {
-    return new AutoValue_FlightsTestNonPojo(UUID.randomUUID(), value);
+  public FlightsTestNonPojo(float value) {
+    this.uuid = UUID.randomUUID();
+    this.value = value;
   }
 
-  private static FlightsTestNonPojo create(UUID uuid, float value) {
-    return new AutoValue_FlightsTestNonPojo(uuid, value);
+  private FlightsTestNonPojo(UUID uuid, float value) {
+    this.uuid = uuid;
+    this.value = value;
+  }
+
+  public UUID getUuid() {
+    return uuid;
+  }
+
+  public float getValue() {
+    return value;
+  }
+
+  @Override
+  public boolean equals(Object o) {
+    if (this == o) return true;
+    if (o == null || getClass() != o.getClass()) return false;
+    FlightsTestNonPojo nonPojo = (FlightsTestNonPojo) o;
+    return Float.compare(nonPojo.value, value) == 0 && uuid.equals(nonPojo.uuid);
+  }
+
+  @Override
+  public int hashCode() {
+    return Objects.hash(uuid, value);
   }
 
   public static FlightParameterSerializer serializer() {
@@ -87,7 +109,7 @@ public abstract class FlightsTestNonPojo {
           value = map.get("value").floatValue();
         }
 
-        return FlightsTestNonPojo.create(uuid, value);
+        return new FlightsTestNonPojo(uuid, value);
 
       } catch (final IOException ex) {
         throw new JsonConversionException(ex.getCause());
