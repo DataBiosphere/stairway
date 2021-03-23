@@ -4,6 +4,7 @@ import static org.hamcrest.CoreMatchers.equalTo;
 import static org.hamcrest.MatcherAssert.assertThat;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
+import bio.terra.stairway.fixtures.FlightsTestNonPojo;
 import bio.terra.stairway.fixtures.FlightsTestPojo;
 import bio.terra.stairway.fixtures.TestUtil;
 import bio.terra.stairway.flights.TestFlight;
@@ -12,7 +13,9 @@ import java.time.Instant;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.stream.Collectors;
 import org.apache.commons.collections4.CollectionUtils;
 import org.junit.jupiter.api.BeforeEach;
@@ -24,6 +27,15 @@ public class EnumerateFlightsTest {
 
   private Stairway stairway;
   private FlightDao flightDao;
+  private Map<Class<?>, FlightParameterSerializer> serializerMap;
+
+  EnumerateFlightsTest() {
+    // In order to maintain the clean usage of makeFlight to build flights, a map is used to inject
+    // custom serializers internally to makeFlight.  If a custom serializer is registered in this
+    // map for a type, it will be used when putting input parameters into flight maps.
+    serializerMap = new HashMap<>();
+    serializerMap.put(FlightsTestNonPojo.class, FlightsTestNonPojo.serializer());
+  }
 
   @BeforeEach
   public void setup() throws Exception {
@@ -35,6 +47,8 @@ public class EnumerateFlightsTest {
   public void enumTest() throws Exception {
     FlightsTestPojo pojo1 = new FlightsTestPojo().anint(5).astring("5");
     FlightsTestPojo pojo2 = new FlightsTestPojo().anint(6).astring("6");
+    FlightsTestNonPojo nopo1 = new FlightsTestNonPojo(1.2f);
+    FlightsTestNonPojo nopo2 = new FlightsTestNonPojo(3.4f);
     int int1 = 5;
     int int2 = 6;
     String string1 = "5";
@@ -43,13 +57,17 @@ public class EnumerateFlightsTest {
     String class2 = TestFlightRetry.class.getName();
 
     // Build 6 flights with various parameters to allow testing of all ops on all datatypes
-    // The input parameters get named "in1", "in2", "in3"
+    // The input parameters get named "in0", "in1", "in2", "in3"
     List<FlightState> flights = new ArrayList<>();
     flights.add(makeFlight("0", FlightStatus.SUCCESS, class1, null));
-    flights.add(makeFlight("1", FlightStatus.ERROR, class2, new Object[] {int1, string1, pojo1}));
-    flights.add(makeFlight("2", FlightStatus.FATAL, class1, new Object[] {int2, string2, pojo2}));
-    flights.add(makeFlight("3", FlightStatus.RUNNING, class2, new Object[] {int1, string2, pojo2}));
-    flights.add(makeFlight("4", FlightStatus.RUNNING, class2, new Object[] {int2, string1, pojo1}));
+    flights.add(
+        makeFlight("1", FlightStatus.ERROR, class2, new Object[] {int1, string1, pojo1, nopo1}));
+    flights.add(
+        makeFlight("2", FlightStatus.FATAL, class1, new Object[] {int2, string2, pojo2, nopo2}));
+    flights.add(
+        makeFlight("3", FlightStatus.RUNNING, class2, new Object[] {int1, string2, pojo2, nopo2}));
+    flights.add(
+        makeFlight("4", FlightStatus.RUNNING, class2, new Object[] {int2, string1, pojo1, nopo1}));
     flights.add(makeFlight("5", FlightStatus.RUNNING, class1, null));
 
     Instant minSubmit = flights.get(0).getSubmitted();
@@ -121,6 +139,15 @@ public class EnumerateFlightsTest {
             .addFilterInputParameter("in2", FlightFilterOp.EQUAL, pojo2);
     flightList = flightDao.getFlights(0, 100, filter);
     checkResults("case 9", flightList, Collections.singletonList("3"));
+
+    // Case 10: custom serialized param (note the additional serializer parameter passed to
+    // addFilterInputParameter) - form 2
+    filter =
+        new FlightFilter()
+            .addFilterInputParameter(
+                "in3", FlightFilterOp.EQUAL, nopo2, FlightsTestNonPojo.serializer());
+    flightList = flightDao.getFlights(0, 100, filter);
+    checkResults("case 10", flightList, Arrays.asList("2", "3"));
   }
 
   private void checkResults(String name, List<FlightState> resultlList, List<String> expectedIds) {
@@ -138,7 +165,13 @@ public class EnumerateFlightsTest {
     int inputIndex = 0;
     if (inputs != null) {
       for (Object input : inputs) {
-        inputParams.put("in" + inputIndex, input);
+        // If a customer serializer was registered with the serializerMap at ctor time, pass it to
+        // the put call, otherwise use the default serializer put overload.
+        if (serializerMap.containsKey(input.getClass())) {
+          inputParams.put("in" + inputIndex, input, serializerMap.get(input.getClass()));
+        } else {
+          inputParams.put("in" + inputIndex, input);
+        }
         inputIndex++;
       }
     }
