@@ -47,14 +47,17 @@ public class EnumerateFlightsTest {
   public void enumTest() throws Exception {
     FlightsTestPojo pojo1 = new FlightsTestPojo().anint(5).astring("5");
     FlightsTestPojo pojo2 = new FlightsTestPojo().anint(6).astring("6");
-    FlightsTestNonPojo nopo1 = new FlightsTestNonPojo(1.2f);
-    FlightsTestNonPojo nopo2 = new FlightsTestNonPojo(3.4f);
     int int1 = 5;
     int int2 = 6;
     String string1 = "5";
     String string2 = "6";
     String class1 = TestFlight.class.getName();
     String class2 = TestFlightRetry.class.getName();
+
+    // Recall that at ctor time we registered a custom serializer for type FlightsTestNonPojo, so
+    // these will get pushed to the FlightMap passing this serializer in makeFlight.
+    FlightsTestNonPojo nopo1 = new FlightsTestNonPojo(1.2f);
+    FlightsTestNonPojo nopo2 = new FlightsTestNonPojo(3.4f);
 
     // Build 6 flights with various parameters to allow testing of all ops on all datatypes
     // The input parameters get named "in0", "in1", "in2", "in3"
