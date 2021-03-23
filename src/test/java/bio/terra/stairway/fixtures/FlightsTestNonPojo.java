@@ -49,7 +49,7 @@ public class FlightsTestNonPojo {
     return Objects.hash(uuid, value);
   }
 
-  public static FlightParameterSerializer serializer() {
+  public static FlightParameterSerializer<FlightsTestNonPojo> serializer() {
     return new SerializerDeserializer();
   }
 
@@ -57,23 +57,22 @@ public class FlightsTestNonPojo {
     return new SerializerDeserializer();
   }
 
-  public static class SerializerDeserializer extends FlightParameterDeserializer<FlightsTestNonPojo>
-      implements FlightParameterSerializer {
+  public static class SerializerDeserializer
+      implements FlightParameterDeserializer<FlightsTestNonPojo>,
+          FlightParameterSerializer<FlightsTestNonPojo> {
 
     private static final int VERSION = 2;
     private final JsonFactory factory;
     private final JsonMapper mapper;
 
     public SerializerDeserializer() {
-      super(FlightsTestNonPojo.class);
       factory = new JsonFactory();
       mapper = new JsonMapper();
     }
 
     @Override
-    public String serialize(Object object) {
+    public String serialize(FlightsTestNonPojo nonPojo) {
 
-      FlightsTestNonPojo nonPojo = safeCast(object);
       try {
         OutputStream outputStream = new ByteArrayOutputStream();
         JsonGenerator generator = factory.createGenerator(outputStream);

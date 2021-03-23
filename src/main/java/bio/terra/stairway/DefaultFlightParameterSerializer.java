@@ -8,17 +8,26 @@ import com.fasterxml.jackson.databind.ObjectMapper;
  * This class implements default Jackson-based serialization of classes and primitive types. It is
  * intended for internal use by FlightMap and FlightFilter classes when a custom serializer is not
  * provided. It is not intended to be used directly.
+ *
+ * @param <T> Type that will be serialized by this class.
  */
-class DefaultFlightParameterSerializer implements FlightParameterSerializer {
+class DefaultFlightParameterSerializer<T> implements FlightParameterSerializer<T> {
 
-  private ObjectMapper mapper;
+  private final ObjectMapper mapper;
 
+  /**
+   * Constructs a DefaultFlightParameterSerializer<T> instance, which uses the passed Jackson
+   * ObjectMapper to serialize objects of type T to Strings.
+   *
+   * @param mapper - Jackson {@link ObjectMapper} used to serialize objects of type T in method
+   *     {@link #serialize(T)}
+   */
   public DefaultFlightParameterSerializer(ObjectMapper mapper) {
     this.mapper = mapper;
   }
 
   @Override
-  public String serialize(Object object) {
+  public String serialize(T object) {
     try {
       return mapper.writeValueAsString(object);
     } catch (JsonProcessingException ex) {

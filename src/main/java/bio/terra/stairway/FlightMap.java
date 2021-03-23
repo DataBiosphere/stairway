@@ -6,11 +6,6 @@ import bio.terra.stairway.exception.JsonConversionException;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.JsonNode;
-import com.fasterxml.jackson.databind.deser.std.StdDelegatingDeserializer;
-import com.fasterxml.jackson.databind.module.SimpleModule;
-import com.fasterxml.jackson.databind.ser.std.StdDelegatingSerializer;
-import com.fasterxml.jackson.databind.util.StdConverter;
-import com.google.common.annotations.VisibleForTesting;
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Collections;
@@ -26,85 +21,10 @@ import org.springframework.lang.Nullable;
  * immutable.
  */
 public class FlightMap {
-  @VisibleForTesting
-  static final class ObjectContainer {
-    private final String serializedObjectState;
-    private final Object objectReference;
-    private final FlightParameterSerializer serializer;
-
-    public ObjectContainer(String data) {
-      this.serializedObjectState = data;
-      this.objectReference = null;
-      this.serializer = null;
-    }
-
-    public ObjectContainer(Object object, FlightParameterSerializer serializer) {
-      this.serializedObjectState = null;
-      this.objectReference = object;
-      this.serializer = serializer;
-    }
-
-    public String getSerializedObjectState() {
-      // Constructors ensure that one can only have valid data OR object+serializer.
-      return (serializedObjectState != null)
-          ? serializedObjectState
-          : serializer.serialize(objectReference);
-    }
-
-    public <T> T getObject(FlightParameterDeserializer<T> deserializer) {
-      return (objectReference != null)
-          ? deserializer.safeCast(objectReference)
-          : deserializer.deserialize(serializedObjectState);
-    }
-  }
-
-  /**
-   * Converter, to be registered with Jackson ObjectMapper instance, to allow direct conversion from
-   * an ObjectContainer to a String.
-   */
-  private static class ObjectContainerToStringConverter
-      extends StdConverter<ObjectContainer, String> {
-    @Override
-    public String convert(ObjectContainer value) {
-      return value.getSerializedObjectState();
-    }
-  }
-
-  /**
-   * Converter, to be registered with Jackson ObjectMapper instance, to allow direct conversion from
-   * an String to an ObjectContainer.
-   */
-  private static class StringToObjectContainerConverter
-      extends StdConverter<String, ObjectContainer> {
-    @Override
-    public ObjectContainer convert(String value) {
-      return new ObjectContainer(value);
-    }
-  }
-
-  private Map<String, ObjectContainer> map;
+  private Map<String, String> map;
 
   public FlightMap() {
     map = new HashMap<>();
-
-    // Register a module that allows direct conversion from/to a Map<String, ObjectContainer>
-    // to/from a Map<String, String>, which prevents ObjectContainer class related cruft from being
-    // added to the resulting JSON (and associated post-processing at deserialization time to work
-    // around it).
-
-    SimpleModule module = new SimpleModule();
-
-    // Module serializes ObjectContainer instances as plain old Strings.
-    module.addSerializer(
-        ObjectContainer.class, new StdDelegatingSerializer(new ObjectContainerToStringConverter()));
-
-    // Module deserializes ObjectContainer instances as plain old Strings.
-    module.addDeserializer(
-        ObjectContainer.class,
-        new StdDelegatingDeserializer<>(new StringToObjectContainerConverter()));
-
-    // Register module with ObjectMapper
-    getObjectMapper().registerModule(module);
   }
 
   /**
@@ -115,7 +35,7 @@ public class FlightMap {
   FlightMap(List<FlightInput> inputList) {
     this();
     for (FlightInput input : inputList) {
-      map.put(input.getKey(), new ObjectContainer(input.getValue()));
+      map.put(input.getKey(), input.getValue());
     }
   }
 
@@ -127,8 +47,8 @@ public class FlightMap {
    */
   List<FlightInput> makeFlightInputList() {
     ArrayList<FlightInput> inputList = new ArrayList<>();
-    for (Map.Entry<String, ObjectContainer> entry : map.entrySet()) {
-      inputList.add(new FlightInput(entry.getKey(), entry.getValue().getSerializedObjectState()));
+    for (Map.Entry<String, String> entry : map.entrySet()) {
+      inputList.add(new FlightInput(entry.getKey(), entry.getValue()));
     }
     return inputList;
   }
@@ -168,8 +88,8 @@ public class FlightMap {
    */
   @Nullable
   public <T> T get(String key, FlightParameterDeserializer<T> deserializer) {
-    ObjectContainer container = map.get(key);
-    return (container != null) ? container.getObject(deserializer) : null;
+    String serializedObject = map.get(key);
+    return (serializedObject != null) ? deserializer.deserialize(serializedObject) : null;
   }
 
   /**
@@ -179,8 +99,9 @@ public class FlightMap {
    * @param key - key to store object under in the hash map
    * @param value - object to be stored
    */
-  public void put(String key, Object value) {
-    FlightParameterSerializer serializer = new DefaultFlightParameterSerializer(getObjectMapper());
+  public <T> void put(String key, T value) {
+    FlightParameterSerializer<T> serializer =
+        new DefaultFlightParameterSerializer<T>(getObjectMapper());
     put(key, value, serializer);
   }
 
@@ -191,8 +112,8 @@ public class FlightMap {
    * @param value - object to be stored
    * @param serializer - custom serializer implementing interface FlightParameterSerializer
    */
-  public void put(String key, Object value, FlightParameterSerializer serializer) {
-    map.put(key, new ObjectContainer(value, serializer));
+  public <T> void put(String key, T value, FlightParameterSerializer<T> serializer) {
+    map.put(key, serializer.serialize(value));
   }
 
   public String toJson() {
@@ -208,7 +129,7 @@ public class FlightMap {
       Map<String, JsonNode> legacyMap =
           getObjectMapper().readValue(json, new TypeReference<Map<String, JsonNode>>() {});
       for (Map.Entry<String, JsonNode> entry : legacyMap.entrySet()) {
-        map.put(entry.getKey(), new ObjectContainer(entry.getValue().toString()));
+        map.put(entry.getKey(), entry.getValue().toString());
       }
     } catch (IOException ex) {
       throw new JsonConversionException("Failed to convert json string to map", ex);
@@ -220,8 +141,7 @@ public class FlightMap {
       fromJsonV1(json);
     } else {
       try {
-        map =
-            getObjectMapper().readValue(json, new TypeReference<Map<String, ObjectContainer>>() {});
+        map = getObjectMapper().readValue(json, new TypeReference<Map<String, String>>() {});
       } catch (IOException ex) {
         throw new JsonConversionException("Failed to convert json string to map", ex);
       }

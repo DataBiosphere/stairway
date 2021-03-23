@@ -1,19 +1,16 @@
 package bio.terra.stairway;
 
-public abstract class FlightParameterDeserializer<T> {
+/**
+ * Interface for deserializing objects of type T from Strings
+ *
+ * @param <T> - type to deserialize to
+ */
+public interface FlightParameterDeserializer<T> {
 
-  protected Class<T> type;
-
-  public FlightParameterDeserializer(Class<T> type) {
-    this.type = type;
-  }
-
-  public abstract T deserialize(String string);
-
-  public T safeCast(Object object) {
-    if (!type.isInstance(object)) {
-      throw new ClassCastException("Value is not an instance of type " + type.getName());
-    }
-    return type.cast(object);
-  }
+  /**
+   * Deserialize a String, returning an object of type T
+   *
+   * @param string - the String to be deserialized
+   */
+  public T deserialize(String string);
 }

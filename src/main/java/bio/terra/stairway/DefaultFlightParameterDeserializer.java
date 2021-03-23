@@ -11,12 +11,21 @@ import java.io.IOException;
  *
  * @param <T> Type that will be deserialized by this class.
  */
-class DefaultFlightParameterDeserializer<T> extends FlightParameterDeserializer<T> {
+class DefaultFlightParameterDeserializer<T> implements FlightParameterDeserializer<T> {
 
-  private ObjectMapper mapper;
+  private final Class<T> type;
+  private final ObjectMapper mapper;
 
+  /**
+   * Constructs a DefaultFlightParameterDeserializer<T> instance, which uses the passed Jackson
+   * ObjectMapper to deserialize objects of type T to Strings.
+   *
+   * @param type - type Class<T>, required to pass to Jackson {@link ObjectMapper} at deserialization time
+   * @param mapper - Jackson {@link ObjectMapper} used to serialize objects of type T in method
+   *     {@link #deserialize(String)}
+   */
   public DefaultFlightParameterDeserializer(Class<T> type, ObjectMapper mapper) {
-    super(type);
+    this.type = type;
     this.mapper = mapper;
   }
 

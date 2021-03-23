@@ -1,7 +1,5 @@
 package bio.terra.stairway;
 
-import static bio.terra.stairway.StairwayMapper.getObjectMapper;
-
 import bio.terra.stairway.fixtures.FlightsTestNonPojo;
 import bio.terra.stairway.fixtures.FlightsTestPojo;
 import java.util.UUID;
@@ -15,37 +13,6 @@ import org.slf4j.LoggerFactory;
 public class FlightMapTest {
 
   private static final Logger logger = LoggerFactory.getLogger("FlightMapTest");
-
-  private static <T> void testObjectContainer(
-      T in, FlightParameterSerializer serializer, FlightParameterDeserializer<T> deserializer) {
-    FlightMap.ObjectContainer ocSer = new FlightMap.ObjectContainer(in, serializer);
-    String data = ocSer.getSerializedObjectState();
-    logger.info("Serialized Data: '{}'", data);
-
-    FlightMap.ObjectContainer ocDes = new FlightMap.ObjectContainer(data);
-    T out = ocDes.getObject(deserializer);
-    Assertions.assertEquals(in, out);
-  }
-
-  private static <T> void testObjectContainer(T in, Class<T> type) {
-    FlightParameterSerializer serializer = new DefaultFlightParameterSerializer(getObjectMapper());
-    FlightParameterDeserializer<T> deserializer =
-        new DefaultFlightParameterDeserializer<>(type, getObjectMapper());
-    testObjectContainer(in, serializer, deserializer);
-  }
-
-  @Test
-  public void objectContainers() {
-    FlightsTestPojo inPojo = new FlightsTestPojo().anint(99).astring("mystring");
-    testObjectContainer(inPojo, FlightsTestPojo.class);
-
-    FlightsTestNonPojo inNonPojo = new FlightsTestNonPojo(1.99f);
-    testObjectContainer(
-        inNonPojo, FlightsTestNonPojo.serializer(), FlightsTestNonPojo.deserializer());
-
-    Integer inInt = 100;
-    testObjectContainer(inInt, Integer.class);
-  }
 
   @Test
   public void toAndFromJson() {
