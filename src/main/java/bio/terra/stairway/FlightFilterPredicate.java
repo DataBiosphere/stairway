@@ -1,9 +1,7 @@
 package bio.terra.stairway;
 
-import com.fasterxml.jackson.core.JsonProcessingException;
 import java.sql.SQLException;
 import java.time.Instant;
-import java.util.Optional;
 
 class FlightFilterPredicate {
   public enum Datatype {
@@ -16,7 +14,6 @@ class FlightFilterPredicate {
   private final Object value;
   private final Datatype datatype;
   private final String parameterName;
-  private final Optional<FlightParameterSerializer> serializer;
 
   /**
    * Predicate comparison constructor
@@ -29,31 +26,11 @@ class FlightFilterPredicate {
    */
   FlightFilterPredicate(
       String key, FlightFilterOp op, Object value, Datatype datatype, String parameterName) {
-    this(key, op, value, datatype, parameterName, null);
-  }
-
-  /**
-   * Predicate comparison constructor with serialization, required for input parameter predicate
-   *
-   * @param key name of the input parameter
-   * @param op comparison operator
-   * @param value value to compare against
-   * @param datatype comparison datatype for the value
-   * @param parameterName placeholder parameter name for this predicate value
-   */
-  FlightFilterPredicate(
-      String key,
-      FlightFilterOp op,
-      Object value,
-      Datatype datatype,
-      String parameterName,
-      FlightParameterSerializer serializer) {
     this.key = key;
     this.op = op;
     this.value = value;
     this.datatype = datatype;
     this.parameterName = parameterName;
-    this.serializer = Optional.ofNullable(serializer);
   }
 
   /**
@@ -92,9 +69,7 @@ class FlightFilterPredicate {
     return "(I.key = '" + key + "' AND I.value" + op.getSql() + ":" + parameterName + ")";
   }
 
-  void storeInputPredicateValue(NamedParameterPreparedStatement statement)
-      throws SQLException, JsonProcessingException {
-    String jsonValue = serializer.get().serialize(value);
-    statement.setString(parameterName, jsonValue);
+  void storeInputPredicateValue(NamedParameterPreparedStatement statement) throws SQLException {
+    statement.setString(parameterName, (String) value);
   }
 }

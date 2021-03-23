@@ -151,6 +151,12 @@ public class EnumerateFlightsTest {
                 "in3", FlightFilterOp.EQUAL, nopo2, FlightsTestNonPojo.serializer());
     flightList = flightDao.getFlights(0, 100, filter);
     checkResults("case 10", flightList, Arrays.asList("2", "3"));
+
+    // Case 11: raw JSON string passed as input parameter value - form 2
+    String jsonNopo2 = FlightsTestNonPojo.serializer().serialize(nopo2);
+    filter = new FlightFilter().addFilterInputParameterRaw("in3", FlightFilterOp.EQUAL, jsonNopo2);
+    flightList = flightDao.getFlights(0, 100, filter);
+    checkResults("case 11", flightList, Arrays.asList("2", "3"));
   }
 
   private void checkResults(String name, List<FlightState> resultlList, List<String> expectedIds) {

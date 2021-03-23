@@ -4,7 +4,6 @@ import static bio.terra.stairway.FlightFilterPredicate.Datatype.STRING;
 import static bio.terra.stairway.FlightFilterPredicate.Datatype.TIMESTAMP;
 
 import bio.terra.stairway.exception.FlightFilterException;
-import com.fasterxml.jackson.core.JsonProcessingException;
 import java.sql.SQLException;
 import java.time.Instant;
 import java.util.ArrayList;
@@ -106,10 +105,10 @@ public class FlightFilter {
    * @return {@code this}, for fluent style
    * @throws FlightFilterException if key is not supplied
    */
-  public FlightFilter addFilterInputParameter(String key, FlightFilterOp op, Object value)
+  public <T> FlightFilter addFilterInputParameter(String key, FlightFilterOp op, T value)
       throws FlightFilterException {
     return addFilterInputParameter(
-        key, op, value, new DefaultFlightParameterSerializer(StairwayMapper.getObjectMapper()));
+        key, op, value, new DefaultFlightParameterSerializer<T>(StairwayMapper.getObjectMapper()));
   }
 
   /**
@@ -121,17 +120,41 @@ public class FlightFilter {
    * @param key name of the parameter to compare
    * @param op a {@link FlightFilterOp}
    * @param value some object for comparison
+   * @param serializer custom serializer for {@param value}
    * @return {@code this}, for fluent style
    * @throws FlightFilterException if key is not supplied
    */
-  public FlightFilter addFilterInputParameter(
-      String key, FlightFilterOp op, Object value, FlightParameterSerializer serializer)
+  public <T> FlightFilter addFilterInputParameter(
+      String key, FlightFilterOp op, T value, FlightParameterSerializer<T> serializer)
       throws FlightFilterException {
     if (key == null) {
       throw new FlightFilterException("Key must be specified in an input filter");
     }
     FlightFilterPredicate predicate =
-        new FlightFilterPredicate(key, op, value, STRING, makeParameterName(), serializer);
+        new FlightFilterPredicate(
+            key, op, serializer.serialize(value), STRING, makeParameterName());
+    inputPredicates.add(predicate);
+    return this;
+  }
+
+  /**
+   * Filter by an input parameter. This is processed by doing a string comparison of the passed raw
+   * JSON string against the input parameter stored in the database. The {@code value} object must
+   * be <b>exactly</b> the same class as the input parameter.
+   *
+   * @param key name of the parameter to compare
+   * @param op a {@link FlightFilterOp}
+   * @param json raw JSON string representing object to compare against
+   * @return {@code this}, for fluent style
+   * @throws FlightFilterException if key is not supplied
+   */
+  public FlightFilter addFilterInputParameterRaw(String key, FlightFilterOp op, String json)
+      throws FlightFilterException {
+    if (key == null) {
+      throw new FlightFilterException("Key must be specified in an input filter");
+    }
+    FlightFilterPredicate predicate =
+        new FlightFilterPredicate(key, op, json, STRING, makeParameterName());
     inputPredicates.add(predicate);
     return this;
   }
@@ -151,7 +174,7 @@ public class FlightFilter {
       for (FlightFilterPredicate predicate : inputPredicates) {
         predicate.storeInputPredicateValue(statement);
       }
-    } catch (SQLException | JsonProcessingException ex) {
+    } catch (SQLException ex) {
       throw new FlightFilterException("Failure storing predicate values", ex);
     }
   }

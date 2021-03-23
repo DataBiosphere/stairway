@@ -20,7 +20,8 @@ class DefaultFlightParameterDeserializer<T> implements FlightParameterDeserializ
    * Constructs a DefaultFlightParameterDeserializer<T> instance, which uses the passed Jackson
    * ObjectMapper to deserialize objects of type T to Strings.
    *
-   * @param type - type Class<T>, required to pass to Jackson {@link ObjectMapper} at deserialization time
+   * @param type - type Class<T>, required to pass to Jackson {@link ObjectMapper} at
+   *     deserialization time
    * @param mapper - Jackson {@link ObjectMapper} used to serialize objects of type T in method
    *     {@link #deserialize(String)}
    */
