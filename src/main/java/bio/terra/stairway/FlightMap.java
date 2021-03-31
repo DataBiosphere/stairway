@@ -82,7 +82,8 @@ public class FlightMap {
    *
    * @param <T> - type of class to expect in the hash map
    * @param key - key to lookup in the hash map
-   * @param deserializer - custom deserializer implementing interface FlightParameterDeserializer<T>
+   * @param deserializer - custom deserializer implementing interface {@code
+   *     FlightParameterDeserializer<T>}
    * @return null if not found
    * @throws ClassCastException if found, not castable to the requested type
    */

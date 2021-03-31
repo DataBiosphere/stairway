@@ -120,7 +120,7 @@ public class FlightFilter {
    * @param key name of the parameter to compare
    * @param op a {@link FlightFilterOp}
    * @param value some object for comparison
-   * @param serializer custom serializer for {@param value}
+   * @param serializer custom serializer for {@code value}
    * @return {@code this}, for fluent style
    * @throws FlightFilterException if key is not supplied
    */
