@@ -10,6 +10,7 @@ buildscript {
 
 plugins {
     id 'java-library'
+    id 'java-test-fixtures'
     id 'maven-publish'
     id 'com.jfrog.artifactory' version '4.13.0'
     id 'com.diffplug.gradle.spotless' version '3.27.2'
@@ -17,7 +18,8 @@ plugins {
 }
 
 group 'bio.terra'
-version '0.0.41-SNAPSHOT'
+// DO NOT SUBMIT
+version '0.1.0-SNAPSHOT'
 sourceCompatibility = 1.8
 
 // TODO: there may be a better way to supply these values than envvars.
@@ -37,6 +39,7 @@ gradle.taskGraph.whenReady { taskGraph ->
 
 repositories {
     mavenCentral()
+    mavenLocal()
 }
 
 dependencies {
