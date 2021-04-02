@@ -22,7 +22,7 @@ public class FlightMapTest {
   @Test
   public void recreateFromSerializedStringError_simpleEnum() throws Exception {
     SimpleEnum simpleEnum = SimpleEnum.ONE;
-    // Server running create flight map, put value inside.
+    // Server is running, flight is created with values in FlightMap correctly
     FlightMap flightMap = new FlightMap();
     flightMap.put(MAP_KEY, simpleEnum);
 
