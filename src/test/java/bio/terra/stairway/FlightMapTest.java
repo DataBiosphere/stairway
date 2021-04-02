@@ -61,6 +61,7 @@ public class FlightMapTest {
     FlightMap flightMap = new FlightMap();
     flightMap.put(MAP_KEY, finalClass);
 
+    // This is worse? If fails earlier than we expected.
     Assertions.assertThrows(
         JsonConversionException.class,
         () -> {
