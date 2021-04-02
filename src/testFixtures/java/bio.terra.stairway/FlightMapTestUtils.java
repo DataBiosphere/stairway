@@ -8,6 +8,8 @@ public class FlightMapTestUtils {
    * Tries to serialize and deserialize the object as JSON and a {@link FlightInput} with {@link
    * FlightMap#put(String, Object)} and {@link FlightMap#get(String, Class)}.
    *
+   * <p>{@link FlightMap} will throw if there's an issue with the serialize/deserialize.
+   *
    * <p>This is useful for unit testing that arbitrary classes are supported with {@link FlightMap}
    * serialization.
    */
