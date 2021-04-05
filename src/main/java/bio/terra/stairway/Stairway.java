@@ -5,6 +5,7 @@ import bio.terra.stairway.exception.DatabaseSetupException;
 import bio.terra.stairway.exception.DuplicateFlightIdException;
 import bio.terra.stairway.exception.DuplicateFlightIdSubmittedException;
 import bio.terra.stairway.exception.FlightException;
+import bio.terra.stairway.exception.JsonConversionException;
 import bio.terra.stairway.exception.MakeFlightException;
 import bio.terra.stairway.exception.MigrateException;
 import bio.terra.stairway.exception.QueueException;
@@ -889,6 +890,8 @@ public class Stairway {
    * to take on all of the recovered flights itself. If there is no workQueue, we build the flight
    * object and launch it ourselves.
    *
+   * <p>Flights that cannot be recovered are marked as having fatally failed.
+   *
    * @throws DatabaseOperationException unexpected database error
    * @throws InterruptedException on shutdown during recovery
    * @throws StairwayExecutionException stairway error
@@ -897,11 +900,19 @@ public class Stairway {
       throws DatabaseOperationException, InterruptedException, StairwayExecutionException {
     List<String> readyFlightList = flightDao.getReadyFlights();
     for (String flightId : readyFlightList) {
-      if (workQueueEnabled) {
-        FlightContext flightContext = flightDao.makeFlightContextById(flightId);
-        queueFlight(flightContext);
-      } else {
-        resume(flightId);
+      try {
+        if (workQueueEnabled) {
+          FlightContext flightContext = flightDao.makeFlightContextById(flightId);
+          queueFlight(flightContext);
+        } else {
+          resume(flightId);
+        }
+      } catch (MakeFlightException | JsonConversionException e) {
+        // Catch only exceptions that are unlikely to be resolved with retries. Allow the rest of
+        // recovery to continue.
+        logger.error(String.format("Unable to recover flight id %s", flightId), e);
+        // Mark the flight as having fatally failed so it does not stay un-recovered forever.
+        flightDao.fatalFail(flightId, e);
       }
     }
   }

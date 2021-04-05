@@ -9,6 +9,7 @@ import bio.terra.stairway.exception.DuplicateFlightIdException;
 import bio.terra.stairway.exception.FlightException;
 import bio.terra.stairway.exception.FlightFilterException;
 import bio.terra.stairway.exception.FlightNotFoundException;
+import bio.terra.stairway.exception.JsonConversionException;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import edu.umd.cs.findbugs.annotations.SuppressFBWarnings;
 import java.sql.Connection;
@@ -300,7 +301,17 @@ class FlightDao {
       List<FlightContext> flightList = new ArrayList<>();
       try (ResultSet rs = getStatement.getPreparedStatement().executeQuery()) {
         while (rs.next()) {
-          FlightContext flightContext = makeFlightContext(connection, rs.getString("flightid"), rs);
+          String flightId = rs.getString("flightid");
+          FlightContext flightContext;
+          try {
+            flightContext = makeFlightContext(connection, flightId, rs);
+          } catch (JsonConversionException e) {
+            logger.error(
+                String.format("Unable to make FlightContext to disown flight id %s", flightId));
+            // The flight will still be marked as READY by the database transaction, but the hook
+            // will not be called.
+            continue;
+          }
           flightContext.setFlightStatus(FlightStatus.READY);
           flightList.add(flightContext);
         }
@@ -420,6 +431,66 @@ class FlightDao {
 
       commitTransaction(connection);
       hookWrapper.stateTransition(flightContext);
+    }
+  }
+
+  /**
+   * Fatally fail the flight id.
+   *
+   * <p>This should only be used if there are problems creating the FlightContext such that {@link
+   * #complete(FlightContext)} cannot be used.
+   *
+   * <p>This does not do a hook state transition as we do not have a FlightContext.
+   *
+   * @param flightId flight to fail fatally.
+   * @param fatalCause the reason to fail the flight fatally. May be null.
+   */
+  void fatalFail(String flightId, Exception fatalCause)
+      throws DatabaseOperationException, InterruptedException {
+    String serializedException;
+    try {
+      serializedException = exceptionSerializer.serialize(fatalCause);
+    } catch (Exception e) {
+      // We really do not want to throw while we're trying to fatally fail the flight.
+      logger.error("Unable to serialize fatalFail exception.", e);
+      serializedException = "Cause unknown. Unable to serialize fatalFail exception.";
+    }
+    String finalSerializedException = serializedException;
+    DbRetry.retryVoid("flight.fatalFail", () -> fatalFailInner(flightId, finalSerializedException));
+  }
+
+  private void fatalFailInner(String flightId, String serializedException) throws SQLException {
+    // Make this idempotent by not updating if the status is already FATAL.
+    final String sqlUpdateFlight =
+        "UPDATE "
+            + FLIGHT_TABLE
+            + " SET completed_time = CURRENT_TIMESTAMP,"
+            + " status = 'FATAL',"
+            + " serialized_exception = :serializedException,"
+            + " stairway_id = NULL"
+            + " WHERE flightid = :flightId AND status != 'FATAL'";
+
+    // The delete is harmless if it has been done before. We just won't find anything.
+    final String sqlDeleteFlightLog =
+        "DELETE FROM " + FLIGHT_LOG_TABLE + " WHERE flightid = :flightId";
+
+    try (Connection connection = dataSource.getConnection();
+        NamedParameterPreparedStatement statement =
+            new NamedParameterPreparedStatement(connection, sqlUpdateFlight);
+        NamedParameterPreparedStatement deleteStatement =
+            new NamedParameterPreparedStatement(connection, sqlDeleteFlightLog)) {
+
+      startTransaction(connection);
+      statement.setString("serializedException", serializedException);
+      statement.setString("flightId", flightId);
+      statement.getPreparedStatement().executeUpdate();
+
+      if (!keepFlightLog) {
+        deleteStatement.setString("flightId", flightId);
+        deleteStatement.getPreparedStatement().executeUpdate();
+      }
+
+      commitTransaction(connection);
     }
   }
 
@@ -571,7 +642,7 @@ class FlightDao {
   // The results set must be positioned at a row from the flight table,
   // and the select list must include debug_info, class_name, and status.
   private FlightContext makeFlightContext(Connection connection, String flightId, ResultSet rs)
-      throws InterruptedException, DatabaseOperationException, SQLException {
+      throws InterruptedException, JsonConversionException, SQLException {
     List<FlightInput> inputList = retrieveInputParameters(connection, flightId);
     FlightMap inputParameters = new FlightMap(inputList);
     FlightDebugInfo debugInfo = null;
@@ -582,7 +653,7 @@ class FlightDao {
               : FlightDebugInfo.getObjectMapper()
                   .readValue(rs.getString("debug_info"), FlightDebugInfo.class);
     } catch (JsonProcessingException e) {
-      throw new DatabaseOperationException(e);
+      throw new JsonConversionException("Unable to deserialize debug_info", e);
     }
     FlightContext flightContext =
         new FlightContext(inputParameters, rs.getString("class_name"), Collections.emptyList());
@@ -604,7 +675,7 @@ class FlightDao {
    * @throws SQLException on database errors
    */
   private void fillFlightContexts(Connection connection, List<FlightContext> flightContextList)
-      throws SQLException {
+      throws SQLException, JsonConversionException {
 
     final String sqlLastFlightLog =
         "SELECT working_parameters, step_index, direction, rerun,"

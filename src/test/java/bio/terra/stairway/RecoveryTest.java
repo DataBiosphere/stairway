@@ -12,8 +12,11 @@ import bio.terra.stairway.fixtures.TestUtil;
 import bio.terra.stairway.flights.TestFlightRecovery;
 import bio.terra.stairway.flights.TestFlightRecoveryUndo;
 import bio.terra.stairway.flights.TestFlightRecoveryUndoSwitch;
+import bio.terra.stairway.flights.TestFlightRecoveryUnrecoverableInput;
+import bio.terra.stairway.flights.TestFlightRecoveryUnrecoverableWorkingMap;
 import bio.terra.stairway.flights.TestFlightStop;
 import java.util.List;
+import java.util.UUID;
 import java.util.concurrent.TimeUnit;
 import javax.sql.DataSource;
 import org.junit.jupiter.api.Tag;
@@ -195,5 +198,85 @@ public class RecoveryTest {
     assertTrue(result.getResultMap().isPresent());
     Integer value = result.getResultMap().get().get("value", Integer.class);
     assertThat(value, is(equalTo(12)));
+  }
+
+  @Test
+  public void unrecoverableFlightTest() throws Exception {
+    DataSource dataSource = TestUtil.makeDataSource();
+    final String stairwayName = "recoveryUnrecoverableFlightTest";
+
+    // Start with a clean and shiny database environment with enough threads for our test.
+    Stairway stairway1 =
+        Stairway.newBuilder()
+            .stairwayClusterName("stairway-cluster")
+            .stairwayName(stairwayName)
+            .workQueueProjectId(null)
+            .maxParallelFlights(3)
+            .build();
+    stairway1.recoverAndStart(stairway1.initialize(dataSource, false, false));
+
+    FlightMap inputs = new FlightMap();
+
+    Integer initialValue = 0;
+    inputs.put("initialValue", initialValue);
+
+    // Submit one flight that will start, stop and then be recovered successfully.
+    TestPauseController.setControl(0);
+    String okFlightId = "okFlight";
+    stairway1.submit(okFlightId, TestFlightRecovery.class, inputs);
+
+    // Submit one flight that will be unable to be recovered because of inputs.
+    String badInputFlightId = "badInputFlight";
+    FlightMap badInputs = new FlightMap();
+    badInputs.put("initialValue", initialValue);
+    badInputs.put(TestFlightRecoveryUnrecoverableInput.INPUT_KEY, UUID.randomUUID());
+    stairway1.submit(badInputFlightId, TestFlightRecoveryUnrecoverableInput.class, badInputs);
+
+    // Submit one flight that will be unable to be recovered because of the working map value.
+    String badWorkingMapFlightId = "badWorkingMapFlight";
+    stairway1.submit(
+        badWorkingMapFlightId, TestFlightRecoveryUnrecoverableWorkingMap.class, inputs);
+
+    // Allow time for the flight thread to go to sleep
+    TimeUnit.SECONDS.sleep(5);
+
+    assertFalse(TestUtil.isDone(stairway1, okFlightId));
+    assertFalse(TestUtil.isDone(stairway1, badInputFlightId));
+    assertFalse(TestUtil.isDone(stairway1, badWorkingMapFlightId));
+
+    // Simulate a restart with a new thread pool and stairway. Set control so this one does not
+    // sleep. We create the new stairway directly, rather than use TestUtil so we can validate the
+    // process. We reuse the stairway name to make sure that replacement by the same name works.
+    TestPauseController.setControl(1);
+    Stairway stairway2 =
+        Stairway.newBuilder()
+            .stairwayClusterName("stairway-cluster")
+            .stairwayName(stairwayName)
+            .workQueueProjectId(null)
+            .maxParallelFlights(3)
+            .build();
+    List<String> recordedStairways = stairway2.initialize(dataSource, false, false);
+    assertThat("One obsolete stairway to recover", recordedStairways.size(), equalTo(1));
+    String obsoleteStairway = recordedStairways.get(0);
+    assertThat("Obsolete stairway has the right name", obsoleteStairway, equalTo(stairwayName));
+
+    stairway2.recoverAndStart(recordedStairways);
+
+    // Wait for recovery to complete
+    stairway2.waitForFlight(okFlightId, 1, 20);
+    FlightState result = stairway2.getFlightState(okFlightId);
+    assertThat(result.getFlightStatus(), is(equalTo(FlightStatus.SUCCESS)));
+    assertTrue(result.getResultMap().isPresent());
+    Integer value = result.getResultMap().get().get("value", Integer.class);
+    assertThat(value, is(equalTo(2)));
+
+    // The unrecoverable flights are marked as having failed fatally.
+    stairway2.waitForFlight(badInputFlightId, 1, 20);
+    assertThat(
+        stairway2.getFlightState(badInputFlightId).getFlightStatus(), equalTo(FlightStatus.FATAL));
+    stairway2.waitForFlight(badWorkingMapFlightId, 1, 20);
+    assertThat(
+        stairway2.getFlightState(badWorkingMapFlightId).getFlightStatus(),
+        equalTo(FlightStatus.FATAL));
   }
 }
