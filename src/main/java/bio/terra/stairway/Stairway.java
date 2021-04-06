@@ -912,7 +912,16 @@ public class Stairway {
         // recovery to continue.
         logger.error(String.format("Unable to recover flight id %s", flightId), e);
         // Mark the flight as having fatally failed so it does not stay un-recovered forever.
-        flightDao.fatalFail(flightId, e);
+        try {
+          flightDao.fatalFail(flightId, e);
+        } catch (Exception fatalFailException) {
+          // Failed to mark the flight as FATAL. Give up on this flight for now and proceed.
+          logger.error(
+              String.format(
+                  "Unable to fatal fail the flight that was unable to recover. "
+                      + "The flight is still READY. Flight id %s".format(flightId)),
+              fatalFailException);
+        }
       }
     }
   }

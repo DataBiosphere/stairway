@@ -4,6 +4,7 @@ import static org.hamcrest.CoreMatchers.containsString;
 import static org.hamcrest.CoreMatchers.is;
 import static org.hamcrest.MatcherAssert.assertThat;
 import static org.hamcrest.Matchers.equalTo;
+import static org.hamcrest.Matchers.hasSize;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
@@ -256,7 +257,7 @@ public class RecoveryTest {
             .maxParallelFlights(3)
             .build();
     List<String> recordedStairways = stairway2.initialize(dataSource, false, false);
-    assertThat("One obsolete stairway to recover", recordedStairways.size(), equalTo(1));
+    assertThat("One obsolete stairway to recover", recordedStairways, hasSize(1));
     String obsoleteStairway = recordedStairways.get(0);
     assertThat("Obsolete stairway has the right name", obsoleteStairway, equalTo(stairwayName));
 
@@ -274,6 +275,56 @@ public class RecoveryTest {
     stairway2.waitForFlight(badInputFlightId, 1, 20);
     assertThat(
         stairway2.getFlightState(badInputFlightId).getFlightStatus(), equalTo(FlightStatus.FATAL));
+    stairway2.waitForFlight(badWorkingMapFlightId, 1, 20);
+    assertThat(
+        stairway2.getFlightState(badWorkingMapFlightId).getFlightStatus(),
+        equalTo(FlightStatus.FATAL));
+  }
+
+  @Test
+  public void onlyUnrecoverableFlightTest() throws Exception {
+    DataSource dataSource = TestUtil.makeDataSource();
+    final String stairwayName = "recoveryOnlyUnrecoverableFlightTest";
+
+    // Start with a clean and shiny database environment with enough threads for our test.
+    Stairway stairway1 = TestUtil.setupStairway(stairwayName, false);
+
+    FlightMap inputs = new FlightMap();
+
+    Integer initialValue = 0;
+    inputs.put("initialValue", initialValue);
+
+    // Submit one flight that will be unable to be recovered because of the working map value.
+    TestPauseController.setControl(0);
+    String badWorkingMapFlightId = "badWorkingMapFlight";
+    stairway1.submit(
+        badWorkingMapFlightId, TestFlightRecoveryUnrecoverableWorkingMap.class, inputs);
+
+    // Allow time for the flight thread to go to sleep
+    TimeUnit.SECONDS.sleep(5);
+
+    assertFalse(TestUtil.isDone(stairway1, badWorkingMapFlightId));
+
+    // Simulate a restart with a new thread pool and stairway. Set control so this one does not
+    // sleep. We create the new stairway directly, rather than use TestUtil so we can validate the
+    // process. We reuse the stairway name to make sure that replacement by the same name works.
+    TestPauseController.setControl(1);
+    Stairway stairway2 =
+        Stairway.newBuilder()
+            .stairwayClusterName("stairway-cluster")
+            .stairwayName(stairwayName)
+            .workQueueProjectId(null)
+            .maxParallelFlights(3)
+            .build();
+    List<String> recordedStairways = stairway2.initialize(dataSource, false, false);
+    assertThat("One obsolete stairway to recover", recordedStairways, hasSize(1));
+    String obsoleteStairway = recordedStairways.get(0);
+    assertThat("Obsolete stairway has the right name", obsoleteStairway, equalTo(stairwayName));
+
+    stairway2.recoverAndStart(recordedStairways);
+
+    // The unrecoverable flights are marked as having failed fatally, even when there was only
+    // unrecoverable flights to recover.
     stairway2.waitForFlight(badWorkingMapFlightId, 1, 20);
     assertThat(
         stairway2.getFlightState(badWorkingMapFlightId).getFlightStatus(),

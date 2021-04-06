@@ -299,15 +299,17 @@ class FlightDao {
       startTransaction(connection);
       getStatement.setString("stairwayId", stairwayId);
       List<FlightContext> flightList = new ArrayList<>();
+      boolean flightsToDisown = false;
       try (ResultSet rs = getStatement.getPreparedStatement().executeQuery()) {
         while (rs.next()) {
+          flightsToDisown = true;
           String flightId = rs.getString("flightid");
           FlightContext flightContext;
           try {
             flightContext = makeFlightContext(connection, flightId, rs);
           } catch (JsonConversionException e) {
             logger.error(
-                String.format("Unable to make FlightContext to disown flight id %s", flightId));
+                "Unable to make FlightContext while recovering disowned flight id {}", flightId);
             // The flight will still be marked as READY by the database transaction, but the hook
             // will not be called.
             continue;
@@ -317,7 +319,7 @@ class FlightDao {
         }
       }
 
-      if (!flightList.isEmpty()) {
+      if (flightsToDisown) {
         updateStatement.setString("stairwayId", stairwayId);
         int disownCount = updateStatement.getPreparedStatement().executeUpdate();
         logger.info("Disowned " + disownCount + " flights for stairway: " + stairwayId);
