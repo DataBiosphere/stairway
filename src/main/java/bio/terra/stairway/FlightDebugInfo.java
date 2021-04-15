@@ -12,6 +12,9 @@ public class FlightDebugInfo {
 
   private static final ObjectMapper objectMapper = new ObjectMapper();
   private boolean restartEachStep; // if true - restart the flight at each step
+  // If true, make the flight's last do Step result in STEP_RESULT_FATAL_FAILURE after it executes.
+  // This is useful for checking correct UNDO behavior for a whole flight.
+  private boolean lastStepFailure;
 
   // Each entry in the map is the index at which we should insert a failure. Note that retryable
   // failures should only be inserted on steps that can be safely retried.
@@ -20,10 +23,16 @@ public class FlightDebugInfo {
   // Use a builder so it is easy to add new fields
   public static class Builder {
     private boolean restartEachStep;
+    private boolean lastStepFailure;
     private Map<Integer, StepStatus> failAtSteps;
 
     public Builder restartEachStep(boolean restart) {
       this.restartEachStep = restart;
+      return this;
+    }
+
+    public Builder lastStepFailure(boolean lastStepFailure) {
+      this.lastStepFailure = lastStepFailure;
       return this;
     }
 
@@ -49,6 +58,7 @@ public class FlightDebugInfo {
   public FlightDebugInfo(FlightDebugInfo.Builder builder) {
     this.restartEachStep = builder.restartEachStep;
     this.failAtSteps = builder.failAtSteps;
+    this.lastStepFailure = builder.lastStepFailure;
   }
 
   public FlightDebugInfo() {
@@ -61,6 +71,14 @@ public class FlightDebugInfo {
 
   public void setRestartEachStep(boolean restart) {
     this.restartEachStep = restart;
+  }
+
+  public boolean getLastStepFailure() {
+    return lastStepFailure;
+  }
+
+  public void setLastStepFailure(boolean lastStepFailure) {
+    this.lastStepFailure = lastStepFailure;
   }
 
   public Map<Integer, StepStatus> getFailAtSteps() {

@@ -6,9 +6,11 @@ import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import bio.terra.stairway.fixtures.TestUtil;
+import bio.terra.stairway.flights.TestFlight;
 import bio.terra.stairway.flights.TestFlightMultiStepRetry;
 import bio.terra.stairway.flights.TestFlightRestarting;
 import java.io.File;
+import java.util.Arrays;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.UUID;
@@ -54,6 +56,56 @@ public class DebugInfoTest {
     assertTrue(result.getResultMap().isPresent());
     Integer value = result.getResultMap().get().get("value", Integer.class);
     assertThat(value, is(Matchers.equalTo(3)));
+  }
+
+  @Test
+  public void lastStepFailureTrueTest() throws Exception {
+    final String stairwayName = "lastStepFailureTrueTest";
+    String flightId = "lastStepFailureTrueTest";
+
+    FlightDebugInfo debugInfo = FlightDebugInfo.newBuilder().lastStepFailure(true).build();
+    Stairway stairway = TestUtil.setupStairwayWithHooks(stairwayName, false, 1);
+
+    // Submit the test flight
+    FlightMap inputParameters = new FlightMap();
+    inputParameters.put("filename", makeFilename());
+    inputParameters.put("text", "testing 1 2 3");
+
+    stairway.submitWithDebugInfo(flightId, TestFlight.class, inputParameters, true, debugInfo);
+
+    // Allow time for the flight thread to run
+    TimeUnit.SECONDS.sleep(5);
+
+    assertThat(TestUtil.isDone(stairway, flightId), is(true));
+
+    FlightState result = stairway.getFlightState(flightId);
+    assertThat(result.getFlightStatus(), is(FlightStatus.ERROR));
+
+    // Validate the hook log
+    TestUtil.checkHookLog(
+        Arrays.asList(
+            "1:stateTransition:RUNNING",
+            "1:startFlight",
+            "1:flightHook:startFlight",
+            "1:startStep",
+            "1:stepHook:startStep",
+            "1:endStep",
+            "1:stepHook:endStep",
+            "1:startStep",
+            "1:stepHook:startStep",
+            "1:endStep",
+            "1:stepHook:endStep",
+            "1:startStep",
+            "1:stepHook:startStep",
+            "1:endStep",
+            "1:stepHook:endStep",
+            "1:startStep",
+            "1:stepHook:startStep",
+            "1:endStep",
+            "1:stepHook:endStep",
+            "1:stateTransition:ERROR",
+            "1:endFlight",
+            "1:flightHook:endFlight"));
   }
 
   @Test

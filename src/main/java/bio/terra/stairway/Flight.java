@@ -287,10 +287,21 @@ public class Flight implements Runnable {
               && context().isDoing()
               && context().getDebugInfo().getFailAtSteps().containsKey(context().getStepIndex())
               && !debugStepsFailed.contains(context().getStepIndex())) {
-            result =
-                new StepResult(
-                    this.context().getDebugInfo().getFailAtSteps().get(context().getStepIndex()));
+            StepStatus failStatus =
+                this.context().getDebugInfo().getFailAtSteps().get(context().getStepIndex());
+            logger.info(
+                "Failed for debug mode fail step at step {} with result {}",
+                context().getStepIndex(),
+                failStatus);
+            result = new StepResult(failStatus);
             debugStepsFailed.add(context().getStepIndex());
+          } else if (context().getDebugInfo() != null
+              && context().getDebugInfo().getLastStepFailure()
+              && context().getStepIndex() == steps.size() - 1) {
+            // If we are in debug mode for failing at the last step and this is the last step,
+            // insert a failure.
+            logger.info("Failed for debug mode last step failure.");
+            result = new StepResult(StepStatus.STEP_RESULT_FAILURE_FATAL);
           }
         } else {
           result = currentStep.step.undoStep(context());
