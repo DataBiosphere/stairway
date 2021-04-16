@@ -287,7 +287,7 @@ try 10 times and then give up. Stairway has retried 9 times and then the server 
 When the flight is recovered, the step will be restarted and the retry rule counter will
 start at 0 once again.
 
-There is no limit to the numberof times a flight can be recovered.
+There is no limit to the number of times a flight can be recovered.
 
 ## Flight Construction <a name="flightconstruction"></a>
 
@@ -424,7 +424,6 @@ status. (A flight with a normal failure that gets undon fails with an `ERROR` st
 In our experience, there are two main causes of dismal failures:
  1. Expired retries
  1. Untested undo paths
-
 
 ## Using FlightDebugInfo <a name="flightdebuginfo"></a>
 

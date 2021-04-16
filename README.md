@@ -97,4 +97,3 @@ its objects.
 * Add a link to a flight example. Maybe https://github.com/DataBiosphere/terra-workspace-manager/blob/dev/src/main/java/bio/terra/workspace/service/resource/controlled/flight/create/CreateControlledResourceFlight.java
 * Best practices on serdes of FlightMap parameters
 * Guildance on developer testing of Stairway internal code and flights
-
