@@ -18,8 +18,7 @@ plugins {
 }
 
 group 'bio.terra'
-// do not submit
-version '0.0.44-SNAPSHOT'
+version '0.0.43-SNAPSHOT'
 sourceCompatibility = 1.8
 
 // TODO: there may be a better way to supply these values than envvars.
@@ -38,7 +37,6 @@ gradle.taskGraph.whenReady { taskGraph ->
 }
 
 repositories {
-    mavenLocal()
     mavenCentral()
 }
 
