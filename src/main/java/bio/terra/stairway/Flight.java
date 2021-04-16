@@ -281,7 +281,6 @@ public class Flight implements Runnable {
           result = debugStatusReplacement(result);
         } else {
           result = currentStep.step.undoStep(context());
-          result = debugStatusReplacement(result);
         }
       } catch (InterruptedException ex) {
         // Interrupted exception - we assume this means that the thread pool is shutting down and
@@ -351,7 +350,6 @@ public class Flight implements Runnable {
     // failed here, then insert a failure. We do this right after the step completes but
     // before the flight logs it so that we can look for dangerous UNDOs.
     if (debugInfo.getFailAtSteps() != null
-        && context().isDoing()
         && debugInfo.getFailAtSteps().containsKey(context().getStepIndex())
         && !debugStepsFailed.contains(context().getStepIndex())) {
       StepStatus failStatus = debugInfo.getFailAtSteps().get(context().getStepIndex());
@@ -364,9 +362,7 @@ public class Flight implements Runnable {
     }
     // If we are in debug mode for failing at the last step, and this is the last step, insert a
     // failure.
-    if (debugInfo.getLastStepFailure()
-        && context().isDoing()
-        && context().getStepIndex() == steps.size() - 1) {
+    if (debugInfo.getLastStepFailure() && context().getStepIndex() == steps.size() - 1) {
       logger.info("Failed for debug mode last step failure.");
       return new StepResult(StepStatus.STEP_RESULT_FAILURE_FATAL);
     }
