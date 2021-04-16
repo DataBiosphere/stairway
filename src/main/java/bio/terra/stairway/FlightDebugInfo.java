@@ -1,6 +1,7 @@
 package bio.terra.stairway;
 
 import com.fasterxml.jackson.core.JsonProcessingException;
+import com.fasterxml.jackson.databind.DeserializationFeature;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import java.util.Map;
 
@@ -10,7 +11,8 @@ import java.util.Map;
  */
 public class FlightDebugInfo {
 
-  private static final ObjectMapper objectMapper = new ObjectMapper();
+  private static final ObjectMapper objectMapper =
+      new ObjectMapper().configure(DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES, false);
   private boolean restartEachStep; // if true - restart the flight at each step
   // If true, make the flight's last do Step result in STEP_RESULT_FATAL_FAILURE after it executes.
   // This is useful for checking correct UNDO behavior for a whole flight.
