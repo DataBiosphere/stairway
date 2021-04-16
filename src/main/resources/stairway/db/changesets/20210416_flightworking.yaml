@@ -1,0 +1,37 @@
+databaseChangeLog:
+  - changeSet:
+      id: flightworking
+      author: JCz
+      changes:
+        - dropNotNullConstraint:
+            tableName: flightlog
+            columnName: working_parameters
+            remarks: deprecating for flightworking table
+        - createTable:
+            tableName: flightworking
+            columns:
+              - column:
+                  name: flightid
+                  type: varchar(36)
+                  constraints:
+                    nullable: false
+              - column:
+                  name: log_time
+                  type: timestamp
+                  constraints:
+                    nullable: false
+              - column:
+                  name: key
+                  type: text
+                  constraints:
+                    nullable: false
+              - column:
+                  name: value
+                  type: text
+                  remarks: serialized object representation
+                  constraints:
+                    nullable: false
+        - addPrimaryKey:
+            tableName: flightworking
+            columnNames: flightid, log_time, key
+            constraintName: pk_flightworking
