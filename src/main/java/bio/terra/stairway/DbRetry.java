@@ -119,7 +119,7 @@ class DbRetry {
     if (ss.startsWith(PSQL_CONNECTION_ISSUE_PREFIX) || ss.startsWith(PSQL_RESOURCE_ISSUE_PREFIX)) {
       // Connection or resource issue
       logger.info("Caught SQL connection or resource error (" + ss + ") - retrying");
-      return true;
+      return false;
     }
     return true;
   }
