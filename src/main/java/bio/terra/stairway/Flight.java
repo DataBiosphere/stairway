@@ -278,33 +278,10 @@ public class Flight implements Runnable {
 
         if (context().isDoing()) {
           result = currentStep.step.doStep(context());
-
-          // If we are in debug mode and a failure is set for this step AND we have not already
-          // failed here, then insert a failure. We do this right after the step completes but
-          // before the flight logs it so that we can look for dangerous UNDOs.
-          if (context().getDebugInfo() != null
-              && context().getDebugInfo().getFailAtSteps() != null
-              && context().isDoing()
-              && context().getDebugInfo().getFailAtSteps().containsKey(context().getStepIndex())
-              && !debugStepsFailed.contains(context().getStepIndex())) {
-            StepStatus failStatus =
-                this.context().getDebugInfo().getFailAtSteps().get(context().getStepIndex());
-            logger.info(
-                "Failed for debug mode fail step at step {} with result {}",
-                context().getStepIndex(),
-                failStatus);
-            result = new StepResult(failStatus);
-            debugStepsFailed.add(context().getStepIndex());
-          } else if (context().getDebugInfo() != null
-              && context().getDebugInfo().getLastStepFailure()
-              && context().getStepIndex() == steps.size() - 1) {
-            // If we are in debug mode for failing at the last step and this is the last step,
-            // insert a failure.
-            logger.info("Failed for debug mode last step failure.");
-            result = new StepResult(StepStatus.STEP_RESULT_FAILURE_FATAL);
-          }
+          result = debugStatusReplacement(result);
         } else {
           result = currentStep.step.undoStep(context());
+          result = debugStatusReplacement(result);
         }
       } catch (InterruptedException ex) {
         // Interrupted exception - we assume this means that the thread pool is shutting down and
@@ -357,6 +334,43 @@ public class Flight implements Runnable {
     } while (currentStep.retryRule
         .retrySleep()); // retry rule decides if we should try again or not
     return result;
+  }
+
+  /**
+   * Helper function to replace the StepResult returned by a step based on {@link FlightDebugInfo}.
+   *
+   * @param initialResult the StepResult initially returned by the step.
+   * @return StepResult to use for the step. May be the initial result.
+   */
+  private StepResult debugStatusReplacement(StepResult initialResult) {
+    if (context().getDebugInfo() == null) {
+      return initialResult;
+    }
+    FlightDebugInfo debugInfo = context().getDebugInfo();
+    // If we are in debug mode and a failure is set for this step AND we have not already
+    // failed here, then insert a failure. We do this right after the step completes but
+    // before the flight logs it so that we can look for dangerous UNDOs.
+    if (debugInfo.getFailAtSteps() != null
+        && context().isDoing()
+        && debugInfo.getFailAtSteps().containsKey(context().getStepIndex())
+        && !debugStepsFailed.contains(context().getStepIndex())) {
+      StepStatus failStatus = debugInfo.getFailAtSteps().get(context().getStepIndex());
+      logger.info(
+          "Failed for debug mode fail step at step {} with result {}",
+          context().getStepIndex(),
+          failStatus);
+      debugStepsFailed.add(context().getStepIndex());
+      return new StepResult(failStatus);
+    }
+    // If we are in debug mode for failing at the last step, and this is the last step, insert a
+    // failure.
+    if (debugInfo.getLastStepFailure()
+        && context().isDoing()
+        && context().getStepIndex() == steps.size() - 1) {
+      logger.info("Failed for debug mode last step failure.");
+      return new StepResult(StepStatus.STEP_RESULT_FAILURE_FATAL);
+    }
+    return initialResult;
   }
 
   private StepRetry getCurrentStep() throws StairwayExecutionException {
