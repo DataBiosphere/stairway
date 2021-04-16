@@ -1,7 +1,7 @@
 # Stairway
 Stairway is a library that provides a framework for running _saga transactions_. Saga
 transactions, introduced by Hector Garcia-Molina in 1987, use _compensating operations_ to
-rollback the transaction rather than having an service that intermediates activity so is
+rollback the transaction rather than having a service that intermediates activity so is
 able to perform the rollback. The goal is to make a sequence of operations, often over disparate resources,
 run as a transaction; either complete successfully or make no change.
 
@@ -11,7 +11,8 @@ to instantiate that object. If any of those operations fail, we want to clean up
 the state is as if the operation had never occurred.
 
 Stairway provides a way for you to organize your code so that such operations are:
- * **Atomic** - they either happen or don't happen. If something goes wrong, the operation undone.
+ * **Atomic** - they either happen or don't happen. If something goes wrong, the operation
+   is undone.
  * **Recoverable** - a failure of the service or system does not lose state. When the system recovers, the operation can proceed or rollback.
 
 Stairway does not provide as strong a transaction guarantee as a database system. Most database systems are able to
@@ -89,3 +90,10 @@ You can create your own derivation of the `RetryRule` class and implement your o
 Stairway is designed to provide atomic operations for one instance of one service. It does not coordinate any
 global or cross-service state. Therefore, it is up to the application or service to implement concurrency control on 
 its objects.
+
+# TODOs
+* Add a section on clusters, queuing, failure, and recovery
+* Add a section - perhaps in DEVELOPMENT.md describing the schema
+* Add a link to a flight example. Maybe https://github.com/DataBiosphere/terra-workspace-manager/blob/dev/src/main/java/bio/terra/workspace/service/resource/controlled/flight/create/CreateControlledResourceFlight.java
+* Best practices on serdes of FlightMap parameters
+* Guildance on developer testing of Stairway internal code and flights

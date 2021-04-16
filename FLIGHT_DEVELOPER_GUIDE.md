@@ -24,7 +24,7 @@ particular way of programming to make it work.
     1. [Working Map Best Practices](#workingmapbest)
  1. [Idempotent Steps](#idempotentsteps)
     1. [Database Transactions](#databasetransactions)
-    1. [Existence Checking](#existencechecking]
+    1. [Existence Checking](#existencechecking)
  1. [Retrying Steps in a Flight](#retrying)
     1. [Retry Object State and Reuse](#retryreuse)
     1. [How to Retry](#retryhow)
@@ -52,7 +52,8 @@ The Stairway database is written to:
  * During flight state changes (more on that later)
 
 When a step is restarted after a failure, Stairway **guarantees** that the flight
-state is exactly what it was when the step originally started.
+state is exactly what it was when the step originally started. Flight state refers only
+to the state Stairway controls; not the state of external resources.
 
 ## Using the Working Map <a name="workingmap"></a>
 
@@ -67,23 +68,25 @@ The first **key principle** of the working map is that it is persisted at step
 boundaries. To do otherwise would violate the guarantee that a step starts with a
 consistent initial state across failure/recovery.
 
-The table below shows the state of the key "key" in the 
+The table below shows the state of the key "ABC" in the 
 
-Time | Step | Operation | In memory "key" | Database "key" | Notes
+Time | Step | Operation | In memory "ABC" | Database "ABC" | Notes
 -----|------|-----------|-----------------|----------------|-------
  t0 | 0 | start step | null | null | nothing stored yet
- t1 | 0 | `put("key", "foo")` | "foo" | null | in-memory working map set
- t2 | 0 | end step | "foo" | "foo" | step state logged to database
- t3 | 1 | start step | "foo" | "foo" |
- t4 | 1 | `put("key", "bar")` | "bar" | "foo" | in-memory state updated
- t5 | 1 | end step | "bar" | "bar" | step state logged to database
+ t1 | 0 | `put("ABC", "foo")` | "foo" | null | in-memory working map set
+ t2 |   |          |       |       | failure point
+ t3 | 0 | end step | "foo" | "foo" | step state logged to database
+ t4 |   |          |       |       | failure point
+ t5 | 1 | start step | "foo" | "foo" |
+ t6 | 1 | `put("ABC", "bar")` | "bar" | "foo" | in-memory state updated
+ t7 | 1 | end step | "bar" | "bar" | step state logged to database
 
-Suppose there is a server failure at time t1.5; that is after the working map is updated,
+Suppose there is a server failure at time t2; after the working map is updated,
 but before the step state is logged. When the flight is recovered and the step is
 restarted, the state will be exactly what it was at t0; at the start of step 0.
 
-If there is a server failure at time T2.5, step 0 will be considered complete and
-recovery will start with step 1.
+If there is a server failure at time 4, step 0 will be considered complete. When
+the flight is recovered, work would continue at step 1.
 
 ### Persisting on Transition From Doing to Undoing <a name="persistatuno"></a>
 
@@ -104,10 +107,6 @@ As you can see from the table, the switch from do to undo records state in the S
 database. Clearly it must; on server failure/recovery Stairway has to know that it is
 performing an undo. 
 
-Stairway makes the same guarantee about the state at the start of `undo()` as it does for the
-start of `do()`: the initial state will be the same even if there are server failures and
-recovery.
-
 ### Working Map Best Practices <a name="workingmapbest"></a>
 
 A useful rule of thumb for the working map is: only use the working map to communicate
@@ -119,36 +118,33 @@ reliable across server failure/recover.
 
 
 ## Idempotent Steps <a name="idempotentsteps"></a>
-One of the features of Stairway is that it can resume flights after failure. Suppose a
-step in a flight is running and the server process is killed (e.g., the Kubernetes pod is
-deleted) the flight can be recovered. On recovery, the step that was running at the point
-of failure, is restarted.
+Stairway can resume flights after server failure. A failure might be the server process
+crashing or Kubernetes shutting down the containing pod. On recovery, the step that was
+running at the point of failure is restarted. 
 
 As a result, the `do()` and `undo()` methods of a step must be written to be
-idempotent; that is, they can be run multiple times and must have the same effect each
+idempotent; that is, they may be run multiple times and must have the same effect each
 time. Meeting that requirement often uses a different approach than writing a sequential program.
 
 ### Database Transactions <a name="databasetransactions"></a>
-A step that consists of a database transaction is simple to write. The underlying database
-system provides the rollback of the transaction in the event of failure. However, it is
-still possible for a database transaction step to fail in the window between when the
+A step that consists of a database transaction is simple to write. If there is a failure,
+the underlying database system provides the rollback of the transaction. However, it is
+still possible for a database transaction step to fail in the time between when the
 database transaction commits and when Stairway logs the completion of the step.
 
 You still have to make the step idempotent, so you have to handle that condition. Let's
-say you are inserting a new object into the database. This is best done by giving your
+say you are inserting a new object into your database. This is best done by giving your
 target table a primary key column that is a UUID. Then you can run a sequence of steps
 something like this:
  1. Step that generates a random UUID and stores it in the working map; _OR_ hand a random
- UUID into the flight as an input parameter. If this step is run more than once, it will
- simply generate a different UUID.
+ UUID into the flight as an input parameter.
  1. Step that runs a database transaction. The database transaction does:
     1. Read the table to see if a row with the UUID already exists. If so, return
     success. A previous run of the step inserted that row.
     1. Insert the row into the table.
-    If this step is run more than once, either the database transaction will have rolled
-    back and the row will be re-inserted, or the database transaction will have committed
-    and the read will detect that the insert already happened successfully.
-
+    If there is a failure and this step is re-run, it will either find that the database
+    transaction rolled back and re-insert the row; or it will find that the database
+    transaction committed and the insert already happened successfully.
 
 A variation on this approach is for the step to trap the duplicate key exception from the
 database system and consider that a success.
@@ -186,7 +182,7 @@ Step: Create a thing - take 2
    }
    create "foo"
  undo():
-   if the working map does says "foo already existed" {
+   if the working map says "foo already existed" {
      then return success
    }
    delete "foo"
@@ -198,6 +194,11 @@ The problem is that the `do()` is no longer idempotent. Suppose there is a serve
 after the "foo" thing is created, but before Stairway records the step result. On
 recovery, Stairway will rerun the `do()` step. It will say, "foo already existed", and the
 flight will fail.
+
+In general, best practice is _NOT_ to use the working map to communicate state between
+your `do()` and `undo()` methods. The `undo()` method gets called regardless of
+where in the `do()` step the working map is set. It makes the `undo()` more complex 
+if it has to handle all of the possible states of the working map.
 
 #### Pitfall 3: concurrent operation
 
@@ -227,7 +228,8 @@ exists" error, ignore it, and think they have succeeded.
 #### A Working Approach
 
 The typical case in our system is that we are creating a cloud resource and recording that
-resource in a database. We can use the database state to address the pitfalls. The general
+resource in a database. We can use the database state to address the pitfalls. We setup
+the database so that the UUID and the name columns both have unique constraints. The general
 approach is:
  1. Create or provide as flight input a random UUID
  1. Write a row in the database with the UUID and the name. If there is a name
@@ -246,8 +248,8 @@ forms in other kinds of operations.
 ### Retry Object State and Reuse <a name="retryreuse"></a>
 It is important to understand the scope and state of a RetryRule object and only share
 RetryRules objects where they will work properly. It is safe to re-use the same RetryRule
-object *within* a flight. It is not safe to share the same RetryRule object *between*
-flights.
+object *within* a flight instance. It is not safe to share the same RetryRule object *between*
+flight instances.
 
 The reason that you cannot share a RetryRule object between flights is that a RetryRule
 object is stateful: it holds the state of retrying. For example, a rule that retries 3
@@ -263,7 +265,7 @@ Every step has a RetryRule object associated with it. If the rule is not specifi
 returns: "do not retry".
 
 ### How to Retry <a name="retryhow"></a>
-There are two ways from with a step to request that the step be retried.
+There are two ways to request that the step be retried from within the step.
  1. Throw an exception that derives from `RetryException`. When flight execution catches
  that exception, it will attempt a retry.
  1. Return a StepResult of `STEP_RESULT_FAILURE_RETRY`.
@@ -275,7 +277,7 @@ exceptions separate from Stairway exceptions.
 Remember that simply requesting a retry and actually retrying are two separate
 things. Requesting retry asks Stairway to check the RetryRule to see if there are any more
 retries left. If the rule says, "no more retries", then the exception returned in the
-StepResult is used as the result exception of the flight.
+StepResult is used as the failure result exception of the flight.
 
 ### Retry After Restart <a name="retryafterrestart"></a>
 Retrying is only in-memory. RetryRule state is not retained across a failure/recovery.
@@ -285,12 +287,22 @@ try 10 times and then give up. Stairway has retried 9 times and then the server 
 When the flight is recovered, the step will be restarted and the retry rule counter will
 start at 0 once again.
 
+There is no limit to the number of times a flight can be recovered.
+
 ## Flight Construction <a name="flightconstruction"></a>
 
 The Stairway caller never constructs a Flight object. When you call Stairway to run a flight,
-you provide the input parameters and the class name. Stairway does the actual
-construction. That is because Stairway must be able to re-construct the flight after a
-failure/recovery from the data stored in the Stairway database.
+you provide the input parameters and the class name.
+```java
+  String jobId = UUID.randomUUID().toString();
+  FlightMap inputs = new FlightMap();
+  inputs.put("ABC","foo);
+  stairway.submit(jobid, MyFlight.class, inputs);
+```
+
+Stairway does the actual construction. Stairway must be able to re-construct the flight
+after a failure/recovery from the data stored in the Stairway database. Constructing it in
+all cases helps ensure that the class has the right constructor.
 
 ### Constructors Should... <a name="constructorsshould"></a>
 
@@ -307,7 +319,7 @@ The constructor **should not**:
 
 There are two reasons for those constraints. First, flight construction is done in
 Stairway on the recovery path. If a flight cannot be reconstructed, Stairway will
-fail to initialize. That can leave your service in a failed state.  
+fail to initialize. That can leave your service in a failed state.
 
 Second, errors in flight construction can cause the flight to be marked as a dismal
 failure. It is better to keep the construction simpler and do the work within steps where
@@ -406,7 +418,8 @@ all-or-nothing. This is a serious issue, because the system is left in an uninte
 potentially corrupt state. It probably requires human intervention to repair the problem.
 
 When this happens, Stairway writes a log message including the text
-`DISMAL FAILURE` that can be used for alerting.
+`DISMAL FAILURE` that can be used for alerting. The flight is finished with a `FATAL`
+status. (A flight with a normal failure that gets undon fails with an `ERROR` status.
 
 In our experience, there are two main causes of dismal failures:
  1. Expired retries
@@ -427,7 +440,7 @@ several things:
  * Your flight object can be reconstituted from the Stairway database
 
 Restarting each step does not change the flow of your flight. It will make it a bit slower
-as the flight object is reconstructed.
+as the flight object is reconstructed and the flight is queued on to the thread pool.
 
 ### Fail at Specific Steps <a name="failsteps"></a>
 
