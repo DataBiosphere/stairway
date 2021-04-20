@@ -97,7 +97,7 @@ class FlightDao {
         "INSERT INTO "
             + FLIGHT_TABLE
             + " (flightId, submit_time, class_name, status, stairway_id, debug_info)"
-            + "VALUES (:flightId, CURRENT_TIMESTAMP, :className, :status, :stairwayId, :debugInfo)";
+            + "VALUES (:flightId, :submitTime, :className, :status, :stairwayId, :debugInfo)";
 
     try (Connection connection = dataSource.getConnection();
         NamedParameterPreparedStatement statement =
@@ -105,6 +105,7 @@ class FlightDao {
 
       startTransaction(connection);
       statement.setString("flightId", flightContext.getFlightId());
+      statement.setInstant("submitTime", Instant.now());
       statement.setString("className", flightContext.getFlightClassName());
       statement.setString("status", flightContext.getFlightStatus().name());
       if (flightContext.getFlightStatus() == FlightStatus.READY
