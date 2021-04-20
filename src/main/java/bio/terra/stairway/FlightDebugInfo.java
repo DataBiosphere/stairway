@@ -79,7 +79,7 @@ public class FlightDebugInfo {
     return new FlightDebugInfo.Builder();
   }
 
-  public FlightDebugInfo(Builder builder) {
+  public FlightDebugInfo(FlightDebugInfo.Builder builder) {
     this.restartEachStep = builder.restartEachStep;
     this.failAtSteps = builder.failAtSteps;
     this.lastStepFailure = builder.lastStepFailure;
