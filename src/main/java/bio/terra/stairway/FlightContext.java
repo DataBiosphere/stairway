@@ -1,6 +1,7 @@
 package bio.terra.stairway;
 
 import java.util.List;
+import java.util.Optional;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.commons.lang3.builder.ToStringBuilder;
 
@@ -29,7 +30,7 @@ public class FlightContext {
   /**
    * Modifiable flight map used to communicate state between steps and convey output of the flight.
    */
-  private final FlightMap workingMap;
+  private FlightMap workingMap;
 
   /** Index into the flight's step array of the step we are */
   private int stepIndex;
@@ -102,6 +103,16 @@ public class FlightContext {
   // to encapsulate it in this class.
   public FlightMap getWorkingMap() {
     return workingMap;
+  }
+
+  /**
+   * Replace the default map created at constructor time.
+   *
+   * @param map If not empty, replaces the existing workingMap with the contained map. If empty,
+   *     existing map is left as-is.
+   */
+  public void setWorkingMap(Optional<FlightMap> map) {
+    if (map.isPresent()) workingMap = map.get();
   }
 
   public int getStepIndex() {

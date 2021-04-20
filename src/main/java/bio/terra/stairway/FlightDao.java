@@ -686,8 +686,7 @@ class FlightDao {
             final List<FlightInput> workingList =
                 retrieveWorkingParameters(connection, flightContext.getFlightId(), lastLogTime);
 
-            // FIXME: Call new FlightMap API when available.
-            flightContext.getWorkingMap().fromJson(workingMapJson);
+            flightContext.setWorkingMap(FlightMap.create(workingList, workingMapJson));
           }
         }
       }
@@ -851,7 +850,6 @@ class FlightDao {
         flightState.setException(
             exceptionSerializer.deserialize(rs.getString("serialized_exception")));
 
-
         // TODO: In the current transition away from output_parameters column towards
         //       flightworking table we can either have only JSON or both.  Until we've
         //       transitioned, delegate the decision of which to use to the FlightMap class.
@@ -861,12 +859,7 @@ class FlightDao {
         final List<FlightInput> workingList =
             retrieveWorkingParameters(connection, flightId, completedTime);
 
-        // FIXME: Call new FlightMap API when available.
-        if (outputParamsJson != null) {
-          FlightMap outputParameters = new FlightMap();
-          outputParameters.fromJson(outputParamsJson);
-          flightState.setResultMap(outputParameters);
-        }
+        flightState.setResultMap(FlightMap.create(workingList, outputParamsJson));
       }
 
       flightStateList.add(flightState);
