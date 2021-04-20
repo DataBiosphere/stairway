@@ -42,5 +42,5 @@ public interface Step {
    * @return step result object
    * @throws InterruptedException when the thread pool is being shut down
    */
-  StepResult undoStep(FlightContext context) throws InterruptedException;
+  StepResult undoStep(FlightContext context) throws InterruptedException, RetryException;
 }

@@ -9,6 +9,8 @@ import bio.terra.stairway.fixtures.TestUtil;
 import bio.terra.stairway.flights.TestFlight;
 import bio.terra.stairway.flights.TestFlightMultiStepRetry;
 import bio.terra.stairway.flights.TestFlightRestarting;
+import bio.terra.stairway.flights.TestStepCreateFile;
+import bio.terra.stairway.flights.TestStepExistence;
 import java.io.File;
 import java.util.Arrays;
 import java.util.HashMap;
@@ -136,6 +138,69 @@ public class DebugInfoTest {
     assertThat(result.getFlightStatus(), is(Matchers.equalTo(FlightStatus.SUCCESS)));
     File file = new File(filename);
     assertTrue(file.exists());
+  }
+
+  @Test
+  public void doStepsFailureRetryable() throws Exception {
+    final String stairwayName = "doStepsFailureRetryable";
+    String flightId = "doStepsFailureRetryable";
+
+    Map<String, StepStatus> doFailures = new HashMap<>();
+    doFailures.put(TestStepExistence.class.getName(), StepStatus.STEP_RESULT_FAILURE_RETRY);
+    FlightDebugInfo debugInfo = FlightDebugInfo.newBuilder().doStepFailures(doFailures).build();
+
+    Stairway stairway = TestUtil.setupStairway(stairwayName, false);
+    FlightMap inputs = new FlightMap();
+    String filename = makeFilename();
+    inputs.put("filename", filename);
+    inputs.put("text", "testing 1 2 3");
+    inputs.put("retryType", "fixed");
+    inputs.put("failCount", 2);
+    inputs.put("intervalSeconds", 2);
+    inputs.put("maxCount", 4);
+    stairway.submitWithDebugInfo(flightId, TestFlightMultiStepRetry.class, inputs, true, debugInfo);
+
+    // Allow time for the flight thread to run
+    TimeUnit.SECONDS.sleep(5);
+
+    assertThat(TestUtil.isDone(stairway, flightId), is(true));
+    FlightState result = stairway.getFlightState(flightId);
+    assertThat(result.getFlightStatus(), is(FlightStatus.SUCCESS));
+    File file = new File(filename);
+    assertTrue(file.exists());
+  }
+
+  @Test
+  public void undoStepsFailureRetryable() throws Exception {
+    final String stairwayName = "undoStepsFailureRetryable";
+    String flightId = "undoStepsFailureRetryable";
+
+    Map<String, StepStatus> undoFailures = new HashMap<>();
+    undoFailures.put(TestStepCreateFile.class.getName(), StepStatus.STEP_RESULT_FAILURE_RETRY);
+    // Set the undo failrues and the last step failure to trigger an error.
+    FlightDebugInfo debugInfo =
+        FlightDebugInfo.newBuilder().undoStepFailures(undoFailures).lastStepFailure(true).build();
+
+    Stairway stairway = TestUtil.setupStairway(stairwayName, false);
+    FlightMap inputs = new FlightMap();
+    String filename = makeFilename();
+    inputs.put("filename", filename);
+    inputs.put("text", "testing 1 2 3");
+    inputs.put("retryType", "fixed");
+    inputs.put("failCount", 2);
+    inputs.put("intervalSeconds", 2);
+    inputs.put("maxCount", 4);
+    stairway.submitWithDebugInfo(flightId, TestFlightMultiStepRetry.class, inputs, true, debugInfo);
+
+    // Allow time for the flight thread to run
+    TimeUnit.SECONDS.sleep(5);
+
+    assertThat(TestUtil.isDone(stairway, flightId), is(true));
+    FlightState result = stairway.getFlightState(flightId);
+    // The flight should be rolled back successfully as an ERROR.
+    assertThat(result.getFlightStatus(), is(FlightStatus.ERROR));
+    File file = new File(filename);
+    assertFalse(file.exists());
   }
 
   @Test

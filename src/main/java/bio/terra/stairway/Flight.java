@@ -42,9 +42,12 @@ public class Flight implements Runnable {
   private FlightContext flightContext;
   private final Object applicationContext;
 
-  // This list will only be populated if debugInfo.FailAtSteps is populated. If so, this
-  // keeps track of which steps have already been failed so we do not infinitely retry.
+  // These sets will only be populated if the corresponding debugInfo field is populated. If so,
+  // each set keeps track of which steps have already been failed so we do not infinitely
+  // retry.
   private final Set<Integer> debugStepsFailed;
+  private final Set<String> debugDoStepsFailed;
+  private final Set<String> debugUndoStepsFailed;
 
   public Flight(FlightMap inputParameters, Object applicationContext) {
     this.applicationContext = applicationContext;
@@ -52,6 +55,8 @@ public class Flight implements Runnable {
     stepClassNames = new LinkedList<>();
     flightContext = new FlightContext(inputParameters, this.getClass().getName(), stepClassNames);
     debugStepsFailed = new HashSet<>();
+    debugDoStepsFailed = new HashSet<>();
+    debugUndoStepsFailed = new HashSet<>();
   }
 
   public void setDebugInfo(FlightDebugInfo debugInfo) {
@@ -281,6 +286,7 @@ public class Flight implements Runnable {
           result = debugStatusReplacement(result);
         } else {
           result = currentStep.step.undoStep(context());
+          result = debugStatusReplacement(result);
         }
       } catch (InterruptedException ex) {
         // Interrupted exception - we assume this means that the thread pool is shutting down and
@@ -346,10 +352,11 @@ public class Flight implements Runnable {
       return initialResult;
     }
     FlightDebugInfo debugInfo = context().getDebugInfo();
-    // If we are in debug mode and a failure is set for this step AND we have not already
+    // If we are in debug mode, in the DO and a failure is set for this step AND we have not already
     // failed here, then insert a failure. We do this right after the step completes but
     // before the flight logs it so that we can look for dangerous UNDOs.
-    if (debugInfo.getFailAtSteps() != null
+    if (context().isDoing()
+        && debugInfo.getFailAtSteps() != null
         && debugInfo.getFailAtSteps().containsKey(context().getStepIndex())
         && !debugStepsFailed.contains(context().getStepIndex())) {
       StepStatus failStatus = debugInfo.getFailAtSteps().get(context().getStepIndex());
@@ -360,9 +367,40 @@ public class Flight implements Runnable {
       debugStepsFailed.add(context().getStepIndex());
       return new StepResult(failStatus);
     }
+    String currentStepClassName = context().getStepClassName();
+    // If we are in debug mode, doing, and a a failure is set for this step class name for do and we
+    // have not already failed for this Step class, then insert a failure.
+    if (context().isDoing()
+        && debugInfo.getDoStepFailures() != null
+        && debugInfo.getDoStepFailures().containsKey(currentStepClassName)
+        && !debugDoStepsFailed.contains(currentStepClassName)) {
+      StepStatus failStatus = debugInfo.getDoStepFailures().get(currentStepClassName);
+      logger.info(
+          "Failed for debug mode fail do step at step {} with result {}",
+          context().getStepIndex(),
+          failStatus);
+      debugDoStepsFailed.add(currentStepClassName);
+      return new StepResult(failStatus);
+    }
+    // If we are in debug mode, undoing, and a a failure is set for this step class name for undo
+    // and we have not already failed for this Step class, then insert a failure.
+    if (!context().isDoing()
+        && debugInfo.getUndoStepFailures() != null
+        && debugInfo.getUndoStepFailures().containsKey(currentStepClassName)
+        && !debugUndoStepsFailed.contains(currentStepClassName)) {
+      StepStatus failStatus = debugInfo.getUndoStepFailures().get(currentStepClassName);
+      logger.info(
+          "Failed for debug mode fail do step at step {} with result {}",
+          context().getStepIndex(),
+          failStatus);
+      debugUndoStepsFailed.add(currentStepClassName);
+      return new StepResult(failStatus);
+    }
     // If we are in debug mode for failing at the last step, and this is the last step, insert a
     // failure.
-    if (debugInfo.getLastStepFailure() && context().getStepIndex() == steps.size() - 1) {
+    if (context().isDoing()
+        && debugInfo.getLastStepFailure()
+        && context().getStepIndex() == steps.size() - 1) {
       logger.info("Failed for debug mode last step failure.");
       return new StepResult(StepStatus.STEP_RESULT_FAILURE_FATAL);
     }

@@ -22,11 +22,23 @@ public class FlightDebugInfo {
   // failures should only be inserted on steps that can be safely retried.
   private Map<Integer, StepStatus> failAtSteps;
 
+  // Map from Step class name, e.g. MyStep.class.getName(), to the failure to insert on do. Note
+  // that retryable failures should only be inserted on step's with do operations that can be safely
+  // retried.
+  private Map<String, StepStatus> doStepFailures;
+
+  // Map from Step class name, e.g. MyStep.class.getName(), to the failure to insert on undo. Note
+  // that retryable failures should only be inserted on step's with undo operations that can be
+  // safely retried.
+  private Map<String, StepStatus> undoStepFailures;
+
   // Use a builder so it is easy to add new fields
   public static class Builder {
     private boolean restartEachStep;
     private boolean lastStepFailure;
     private Map<Integer, StepStatus> failAtSteps;
+    private Map<String, StepStatus> doStepFailures;
+    private Map<String, StepStatus> undoStepFailures;
 
     public Builder restartEachStep(boolean restart) {
       this.restartEachStep = restart;
@@ -40,6 +52,16 @@ public class FlightDebugInfo {
 
     public Builder failAtSteps(Map<Integer, StepStatus> failures) {
       this.failAtSteps = failures;
+      return this;
+    }
+
+    public Builder doStepFailures(Map<String, StepStatus> doStepFailures) {
+      this.doStepFailures = doStepFailures;
+      return this;
+    }
+
+    public Builder undoStepFailures(Map<String, StepStatus> undoStepFailures) {
+      this.undoStepFailures = undoStepFailures;
       return this;
     }
 
@@ -57,10 +79,12 @@ public class FlightDebugInfo {
     return new FlightDebugInfo.Builder();
   }
 
-  public FlightDebugInfo(FlightDebugInfo.Builder builder) {
+  public FlightDebugInfo(Builder builder) {
     this.restartEachStep = builder.restartEachStep;
     this.failAtSteps = builder.failAtSteps;
     this.lastStepFailure = builder.lastStepFailure;
+    this.doStepFailures = builder.doStepFailures;
+    this.undoStepFailures = builder.undoStepFailures;
   }
 
   public FlightDebugInfo() {
@@ -89,6 +113,22 @@ public class FlightDebugInfo {
 
   public void setFailAtSteps(Map<Integer, StepStatus> failures) {
     this.failAtSteps = failures;
+  }
+
+  public Map<String, StepStatus> getDoStepFailures() {
+    return doStepFailures;
+  }
+
+  public void setDoStepFailures(Map<String, StepStatus> doStepFailures) {
+    this.doStepFailures = doStepFailures;
+  }
+
+  public Map<String, StepStatus> getUndoStepFailures() {
+    return undoStepFailures;
+  }
+
+  public void setUndoStepFailures(Map<String, StepStatus> undoStepFailures) {
+    this.undoStepFailures = undoStepFailures;
   }
 
   static ObjectMapper getObjectMapper() {
