@@ -14,6 +14,7 @@ import edu.umd.cs.findbugs.annotations.SuppressFBWarnings;
 import java.sql.Connection;
 import java.sql.ResultSet;
 import java.sql.SQLException;
+import java.time.Instant;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
@@ -56,6 +57,7 @@ class FlightDao {
   static final String FLIGHT_TABLE = "flight";
   static final String FLIGHT_LOG_TABLE = "flightlog";
   static final String FLIGHT_INPUT_TABLE = "flightinput";
+  static final String FLIGHT_WORKING_TABLE = "flightworking";
 
   private static final String UNKNOWN = "<unknown>";
 
@@ -148,12 +150,15 @@ class FlightDao {
   }
 
   private void stepInner(FlightContext flightContext) throws SQLException {
+
+    final Instant logTime = Instant.now();
+
     final String sqlInsertFlightLog =
         "INSERT INTO "
             + FLIGHT_LOG_TABLE
             + "(flightid, log_time, working_parameters, step_index, rerun, direction,"
             + " succeeded, serialized_exception, status)"
-            + " VALUES (:flightId, CURRENT_TIMESTAMP, :workingMap, :stepIndex, :rerun, :direction,"
+            + " VALUES (:flightId, :logTime, :workingMap, :stepIndex, :rerun, :direction,"
             + " :succeeded, :serializedException, :status)";
 
     String serializedException =
@@ -164,15 +169,25 @@ class FlightDao {
             new NamedParameterPreparedStatement(connection, sqlInsertFlightLog)) {
       startTransaction(connection);
       statement.setString("flightId", flightContext.getFlightId());
+      statement.setInstant("logTime", logTime);
+
+      // TODO: Column working_parameters is being phased out in favor of table flightworking.
+      //       We continue to write the working map here temporarily for backward compatibility.
       statement.setString("workingMap", flightContext.getWorkingMap().toJson());
+
       statement.setInt("stepIndex", flightContext.getStepIndex());
       statement.setBoolean("rerun", flightContext.isRerun());
       statement.setString("direction", flightContext.getDirection().name());
       statement.setBoolean("succeeded", flightContext.getResult().isSuccess());
       statement.setString("serializedException", serializedException);
+
       // TODO: I believe storing this is useless. The status always RUNNING
       statement.setString("status", flightContext.getFlightStatus().name());
       statement.getPreparedStatement().executeUpdate();
+
+      storeWorkingParameters(
+          connection, flightContext.getFlightId(), logTime, flightContext.getWorkingMap());
+
       commitTransaction(connection);
     }
   }
@@ -381,11 +396,14 @@ class FlightDao {
   }
 
   private void completeInner(FlightContext flightContext) throws SQLException {
+
+    final Instant completedTime = Instant.now();
+
     // Make the update idempotent; that is, only do it if the status is RUNNING
     final String sqlUpdateFlight =
         "UPDATE "
             + FLIGHT_TABLE
-            + " SET completed_time = CURRENT_TIMESTAMP,"
+            + " SET completed_time = :completedTime,"
             + " output_parameters = :outputParameters,"
             + " status = :status,"
             + " serialized_exception = :serializedException,"
@@ -396,27 +414,43 @@ class FlightDao {
     final String sqlDeleteFlightLog =
         "DELETE FROM " + FLIGHT_LOG_TABLE + " WHERE flightid = :flightId";
 
+    final String sqlDeleteFlightWorking =
+        "DELETE FROM " + FLIGHT_WORKING_TABLE + " WHERE flightid = :flightId";
+
     String serializedException =
         exceptionSerializer.serialize(flightContext.getResult().getException().orElse(null));
 
     try (Connection connection = dataSource.getConnection();
         NamedParameterPreparedStatement statement =
             new NamedParameterPreparedStatement(connection, sqlUpdateFlight);
-        NamedParameterPreparedStatement deleteStatement =
+        NamedParameterPreparedStatement deleteLogStatement =
+            new NamedParameterPreparedStatement(connection, sqlDeleteFlightLog);
+        NamedParameterPreparedStatement deleteWorkingStatement =
             new NamedParameterPreparedStatement(connection, sqlDeleteFlightLog)) {
 
       startTransaction(connection);
 
+      // TODO: Column output_parameters is being phased out in favor of table flightworking.
+      //       We continue to write the output map here temporarily for backward compatibility.
       statement.setString("outputParameters", flightContext.getWorkingMap().toJson());
+
+      statement.setInstant("completedTime", completedTime);
       statement.setString("status", flightContext.getFlightStatus().name());
       statement.setString("serializedException", serializedException);
       statement.setString("flightId", flightContext.getFlightId());
       statement.getPreparedStatement().executeUpdate();
 
       if (!keepFlightLog) {
-        deleteStatement.setString("flightId", flightContext.getFlightId());
-        deleteStatement.getPreparedStatement().executeUpdate();
+        deleteLogStatement.setString("flightId", flightContext.getFlightId());
+        deleteLogStatement.getPreparedStatement().executeUpdate();
+        deleteWorkingStatement.setString("flightId", flightContext.getFlightId());
+        deleteWorkingStatement.getPreparedStatement().executeUpdate();
       }
+
+      // Make sure to write the last working parameters entry AFTER we've cleaned up any logged
+      // results.
+      storeWorkingParameters(
+          connection, flightContext.getFlightId(), completedTime, flightContext.getWorkingMap());
 
       commitTransaction(connection);
       hookWrapper.stateTransition(flightContext);
@@ -608,7 +642,7 @@ class FlightDao {
 
     final String sqlLastFlightLog =
         "SELECT working_parameters, step_index, direction, rerun,"
-            + " succeeded, serialized_exception, status"
+            + " succeeded, serialized_exception, status, log_time"
             + " FROM "
             + FLIGHT_LOG_TABLE
             + " WHERE flightid = :flightId AND log_time = "
@@ -637,13 +671,23 @@ class FlightDao {
                       exceptionSerializer.deserialize(rsflight.getString("serialized_exception")));
             }
 
-            flightContext.getWorkingMap().fromJson(rsflight.getString("working_parameters"));
-
             flightContext.setRerun(rsflight.getBoolean("rerun"));
             flightContext.setDirection(Direction.valueOf(rsflight.getString("direction")));
             flightContext.setResult(stepResult);
             flightContext.setFlightStatus(FlightStatus.valueOf(rsflight.getString("status")));
             flightContext.setStepIndex(rsflight.getInt("step_index"));
+
+            // TODO: In the current transition away from working_parameters column towards
+            //       flightworking table we can either have only JSON or both.  Until we've
+            //       transitioned, delegate the decision of which to use to the FlightMap class.
+
+            final String workingMapJson = rsflight.getString("working_parameters");
+            final Instant lastLogTime = rsflight.getTimestamp("log_time").toInstant();
+            final List<FlightInput> workingList =
+                retrieveWorkingParameters(connection, flightContext.getFlightId(), lastLogTime);
+
+            // FIXME: Call new FlightMap API when available.
+            flightContext.getWorkingMap().fromJson(workingMapJson);
           }
         }
       }
@@ -802,10 +846,22 @@ class FlightDao {
       if (flightState.getFlightStatus() == FlightStatus.SUCCESS
           || flightState.getFlightStatus() == FlightStatus.ERROR
           || flightState.getFlightStatus() == FlightStatus.FATAL) {
-        flightState.setCompleted(rs.getTimestamp("completed_time").toInstant());
+        final Instant completedTime = rs.getTimestamp("completed_time").toInstant();
+        flightState.setCompleted(completedTime);
         flightState.setException(
             exceptionSerializer.deserialize(rs.getString("serialized_exception")));
+
+
+        // TODO: In the current transition away from output_parameters column towards
+        //       flightworking table we can either have only JSON or both.  Until we've
+        //       transitioned, delegate the decision of which to use to the FlightMap class.
+
         String outputParamsJson = rs.getString("output_parameters");
+
+        final List<FlightInput> workingList =
+            retrieveWorkingParameters(connection, flightId, completedTime);
+
+        // FIXME: Call new FlightMap API when available.
         if (outputParamsJson != null) {
           FlightMap outputParameters = new FlightMap();
           outputParameters.fromJson(outputParamsJson);
@@ -841,6 +897,30 @@ class FlightDao {
     }
   }
 
+  private void storeWorkingParameters(
+      Connection connection, String flightId, Instant logTime, FlightMap workingParameters)
+      throws SQLException {
+    List<FlightInput> inputList = workingParameters.makeFlightInputList();
+
+    final String sqlInsertInput =
+        "INSERT INTO "
+            + FLIGHT_WORKING_TABLE
+            + " (flightId, log_time, key, value) VALUES (:flightId, :logTime, :key, :value)";
+
+    try (NamedParameterPreparedStatement statement =
+        new NamedParameterPreparedStatement(connection, sqlInsertInput)) {
+
+      statement.setString("flightId", flightId);
+      statement.setInstant("logTime", logTime);
+
+      for (FlightInput input : inputList) {
+        statement.setString("key", input.getKey());
+        statement.setString("value", input.getValue());
+        statement.getPreparedStatement().executeUpdate();
+      }
+    }
+  }
+
   private List<FlightInput> retrieveInputParameters(Connection connection, String flightId)
       throws SQLException {
     final String sqlSelectInput =
@@ -851,6 +931,30 @@ class FlightDao {
     try (NamedParameterPreparedStatement statement =
         new NamedParameterPreparedStatement(connection, sqlSelectInput)) {
       statement.setString("flightId", flightId);
+
+      try (ResultSet rs = statement.getPreparedStatement().executeQuery()) {
+        while (rs.next()) {
+          FlightInput input = new FlightInput(rs.getString("key"), rs.getString("value"));
+          inputList.add(input);
+        }
+      }
+    }
+    return inputList;
+  }
+
+  private List<FlightInput> retrieveWorkingParameters(
+      Connection connection, String flightId, Instant logTime) throws SQLException {
+    final String sqlSelectInput =
+        "SELECT key, value FROM "
+            + FLIGHT_WORKING_TABLE
+            + " WHERE flightId = :flightId AND log_time = :logTime";
+
+    List<FlightInput> inputList = new ArrayList<>();
+
+    try (NamedParameterPreparedStatement statement =
+        new NamedParameterPreparedStatement(connection, sqlSelectInput)) {
+      statement.setString("flightId", flightId);
+      statement.setInstant("logTime", logTime);
 
       try (ResultSet rs = statement.getPreparedStatement().executeQuery()) {
         while (rs.next()) {
