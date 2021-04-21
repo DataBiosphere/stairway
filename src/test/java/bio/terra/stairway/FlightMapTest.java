@@ -2,9 +2,11 @@ package bio.terra.stairway;
 
 import bio.terra.stairway.exception.JsonConversionException;
 import bio.terra.stairway.fixtures.FlightsTestPojo;
+import com.fasterxml.jackson.core.JsonProcessingException;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Optional;
+import java.util.UUID;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
@@ -16,24 +18,31 @@ public class FlightMapTest {
 
   private static final Logger logger = LoggerFactory.getLogger("FlightMapTest");
 
-  private static String pojoKey = "mypojo";
+  private static final String pojoKey = "mypojo";
   private static final FlightsTestPojo pojoIn = new FlightsTestPojo().anint(99).astring("mystring");
 
-  private static String intKey = "mykey";
+  private static final String intKey = "mykey";
   private static final Integer intIn = 3;
 
-  private static String stringKey = "mystring";
+  private static final String stringKey = "mystring";
   private static final String stringIn = "StringValue";
+
+  private static final String uuidKey = "myuuid";
+  private static final UUID uuidIn = UUID.fromString("2e74e380-cccd-48ad-a0ac-e006b3650dbe");
+
+  private enum MyEnum {
+    FOO,
+  }
+
+  private static final String enumKey = "myenum";
+  private static final MyEnum enumIn = MyEnum.FOO;
 
   private void loadMap(FlightMap outMap) {
     outMap.put(pojoKey, pojoIn);
-    Assertions.assertEquals(pojoIn, outMap.get(pojoKey, FlightsTestPojo.class));
-
     outMap.put(intKey, intIn);
-    Assertions.assertEquals(intIn, outMap.get(intKey, Integer.class));
-
     outMap.put(stringKey, stringIn);
-    Assertions.assertEquals(stringIn, outMap.get(stringKey, String.class));
+    outMap.put(uuidKey, uuidIn);
+    outMap.put(enumKey, enumIn);
   }
 
   private void verifyMap(FlightMap inMap) {
@@ -45,6 +54,12 @@ public class FlightMapTest {
 
     String stringOut = inMap.get(stringKey, String.class);
     Assertions.assertEquals(stringIn, stringOut);
+
+    UUID uuidOut = inMap.get(uuidKey, UUID.class);
+    Assertions.assertEquals(uuidIn, uuidOut);
+
+    MyEnum enumOut = inMap.get(enumKey, MyEnum.class);
+    Assertions.assertEquals(enumOut, enumIn);
   }
 
   @Test
@@ -59,20 +74,6 @@ public class FlightMapTest {
     String output = map.toString();
     Assertions.assertFalse(output.isEmpty());
     logger.debug(output);
-  }
-
-  @Test
-  public void rawOps() {
-    FlightMap map = new FlightMap();
-    loadMap(map);
-
-    // Peek each field and poke it back as raw data.
-    map.putRaw(pojoKey, map.getRaw(pojoKey));
-    map.putRaw(intKey, map.getRaw(intKey));
-    map.putRaw(stringKey, map.getRaw(stringKey));
-
-    // Make sure it all still matches.
-    verifyMap(map);
   }
 
   @Test
@@ -113,7 +114,7 @@ public class FlightMapTest {
     // JSON created by calling toJson() on a map instance populated by loadMap() using an older
     // version of code.
     String jsonMap =
-        "[\"java.util.HashMap\",{\"mystring\":\"StringValue\",\"mykey\":3,\"mypojo\":[\"bio.terra.stairway.fixtures.FlightsTestPojo\",{\"astring\":\"mystring\",\"anint\":99}]}]";
+        "[\"java.util.HashMap\",{\"myenum\":[\"bio.terra.stairway.FlightMapTest$MyEnum\",\"FOO\"],\"myuuid\":[\"java.util.UUID\",\"2e74e380-cccd-48ad-a0ac-e006b3650dbe\"],\"mystring\":\"StringValue\",\"mykey\":3,\"mypojo\":[\"bio.terra.stairway.fixtures.FlightsTestPojo\",{\"astring\":\"mystring\",\"anint\":99}]}]";
 
     logger.debug(" In JSON: {}", jsonMap);
 
@@ -121,11 +122,6 @@ public class FlightMapTest {
     FlightMap map = new FlightMap();
     map.fromJson(jsonMap);
     verifyMap(map);
-
-    // Make sure the output JSON matches the input JSON
-    String outJson = map.toJson();
-    logger.debug("Out JSON: {}", outJson);
-    Assertions.assertEquals(jsonMap, outJson);
   }
 
   @Test
@@ -136,16 +132,34 @@ public class FlightMapTest {
     List<FlightInput> list = sourceMap.makeFlightInputList();
     String json = sourceMap.toJson();
 
+    // Ignore list, use JSON
     Optional<FlightMap> fromListMap = FlightMap.create(list, json);
     Assertions.assertTrue(fromListMap.isPresent());
     verifyMap(fromListMap.get());
 
-    Optional<FlightMap> jsonEmptyListMap = FlightMap.create(new ArrayList<>(), json);
-    Assertions.assertTrue(jsonEmptyListMap.isPresent());
-    verifyMap(jsonEmptyListMap.get());
-
+    // Null JSON returns empty map
     Optional<FlightMap> nullJsonEmptyListMap = FlightMap.create(new ArrayList<>(), null);
     Assertions.assertFalse(nullJsonEmptyListMap.isPresent());
+
+    // Bad key in list logs error, but still has good content
+    List<FlightInput> badKeyList = new ArrayList<>();
+    FlightInput badKeyInput = new FlightInput("badkey", "badval");
+    badKeyList.add(badKeyInput);
+    Optional<FlightMap> badListKeyMap = FlightMap.create(badKeyList, json);
+    Assertions.assertTrue(badListKeyMap.isPresent());
+    verifyMap(badListKeyMap.get());
+    Assertions.assertThrows(
+        RuntimeException.class, () -> badListKeyMap.get().validateAgainst(badKeyList));
+
+    // Bad value in list logs error, but still has good content
+    List<FlightInput> badValueList = new ArrayList<>();
+    FlightInput badValueInput = new FlightInput(pojoKey, "badval");
+    badValueList.add(badValueInput);
+    Optional<FlightMap> badListValueMap = FlightMap.create(badValueList, json);
+    Assertions.assertTrue(badListValueMap.isPresent());
+    verifyMap(badListValueMap.get());
+    Assertions.assertThrows(
+        JsonProcessingException.class, () -> badListValueMap.get().validateAgainst(badValueList));
   }
 
   // Intentionally non-static internal class, so that attempting to serialize an instance fails.
@@ -158,10 +172,10 @@ public class FlightMapTest {
     // Serializing an unserializable class results in JsonConversionException.
     final String badKey = "bad";
     NonStaticClass unserializable = new NonStaticClass();
-    Assertions.assertThrows(JsonConversionException.class, () -> map.put(badKey, unserializable));
+    map.put(badKey, unserializable);
+    Assertions.assertThrows(JsonConversionException.class, () -> map.toJson());
 
     // Deserializing the wrong type results in ClassCastException.
-    map.put(badKey, "garbage");
     Assertions.assertThrows(ClassCastException.class, () -> map.get(badKey, FlightsTestPojo.class));
 
     // Deserializing map from bad JSON throws
