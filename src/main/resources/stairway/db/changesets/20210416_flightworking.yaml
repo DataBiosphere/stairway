@@ -7,17 +7,20 @@ databaseChangeLog:
             tableName: flightlog
             columnName: working_parameters
             remarks: deprecating for flightworking table
+        - addColumn:
+            tableName: flightlog
+            columns:
+              - column:
+                  name: id
+                  type: uuid
+                  constraints:
+                    unique: true
         - createTable:
             tableName: flightworking
             columns:
               - column:
-                  name: flightid
-                  type: varchar(36)
-                  constraints:
-                    nullable: false
-              - column:
-                  name: log_time
-                  type: timestamp
+                  name: flightlog_id
+                  type: uuid
                   constraints:
                     nullable: false
               - column:
@@ -33,5 +36,14 @@ databaseChangeLog:
                     nullable: false
         - addPrimaryKey:
             tableName: flightworking
-            columnNames: flightid, log_time, key
+            columnNames: flightlog_id, key
             constraintName: pk_flightworking
+        - addForeignKeyConstraint:
+            baseTableName: flightworking
+            baseColumnNames: flightlog_id
+            referencedTableName: flightlog
+            referencedColumnNames: id
+            onDelete: NO ACTION
+            onUpdate: NO ACTION
+            validate: true
+            constraintName: fk_flightworking_flightlog
