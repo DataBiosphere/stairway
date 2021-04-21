@@ -112,7 +112,9 @@ public class FlightContext {
    *     existing map is left as-is.
    */
   public void setWorkingMap(Optional<FlightMap> map) {
-    if (map.isPresent()) workingMap = map.get();
+    if (map.isPresent()) {
+      workingMap = map.get();
+    }
   }
 
   public int getStepIndex() {
