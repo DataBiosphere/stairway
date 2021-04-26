@@ -105,8 +105,25 @@ public class FlightMap {
     return Optional.of(map);
   }
 
+  /**
+   * Validate whether the passed inputList will deserialize to the same set of keys and
+   * corresponding types stored in the map. Note that this does not ensure the equality of values as
+   * all types stored in FlightMap are not required to be comparable.
+   *
+   * <p>Throws {@link RuntimeException} if any key exists in inputList but not in map (or vice
+   * versa). Throws {@link JsonProcessingException} if any value in inputList does not deserialize
+   * to the type of its corresponding entry in the map.
+   *
+   * @param inputList
+   */
   @VisibleForTesting
   void validateAgainst(List<FlightInput> inputList) throws Exception {
+
+    if (inputList.size() != map.size())
+      throw new RuntimeException(
+          String.format(
+              "Passed input list has %d entries, map has %d.", inputList.size(), map.size()));
+
     for (FlightInput input : inputList) {
       final String key = input.getKey();
       final Object object = map.get(key);
@@ -149,6 +166,7 @@ public class FlightMap {
     map.put(key, value);
   }
 
+  @Deprecated
   public String toJson() {
     try {
       return getObjectMapper().writeValueAsString(map);

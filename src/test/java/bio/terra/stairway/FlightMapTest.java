@@ -141,9 +141,19 @@ public class FlightMapTest {
     Optional<FlightMap> nullJsonEmptyListMap = FlightMap.create(new ArrayList<>(), null);
     Assertions.assertFalse(nullJsonEmptyListMap.isPresent());
 
+    // Missing entry logs error, but still has good content
+    List<FlightInput> missingList = new ArrayList<>(list);
+    missingList.remove(missingList.size() - 1);
+    Optional<FlightMap> missingMap = FlightMap.create(missingList, json);
+    Assertions.assertTrue(missingMap.isPresent());
+    verifyMap(missingMap.get());
+    Assertions.assertThrows(
+        RuntimeException.class, () -> missingMap.get().validateAgainst(missingList));
+
     // Bad key in list logs error, but still has good content
-    List<FlightInput> badKeyList = new ArrayList<>();
+    List<FlightInput> badKeyList = new ArrayList<>(list);
     FlightInput badKeyInput = new FlightInput("badkey", "badval");
+    badKeyList.remove(badKeyList.size() - 1);
     badKeyList.add(badKeyInput);
     Optional<FlightMap> badListKeyMap = FlightMap.create(badKeyList, json);
     Assertions.assertTrue(badListKeyMap.isPresent());
@@ -152,8 +162,9 @@ public class FlightMapTest {
         RuntimeException.class, () -> badListKeyMap.get().validateAgainst(badKeyList));
 
     // Bad value in list logs error, but still has good content
-    List<FlightInput> badValueList = new ArrayList<>();
+    List<FlightInput> badValueList = new ArrayList<>(list);
     FlightInput badValueInput = new FlightInput(pojoKey, "badval");
+    badValueList.remove(badValueList.size() - 1);
     badValueList.add(badValueInput);
     Optional<FlightMap> badListValueMap = FlightMap.create(badValueList, json);
     Assertions.assertTrue(badListValueMap.isPresent());
