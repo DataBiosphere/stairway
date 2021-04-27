@@ -14,7 +14,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.stream.Collectors;
-import jdk.internal.jline.internal.Nullable;
+import javax.annotation.Nullable;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -86,8 +86,7 @@ public class FlightMap {
     }
 
     // TODO(PF-703): Once we stop writing JSON, we may still have JSON-only flight data in the
-    //               database, as well as flights with both. At that point we should favor
-    //               inputList over json.
+    // database, as well as flights with both. At that point we should favor inputList over json.
 
     FlightMap map = new FlightMap();
     map.fromJson(json);
@@ -96,7 +95,7 @@ public class FlightMap {
     if (!inputList.isEmpty()) {
       try {
         map.validateAgainst(inputList);
-      } catch (final Exception ex) {
+      } catch (Exception ex) {
         Logger logger = LoggerFactory.getLogger("FlightMap");
         logger.error("Input list does not match JSON: {}", ex.getMessage());
       }

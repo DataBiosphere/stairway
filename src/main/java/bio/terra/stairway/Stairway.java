@@ -164,6 +164,7 @@ public class Stairway {
      * @param keepFlightLog true to keep the flight log. Default is true;
      * @return this
      */
+    @Deprecated
     public Builder keepFlightLog(boolean keepFlightLog) {
       this.keepFlightLog = keepFlightLog;
       return this;

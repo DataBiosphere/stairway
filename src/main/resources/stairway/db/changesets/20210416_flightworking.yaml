@@ -43,7 +43,7 @@ databaseChangeLog:
             baseColumnNames: flightlog_id
             referencedTableName: flightlog
             referencedColumnNames: id
-            onDelete: NO ACTION
+            onDelete: CASCADE
             onUpdate: NO ACTION
             validate: true
             constraintName: fk_flightworking_flightlog

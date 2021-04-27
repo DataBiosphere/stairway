@@ -13,7 +13,6 @@ import static org.hamcrest.MatcherAssert.assertThat;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import java.time.Instant;
-import java.util.Optional;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Tag;
@@ -45,7 +44,7 @@ public class FlightStateClassTest {
     result.setInputParameters(inputs);
     result.setSubmitted(timestamp);
     result.setCompleted(timestamp);
-    result.setResultMap(Optional.of(outputs));
+    result.setResultMap(outputs);
     result.setException(new RuntimeException(errString));
   }
 

@@ -172,8 +172,8 @@ class FlightDao {
       statement.setString("flightId", flightContext.getFlightId());
 
       // TODO(PF-703): Column working_parameters is being phased out in favor of table
-      //               flightworking.  We continue to write the working map here temporarily
-      //               for backward compatibility.
+      // flightworking.  We continue to write the working map here temporarily for backward
+      // compatibility.
       statement.setString("workingMap", flightContext.getWorkingMap().toJson());
 
       statement.setInt("stepIndex", flightContext.getStepIndex());
@@ -416,9 +416,8 @@ class FlightDao {
 
       startTransaction(connection);
 
-      // TODO(PF-703): Column output_parameters is being phased out in favor of table
-      //               flightworking.  We continue to write the output map here
-      //               temporarily for backward compatibility.
+      // TODO(PF-703): Column output_parameters is being phased out in favor of table flightworking.
+      //  We continue to write the output map here temporarily for backward compatibility.
       statement.setString("outputParameters", flightContext.getWorkingMap().toJson());
 
       statement.setString("status", flightContext.getFlightStatus().name());
@@ -664,16 +663,18 @@ class FlightDao {
             flightContext.setStepIndex(rsflight.getInt("step_index"));
 
             // TODO(PF-703): In the current transition away from working_parameters column towards
-            //               flightworking table we can either have only JSON or both.  Until we've
-            //               transitioned, delegate the decision of which to use to the FlightMap
-            //               class.
+            // flightworking table we can either have only JSON or both.  Until we've transitioned,
+            // delegate the decision of which to use to the FlightMap class.
 
             final String workingMapJson = rsflight.getString("working_parameters");
 
             final List<FlightInput> workingList =
                 retrieveWorkingParameters(connection, rsflight.getObject("id", UUID.class));
 
-            flightContext.setWorkingMap(FlightMap.create(workingList, workingMapJson));
+            // If we built a working map from the data, replace the flight context's default working
+            // map with it.
+            FlightMap.create(workingList, workingMapJson)
+                .ifPresent(workingMap -> flightContext.setWorkingMap(workingMap));
           }
         }
       }
@@ -837,12 +838,15 @@ class FlightDao {
             exceptionSerializer.deserialize(rs.getString("serialized_exception")));
 
         // TODO(PF-703): In the current transition away from output_parameters column towards
-        //               flightworking table we can either have only JSON or both.  Until we've
-        //               transitioned, delegate the decision of which to use to the FlightMap class.
+        // flightworking table we can either have only JSON or both.  Until we've transitioned,
+        // delegate the decision of which to use to the FlightMap class.
 
         String outputParamsJson = rs.getString("output_parameters");
         final List<FlightInput> workingList = retrieveLatestWorkingParameters(connection, flightId);
-        flightState.setResultMap(FlightMap.create(workingList, outputParamsJson));
+
+        // If we were able to build a map from the data, use it to set the result map.
+        FlightMap.create(workingList, outputParamsJson)
+            .ifPresent(flightMap -> flightState.setResultMap(flightMap));
       }
 
       flightStateList.add(flightState);

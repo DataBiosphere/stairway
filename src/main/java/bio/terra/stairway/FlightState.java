@@ -11,7 +11,7 @@ public class FlightState {
   private FlightMap inputParameters;
   private Instant submitted;
   private Instant completed;
-  private Optional<FlightMap> resultMap; // filled in when flightStatus is SUCCESS
+  private FlightMap resultMap; // filled in when flightStatus is SUCCESS
   private Exception exception; // filled in when flightStatus is ERROR or FATAL
   private String stairwayId;
 
@@ -60,12 +60,12 @@ public class FlightState {
   }
 
   public Optional<FlightMap> getResultMap() {
-    return resultMap;
+    return Optional.ofNullable(resultMap);
   }
 
-  public void setResultMap(Optional<FlightMap> resultMap) {
-    if (resultMap.isPresent()) {
-      resultMap.get().makeImmutable();
+  public void setResultMap(FlightMap resultMap) {
+    if (resultMap != null) {
+      resultMap.makeImmutable();
     }
     this.resultMap = resultMap;
   }
