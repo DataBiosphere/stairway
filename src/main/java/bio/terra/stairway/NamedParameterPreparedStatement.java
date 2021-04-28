@@ -8,6 +8,7 @@ import java.sql.Timestamp;
 import java.time.Instant;
 import java.util.HashMap;
 import java.util.Map;
+import java.util.UUID;
 import org.apache.commons.lang3.StringUtils;
 
 /**
@@ -98,5 +99,9 @@ class NamedParameterPreparedStatement implements AutoCloseable {
 
   public void setInstant(String name, Instant value) throws SQLException {
     preparedStatement.setTimestamp(getIndex(name), Timestamp.from(value));
+  }
+
+  public void setUuid(String name, UUID uuid) throws SQLException {
+    preparedStatement.setObject(getIndex(name), uuid);
   }
 }

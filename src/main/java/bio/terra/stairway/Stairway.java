@@ -161,9 +161,10 @@ public class Stairway {
      * flightlog table at the completion of a flight. This flag can be set on Stairway create to
      * request keeping the flightlog instead of cleaning it.
      *
-     * @param keepFlightLog true to keep the flight log. Default is false;
+     * @param keepFlightLog true to keep the flight log. Default is true;
      * @return this
      */
+    @Deprecated
     public Builder keepFlightLog(boolean keepFlightLog) {
       this.keepFlightLog = keepFlightLog;
       return this;

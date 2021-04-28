@@ -1,0 +1,49 @@
+databaseChangeLog:
+  - changeSet:
+      id: flightworking
+      author: JCz
+      changes:
+        - dropNotNullConstraint:
+            tableName: flightlog
+            columnName: working_parameters
+            remarks: deprecating for flightworking table
+        - addColumn:
+            tableName: flightlog
+            columns:
+              - column:
+                  name: id
+                  type: uuid
+                  constraints:
+                    unique: true
+        - createTable:
+            tableName: flightworking
+            columns:
+              - column:
+                  name: flightlog_id
+                  type: uuid
+                  constraints:
+                    nullable: false
+              - column:
+                  name: key
+                  type: text
+                  constraints:
+                    nullable: false
+              - column:
+                  name: value
+                  type: text
+                  remarks: serialized object representation
+                  constraints:
+                    nullable: false
+        - addPrimaryKey:
+            tableName: flightworking
+            columnNames: flightlog_id, key
+            constraintName: pk_flightworking
+        - addForeignKeyConstraint:
+            baseTableName: flightworking
+            baseColumnNames: flightlog_id
+            referencedTableName: flightlog
+            referencedColumnNames: id
+            onDelete: CASCADE
+            onUpdate: NO ACTION
+            validate: true
+            constraintName: fk_flightworking_flightlog
