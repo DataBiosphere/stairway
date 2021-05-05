@@ -10,10 +10,13 @@ import bio.terra.stairway.exception.MigrateException;
 import bio.terra.stairway.exception.QueueException;
 import bio.terra.stairway.exception.StairwayExecutionException;
 import java.io.IOException;
+import java.time.Duration;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.UUID;
 import java.util.concurrent.LinkedBlockingQueue;
+import java.util.concurrent.ScheduledExecutorService;
+import java.util.concurrent.ScheduledThreadPoolExecutor;
 import java.util.concurrent.ThreadPoolExecutor;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
@@ -31,6 +34,7 @@ public class Stairway {
   private static final int DEFAULT_MAX_PARALLEL_FLIGHTS = 20;
   private static final int DEFAULT_MAX_QUEUED_FLIGHTS = 2;
   private static final int MIN_QUEUED_FLIGHTS = 0;
+  private static final int SCHEDULED_POOL_CORE_THREADS = 5;
 
   // Constructor parameters
   private final Object applicationContext;
@@ -43,9 +47,11 @@ public class Stairway {
   private final int maxParallelFlights;
   private final int maxQueuedFlights;
   private final boolean workQueueEnabled;
-  private final boolean keepFlightLog;
   private final HookWrapper hookWrapper;
   private final FlightFactory flightFactory;
+  private final Duration retentionCheckInterval;
+  private final Duration completedFlightRetention;
+  private final Duration completedFlightAvailable;
 
   // Initialized state
   private StairwayThreadPool threadPool;
@@ -55,6 +61,7 @@ public class Stairway {
   private FlightDao flightDao;
   private Queue workQueue;
   private Thread workQueueListenerThread;
+  private ScheduledExecutorService scheduledPool;
 
   public static class Builder {
     private Integer maxParallelFlights;
@@ -65,11 +72,13 @@ public class Stairway {
     private String stairwayClusterName;
     private final List<StairwayHook> stairwayHooks = new ArrayList<>();
     private boolean enableWorkQueue;
-    private boolean keepFlightLog = true;
     private FlightFactory flightFactory;
     private String workQueueProjectId;
     private String workQueueTopicId;
     private String workQueueSubscriptionId;
+    private Duration retentionCheckInterval;
+    private Duration completedFlightRetention;
+    private Duration completedFlightAvailable;
 
     /**
      * Determines the size of the thread pool used for running Stairway flights. Default is
@@ -157,16 +166,13 @@ public class Stairway {
     }
 
     /**
-     * For debugging flights and stairway, it can sometimes be useful to skip cleaning up the
-     * flightlog table at the completion of a flight. This flag can be set on Stairway create to
-     * request keeping the flightlog instead of cleaning it.
+     * Use the retention controls instead of this method. It is a no-op.
      *
-     * @param keepFlightLog true to keep the flight log. Default is true;
+     * @param keepFlightLog ignored
      * @return this
      */
     @Deprecated
     public Builder keepFlightLog(boolean keepFlightLog) {
-      this.keepFlightLog = keepFlightLog;
       return this;
     }
 
@@ -230,6 +236,45 @@ public class Stairway {
      */
     public Builder workQueueSubscriptionId(String workQueueSubscriptionId) {
       this.workQueueSubscriptionId = workQueueSubscriptionId;
+      return this;
+    }
+
+    /**
+     * Control the frequency of clean up passes over the retained flights. Defaults to never
+     * checking.
+     *
+     * @param retentionCheckInterval duration between retention checks for this stairway instance
+     * @return this
+     */
+    public Builder retentionCheckInterval(Duration retentionCheckInterval) {
+      this.retentionCheckInterval = retentionCheckInterval;
+      return this;
+    }
+
+    /**
+     * Specify the length of time that completed flights should be retained in the stairway
+     * database. Defaults to retaining forever.
+     *
+     * @param completedFlightRetention duration before clean up
+     * @return this
+     */
+    public Builder completedFlightRetention(Duration completedFlightRetention) {
+      this.completedFlightRetention = completedFlightRetention;
+      return this;
+    }
+
+    /**
+     * Specify how long flight results are to be available through {@link Stairway#getFlightState}
+     * and {@link Stairway#getFlights}. This allows you to bound the length of time you need to
+     * retain associated information or support deprecated result classes.
+     *
+     * <p>Defaults to always available.
+     *
+     * @param completedFlightAvailable duration of availability computed from completed time
+     * @return this
+     */
+    public Builder completedFlightAvailable(Duration completedFlightAvailable) {
+      this.completedFlightAvailable = completedFlightAvailable;
       return this;
     }
 
@@ -325,9 +370,11 @@ public class Stairway {
     }
 
     this.applicationContext = builder.applicationContext;
-    this.keepFlightLog = builder.keepFlightLog;
     this.quietingDown = new AtomicBoolean();
     this.hookWrapper = new HookWrapper(builder.stairwayHooks);
+    this.completedFlightAvailable = builder.completedFlightAvailable;
+    this.completedFlightRetention = builder.completedFlightRetention;
+    this.retentionCheckInterval = builder.retentionCheckInterval;
   }
 
   /**
@@ -355,9 +402,7 @@ public class Stairway {
     }
 
     stairwayInstanceDao = new StairwayInstanceDao(dataSource);
-    flightDao =
-        new FlightDao(
-            dataSource, stairwayInstanceDao, exceptionSerializer, hookWrapper, keepFlightLog);
+    flightDao = new FlightDao(dataSource, stairwayInstanceDao, exceptionSerializer, hookWrapper);
 
     if (forceCleanStart) {
       // Drop all tables and recreate the database
@@ -369,7 +414,7 @@ public class Stairway {
       migrate.upgrade("stairway/db/changelog.xml", dataSource);
     }
 
-    createThreadPool();
+    configureThreadPools();
     setupWorkQueue(forceCleanStart);
     return stairwayInstanceDao.getList();
   }
@@ -409,8 +454,7 @@ public class Stairway {
     startWorkQueueListener();
   }
 
-  private void createThreadPool() {
-    // TODO: tune the keep alive time
+  private void configureThreadPools() {
     threadPool =
         new StairwayThreadPool(
             maxParallelFlights,
@@ -418,6 +462,16 @@ public class Stairway {
             0L,
             TimeUnit.MILLISECONDS,
             new LinkedBlockingQueue<Runnable>());
+
+    scheduledPool = new ScheduledThreadPoolExecutor(SCHEDULED_POOL_CORE_THREADS);
+    // If we have retention settings then set up the regular flight cleaner
+    if (retentionCheckInterval != null && completedFlightRetention != null) {
+      scheduledPool.scheduleWithFixedDelay(
+          new CompletedFlightCleaner(completedFlightRetention, flightDao),
+          retentionCheckInterval.toSeconds(),
+          retentionCheckInterval.toSeconds(),
+          TimeUnit.SECONDS);
+    }
   }
 
   private void setupWorkQueue(boolean forceClean) throws QueueException {

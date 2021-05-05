@@ -14,6 +14,7 @@ import edu.umd.cs.findbugs.annotations.SuppressFBWarnings;
 import java.sql.Connection;
 import java.sql.ResultSet;
 import java.sql.SQLException;
+import java.time.Instant;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
@@ -52,32 +53,27 @@ import org.slf4j.LoggerFactory;
     value = "RCN_REDUNDANT_NULLCHECK_WOULD_HAVE_BEEN_A_NPE",
     justification = "Spotbugs doesn't understand resource try construct")
 class FlightDao {
-  private static final Logger logger = LoggerFactory.getLogger(FlightDao.class);
-
   static final String FLIGHT_TABLE = "flight";
   static final String FLIGHT_LOG_TABLE = "flightlog";
   static final String FLIGHT_INPUT_TABLE = "flightinput";
   static final String FLIGHT_WORKING_TABLE = "flightworking";
-
+  private static final Logger logger = LoggerFactory.getLogger(FlightDao.class);
   private static final String UNKNOWN = "<unknown>";
 
   private final DataSource dataSource;
   private final StairwayInstanceDao stairwayInstanceDao;
   private final ExceptionSerializer exceptionSerializer;
-  private final boolean keepFlightLog;
   private final HookWrapper hookWrapper;
 
   FlightDao(
       DataSource dataSource,
       StairwayInstanceDao stairwayInstanceDao,
       ExceptionSerializer exceptionSerializer,
-      HookWrapper hookWrapper,
-      boolean keepFlightLog) {
+      HookWrapper hookWrapper) {
     this.dataSource = dataSource;
     this.stairwayInstanceDao = stairwayInstanceDao;
     this.exceptionSerializer = exceptionSerializer;
     this.hookWrapper = hookWrapper;
-    this.keepFlightLog = keepFlightLog;
   }
 
   /**
@@ -480,6 +476,70 @@ class FlightDao {
       deleteLogStatement.getPreparedStatement().executeUpdate();
 
       commitTransaction(connection);
+    }
+  }
+
+  /**
+   * Remove completed flights from the database that are older than a specific time
+   *
+   * @param deleteOlderThan time before which flights can be removed
+   * @throws DatabaseOperationException on any database error
+   * @throws InterruptedException thread shutdown
+   * @returns count of deleted lights
+   */
+  int deleteCompletedFlights(Instant deleteOlderThan)
+      throws DatabaseOperationException, InterruptedException {
+    return DbRetry.retry(
+        "flight.deleteCompletedFlights", () -> deleteCompletedFlightsInner(deleteOlderThan));
+  }
+
+  private int deleteCompletedFlightsInner(Instant deleteOlderThan) throws SQLException {
+    final String sqlInClause =
+        " WHERE flightid IN (SELECT flightid FROM "
+            + FLIGHT_TABLE
+            + " WHERE completed_time < :completed_time)";
+
+    final String sqlDeleteFlightWorking =
+        "DELETE FROM "
+            + FLIGHT_WORKING_TABLE
+            + " WHERE flightlog_id IN"
+            + " (SELECT id FROM flightlog "
+            + sqlInClause
+            + ")";
+
+    final String sqlDeleteFlightInput = "DELETE FROM " + FLIGHT_INPUT_TABLE + sqlInClause;
+
+    final String sqlDeleteFlightLog = "DELETE FROM " + FLIGHT_LOG_TABLE + sqlInClause;
+
+    final String sqlDeleteFlight =
+        "DELETE FROM " + FLIGHT_TABLE + "  WHERE completed_time < :completed_time";
+
+    try (Connection connection = dataSource.getConnection();
+        NamedParameterPreparedStatement deleteFlightStatement =
+            new NamedParameterPreparedStatement(connection, sqlDeleteFlight);
+        NamedParameterPreparedStatement deleteInputStatement =
+            new NamedParameterPreparedStatement(connection, sqlDeleteFlightInput);
+        NamedParameterPreparedStatement deleteWorkingStatement =
+            new NamedParameterPreparedStatement(connection, sqlDeleteFlightWorking);
+        NamedParameterPreparedStatement deleteLogStatement =
+            new NamedParameterPreparedStatement(connection, sqlDeleteFlightLog)) {
+
+      startTransaction(connection);
+
+      deleteWorkingStatement.setInstant("completed_time", deleteOlderThan);
+      deleteWorkingStatement.getPreparedStatement().executeUpdate();
+
+      deleteInputStatement.setInstant("completed_time", deleteOlderThan);
+      deleteInputStatement.getPreparedStatement().executeUpdate();
+
+      deleteLogStatement.setInstant("completed_time", deleteOlderThan);
+      deleteLogStatement.getPreparedStatement().executeUpdate();
+
+      deleteFlightStatement.setInstant("completed_time", deleteOlderThan);
+      int count = deleteFlightStatement.getPreparedStatement().executeUpdate();
+
+      commitTransaction(connection);
+      return count;
     }
   }
 

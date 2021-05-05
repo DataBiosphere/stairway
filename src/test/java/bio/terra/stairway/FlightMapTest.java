@@ -3,6 +3,7 @@ package bio.terra.stairway;
 import bio.terra.stairway.exception.JsonConversionException;
 import bio.terra.stairway.fixtures.FlightsTestPojo;
 import com.fasterxml.jackson.core.JsonProcessingException;
+import edu.umd.cs.findbugs.annotations.SuppressFBWarnings;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Optional;
@@ -173,6 +174,7 @@ public class FlightMapTest {
         JsonProcessingException.class, () -> badListValueMap.get().validateAgainst(badValueList));
   }
 
+  @SuppressFBWarnings(value = "SIC_INNER_SHOULD_BE_STATIC", justification = "We want this  here")
   // Intentionally non-static internal class, so that attempting to serialize an instance fails.
   private class NonStaticClass {}
 
