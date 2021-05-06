@@ -5,26 +5,22 @@ import static bio.terra.stairway.StairwayMapper.getObjectMapper;
 import bio.terra.stairway.exception.JsonConversionException;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.core.type.TypeReference;
-import com.google.common.annotations.VisibleForTesting;
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
-import java.util.Optional;
 import java.util.stream.Collectors;
 import javax.annotation.Nullable;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 
 /**
- * FlightMap wraps a {@code HashMap<String, Object>} It provides a subset of the HashMap methods. It
- * localizes code that casts from Object to the target type. It provides a way to set the map to be
- * immutable.
+ * FlightMap wraps a {@code HashMap<String, String>} It provides a map-like interface. It localizes
+ * code that retrieves and deserializes from String to the target type, and serializes and stores to
+ * String for storage. It provides a way to set the map to be immutable.
  */
 public class FlightMap {
-  private Map<String, Object> map;
+  private Map<String, String> map;
 
   public FlightMap() {
     map = new HashMap<>();
@@ -38,12 +34,7 @@ public class FlightMap {
   FlightMap(List<FlightInput> inputList) {
     map = new HashMap<>();
     for (FlightInput input : inputList) {
-      try {
-        Object value = getObjectMapper().readValue(input.getValue(), Object.class);
-        map.put(input.getKey(), value);
-      } catch (IOException ex) {
-        throw new JsonConversionException("Failed to convert json string to object", ex);
-      }
+      map.put(input.getKey(), input.getValue());
     }
   }
 
@@ -55,13 +46,8 @@ public class FlightMap {
    */
   List<FlightInput> makeFlightInputList() {
     ArrayList<FlightInput> inputList = new ArrayList<>();
-    for (Map.Entry<String, Object> entry : map.entrySet()) {
-      try {
-        String value = getObjectMapper().writeValueAsString(entry.getValue());
-        inputList.add(new FlightInput(entry.getKey(), value));
-      } catch (JsonProcessingException ex) {
-        throw new JsonConversionException("Failed to convert value to json string", ex);
-      }
+    for (Map.Entry<String, String> entry : map.entrySet()) {
+      inputList.add(new FlightInput(entry.getKey(), entry.getValue()));
     }
     return inputList;
   }
@@ -69,70 +55,24 @@ public class FlightMap {
   /**
    * Depending on what version of code a Flight log was written with, we may have a JSON Map, a
    * {@code List<FlightInput>}, both, or neither at deserialization time. This method is used to
-   * generate an {@code Optional<FlightMap>} based on what was contained in the database. This will
-   * return an empty {@code Optional<FlightMap>} if json is null.
+   * generate a FlightMap based on what was contained in the database.
    *
    * @param inputList Entries in flightworking for a given Flight log. May be empty if Flight
    *     pre-existed flightworking table, or there are no working parameters.
    * @param json Map of working entries for a given Flight log in JSON. May be NULL.
    */
-  static Optional<FlightMap> create(List<FlightInput> inputList, @Nullable String json) {
+  static FlightMap create(List<FlightInput> inputList, @Nullable String json) {
 
-    // Note that currently if this is NULL, it indicates that the output_parameters field of the
-    // flight table was empty.  Going forward (PF-703) we will expect NULL json to be the normal
-    // case and should also look at flightInput.
-    if (json == null) {
-      return Optional.empty();
+    // If we have an empty list AND there is valid JSON, this predates the flightworking table...
+    // use the json in this case.
+    if (inputList.isEmpty() && json != null) {
+      FlightMap map = new FlightMap();
+      map.fromJson(json);
+      return map;
     }
 
-    // TODO(PF-703): Once we stop writing JSON, we may still have JSON-only flight data in the
-    // database, as well as flights with both. At that point we should favor inputList over json.
-
-    FlightMap map = new FlightMap();
-    map.fromJson(json);
-
-    // TODO(PF-703): Remove this block.
-    if (!inputList.isEmpty()) {
-      try {
-        map.validateAgainst(inputList);
-      } catch (Exception ex) {
-        Logger logger = LoggerFactory.getLogger("FlightMap");
-        logger.error("Input list does not match JSON: {}", ex.getMessage());
-      }
-    }
-
-    return Optional.of(map);
-  }
-
-  /**
-   * Validate whether the passed inputList will deserialize to the same set of keys and
-   * corresponding types stored in the map. Note that this does not ensure the equality of values as
-   * all types stored in FlightMap are not required to be comparable.
-   *
-   * <p>Throws {@link RuntimeException} if any key exists in inputList but not in map (or vice
-   * versa). Throws {@link JsonProcessingException} if any value in inputList does not deserialize
-   * to the type of its corresponding entry in the map.
-   *
-   * @param inputList
-   */
-  @VisibleForTesting
-  void validateAgainst(List<FlightInput> inputList) throws Exception {
-
-    if (inputList.size() != map.size())
-      throw new RuntimeException(
-          String.format(
-              "Passed input list has %d entries, map has %d.", inputList.size(), map.size()));
-
-    for (FlightInput input : inputList) {
-      final String key = input.getKey();
-      if (!map.containsKey(key)) {
-        throw new RuntimeException(String.format("Key '%s' not found in map.", key));
-      }
-      final Object object = map.get(key);
-      if (object != null) {
-        getObjectMapper().readValue(input.getValue(), object.getClass());
-      }
-    }
+    // Otherwise just use the input list (even if it's empty).
+    return new FlightMap(inputList);
   }
 
   /** Convert the map to an unmodifiable form. */
@@ -140,45 +80,80 @@ public class FlightMap {
     map = Collections.unmodifiableMap(map);
   }
 
+  /** Check map for emptiness */
+  boolean isEmpty() {
+    return map.isEmpty();
+  }
+
   /**
-   * Return the object from the hash map cast to the right type. Throw an exception if the Object
-   * cannot be cast to that type.
+   * Return the object from the hash map deserialized to the right type. Throw an exception if the
+   * Object cannot be deserialized to that type.
    *
    * @param <T> - type of class to expect in the hash map
    * @param key - key to lookup in the hash map
    * @param type - class requested
    * @return null if not found
-   * @throws ClassCastException if found, not castable to the requested type
+   * @throws ClassCastException if found, not deserializable to the requested type
    */
+  @Nullable
   public <T> T get(String key, Class<T> type) {
-    Object value = map.get(key);
+    String value = map.get(key);
+
     if (value == null) {
       return null;
     }
 
-    if (type.isInstance(value)) {
-      return type.cast(value);
-    }
-    throw new ClassCastException(
-        "Found value '" + value.toString() + "' is not an instance of type " + type.getName());
-  }
-
-  public void put(String key, Object value) {
-    map.put(key, value);
-  }
-
-  @Deprecated
-  public String toJson() {
     try {
-      return getObjectMapper().writeValueAsString(map);
+      return getObjectMapper().readValue(value, type);
     } catch (JsonProcessingException ex) {
-      throw new JsonConversionException("Failed to convert map to json string", ex);
+      throw new ClassCastException(
+          "Found value '" + value + "' is not an instance of type " + type.getName());
     }
   }
 
-  public void fromJson(String json) {
+  /**
+   * Returns the raw String stored for a given key in the hash map.
+   *
+   * @param key to lookup in the hash map
+   * @return null if not found
+   */
+  @Nullable
+  public String getRaw(String key) {
+    return map.get(key);
+  }
+
+  /**
+   * Serialize the passed Object to a JSON String and store in the hash map
+   *
+   * @param key to store the data under
+   * @param value to serialize and store
+   * @throws JsonConversionException if object cannot be converted to JSON
+   */
+  public void put(String key, Object value) {
     try {
-      map = getObjectMapper().readValue(json, new TypeReference<Map<String, Object>>() {});
+      map.put(key, getObjectMapper().writeValueAsString(value));
+    } catch (JsonProcessingException ex) {
+      throw new JsonConversionException("Failed to convert value to json string", ex);
+    }
+  }
+
+  /**
+   * Store a raw String representing a serialized object in the hash map
+   *
+   * @param key to store the String under
+   * @param rawValue to store
+   */
+  public void putRaw(String key, String rawValue) {
+    map.put(key, rawValue);
+  }
+
+  private void fromJson(String json) {
+    try {
+      Map<String, Object> legacyMap =
+          getObjectMapper().readValue(json, new TypeReference<Map<String, Object>>() {});
+      for (Map.Entry<String, Object> entry : legacyMap.entrySet()) {
+        map.put(entry.getKey(), getObjectMapper().writeValueAsString(entry.getValue()));
+      }
     } catch (IOException ex) {
       throw new JsonConversionException("Failed to convert json string to map", ex);
     }
