@@ -986,8 +986,8 @@ class FlightDao {
         "SELECT key, value FROM "
             + FLIGHT_WORKING_TABLE
             + " WHERE flightlog_id="
-            + "(SELECT id FROM flightlog WHERE log_time="
-            + "   (SELECT MAX(log_time) FROM flightlog WHERE flightid = :flightId))";
+            + "(SELECT id FROM flightlog WHERE (flightid = :flightId) AND log_time="
+            + "   (SELECT MAX(log_time) FROM flightlog WHERE flightid = :flightId2))";
 
     List<FlightInput> inputList = new ArrayList<>();
 
@@ -995,6 +995,7 @@ class FlightDao {
         new NamedParameterPreparedStatement(connection, sqlSelectInput)) {
 
       statement.setString("flightId", flightId);
+      statement.setString("flightId2", flightId);
       try (ResultSet rs = statement.getPreparedStatement().executeQuery()) {
         while (rs.next()) {
           FlightInput input = new FlightInput(rs.getString("key"), rs.getString("value"));

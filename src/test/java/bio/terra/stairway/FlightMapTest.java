@@ -174,8 +174,10 @@ public class FlightMapTest {
         JsonProcessingException.class, () -> badListValueMap.get().validateAgainst(badValueList));
   }
 
-  @SuppressFBWarnings(value = "SIC_INNER_SHOULD_BE_STATIC", justification = "We want this  here")
-  // Intentionally non-static internal class, so that attempting to serialize an instance fails.
+  @SuppressFBWarnings(
+      value = "SIC_INNER_SHOULD_BE_STATIC",
+      justification =
+          "Intentionally non-static internal class, so that attempting to serialize an instance fails.")
   private class NonStaticClass {}
 
   @Test
