@@ -22,8 +22,11 @@ import bio.terra.stairway.flights.TestFlightUndo;
 import bio.terra.stairway.flights.TestFlightWait;
 import java.io.File;
 import java.io.PrintWriter;
+import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.List;
 import java.util.UUID;
+import java.util.concurrent.Phaser;
 import java.util.concurrent.TimeUnit;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Tag;
@@ -714,5 +717,110 @@ public class ScenarioTest {
 
   private String makeFilename() {
     return "/tmp/test." + UUID.randomUUID().toString() + ".txt";
+  }
+
+  /**
+   * Class to enable creating Flights and waiting for their completion in background threads,
+   * caching results and any thrown exceptions for inspection in the main test thread.
+   */
+  private class ThreadedTestRunnable implements Runnable {
+
+    Phaser phaser;
+    private final int index;
+    private final String filename;
+    Exception exception;
+    FlightState result;
+
+    ThreadedTestRunnable(Phaser phaser, int index) {
+      this.phaser = phaser;
+      this.index = index;
+      this.filename = makeFilename();
+    }
+
+    @Override
+    public void run() {
+
+      // This basically implements the same logic as simpleTest in a background thread, holding
+      // results and any caught exceptions for inspection by the main thread.  A synchronization
+      // point is also injected via the use of a Phaser to introduce a barrier before all threads
+      // submit their flights, with the intent of triggering timestamp collisions to regression test
+      // the fix for PF-785.
+
+      try {
+        // Submit the test flight
+        FlightMap inputParameters = new FlightMap();
+        inputParameters.put("filename", filename);
+        inputParameters.put("text", "testing 1 2 3");
+
+        logger.debug(
+            "Waiting to launch TestFlight '{}' with filename '{}'", getFlightId(), filename);
+
+        // Phaser is used here as a simple barrier to try to induce duplicate timestamps.  All
+        // threads wait on the barrier until the last one reaches it.
+        phaser.arriveAndAwaitAdvance();
+        stairway.submit(getFlightId(), TestFlight.class, inputParameters);
+
+        logger.debug("Waiting for flight {}", getFlightId());
+        result = stairway.waitForFlight(getFlightId(), null, null);
+      } catch (Exception ex) {
+        logger.error(ex.getMessage());
+        exception = ex;
+      }
+    }
+
+    public String getFlightId() {
+      return String.format("threadedTest%02X", index);
+    }
+
+    public String getFilename() {
+      return filename;
+    }
+
+    public void throwExceptionIfPresent() throws Exception {
+      if (exception != null) {
+        throw exception;
+      }
+    }
+
+    public FlightState getResult() {
+      return result;
+    }
+  }
+
+  @Test
+  public void threadedTest() throws Exception {
+
+    // Like simpleTest(), but with threads.  Spawn a set of threads using ThreadedTestRunnable,
+    // which will launch flights, wait for completion, and cache results (and any exceptions
+    // thrown).  We will join these threads and then assert expected results.
+
+    List<ThreadedTestRunnable> runnableList = new ArrayList<>();
+    List<Thread> threadList = new ArrayList<>();
+
+    final int threadCount = Runtime.getRuntime().availableProcessors();
+
+    // Phaser is used as a simple barrier to try to sync flight submissions.
+    Phaser phaser = new Phaser(threadCount);
+
+    for (int i = 0; i < threadCount; ++i) {
+      ThreadedTestRunnable runnable = new ThreadedTestRunnable(phaser, i);
+      runnableList.add(runnable);
+
+      Thread thread = new Thread(runnable);
+      thread.start();
+      threadList.add(thread);
+    }
+
+    // Wait for all threads.
+    for (Thread thread : threadList) {
+      thread.join();
+    }
+
+    // Assert all results (throwing any exceptions caught in threads along the way).
+    for (ThreadedTestRunnable runnable : runnableList) {
+      runnable.throwExceptionIfPresent();
+      assertThat(runnable.getResult().getFlightStatus(), equalTo(FlightStatus.SUCCESS));
+      assertFalse(runnable.getResult().getException().isPresent());
+    }
   }
 }
