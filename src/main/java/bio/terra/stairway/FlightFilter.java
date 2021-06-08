@@ -31,11 +31,15 @@ public class FlightFilter {
   private List<FlightFilterPredicate> flightPredicates;
   private List<FlightFilterPredicate> inputPredicates;
   private int parameterId;
+  private boolean enforceVisibilityLimit;
+  private int flightVisibilitySeconds;
 
   public FlightFilter() {
     flightPredicates = new ArrayList<>();
     inputPredicates = new ArrayList<>();
     parameterId = 0;
+    enforceVisibilityLimit = false;
+    flightVisibilitySeconds = 0;
   }
 
   /**
@@ -117,6 +121,19 @@ public class FlightFilter {
   }
 
   /**
+   * Set visibility of flights. If we are enforcing visibility, these parameters will add a clause
+   * to the flight-filter to filter out flights that have been complete for longer than
+   * flightVisibilitySeconds.
+   *
+   * @param enforceVisibilityLimit true if we are enforcing visibility limits
+   * @param flightVisibilitySeconds visibility limit in seconds
+   */
+  void setVisibility(boolean enforceVisibilityLimit, int flightVisibilitySeconds) {
+    this.enforceVisibilityLimit = (enforceVisibilityLimit && (flightVisibilitySeconds > 0));
+    this.flightVisibilitySeconds = flightVisibilitySeconds;
+  }
+
+  /**
    * Store the comparison values associated with the predicates into the SQL statement
    *
    * @param statement named parameter SQL statement structure
@@ -130,6 +147,9 @@ public class FlightFilter {
       }
       for (FlightFilterPredicate predicate : inputPredicates) {
         predicate.storeInputPredicateValue(statement);
+      }
+      if (enforceVisibilityLimit) {
+        statement.setString("visibility", String.format("%d seconds", flightVisibilitySeconds));
       }
     } catch (SQLException | JsonProcessingException ex) {
       throw new FlightFilterException("Failure storing predicate values", ex);
@@ -241,10 +261,14 @@ public class FlightFilter {
 
   /**
    * Generate the filter for the flight table. The right hand side of any comparison op is generated
-   * as a named parameter.
+   * as a named parameter. This is the method that injects or does not inject the flight visibility
+   * limit.
    */
   private void makeFlightFilter(StringBuilder sb, String prefix) {
-    if (flightPredicates.size() > 0) {
+    final String completedFilter =
+        "(completed_time IS NULL OR completed_time + CAST(:visibility AS INTERVAL) > CURRENT_TIMESTAMP)";
+
+    if (flightPredicates.size() > 0 || enforceVisibilityLimit) {
       sb.append(prefix);
       String inter = StringUtils.EMPTY;
 
@@ -252,6 +276,10 @@ public class FlightFilter {
         String sql = predicate.makeFlightPredicateSql();
         sb.append(inter).append(sql);
         inter = " AND ";
+      }
+
+      if (enforceVisibilityLimit) {
+        sb.append(inter).append(completedFilter);
       }
     }
   }

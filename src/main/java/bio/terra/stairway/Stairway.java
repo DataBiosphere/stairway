@@ -62,6 +62,7 @@ public class Stairway {
   private Queue workQueue;
   private Thread workQueueListenerThread;
   private ScheduledExecutorService scheduledPool;
+  private Control control;
 
   public static class Builder {
     private Integer maxParallelFlights;
@@ -402,7 +403,14 @@ public class Stairway {
     }
 
     stairwayInstanceDao = new StairwayInstanceDao(dataSource);
-    flightDao = new FlightDao(dataSource, stairwayInstanceDao, exceptionSerializer, hookWrapper);
+    flightDao = new FlightDao(
+        dataSource,
+        stairwayInstanceDao,
+        exceptionSerializer,
+        hookWrapper,
+        completedFlightAvailable);
+
+    control = new Control(flightDao);
 
     if (forceCleanStart) {
       // Drop all tables and recreate the database
@@ -976,6 +984,10 @@ public class Stairway {
     }
     logger.info("Launching flight " + flight.context().flightDesc());
     threadPool.submit(flight);
+  }
+
+  public Control getControl() {
+    return control;
   }
 
   @Override

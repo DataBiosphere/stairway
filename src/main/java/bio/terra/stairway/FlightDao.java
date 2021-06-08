@@ -14,6 +14,7 @@ import edu.umd.cs.findbugs.annotations.SuppressFBWarnings;
 import java.sql.Connection;
 import java.sql.ResultSet;
 import java.sql.SQLException;
+import java.time.Duration;
 import java.time.Instant;
 import java.util.ArrayList;
 import java.util.Collections;
@@ -64,16 +65,28 @@ class FlightDao {
   private final StairwayInstanceDao stairwayInstanceDao;
   private final ExceptionSerializer exceptionSerializer;
   private final HookWrapper hookWrapper;
+  private final int flightVisibilitySeconds;
 
   FlightDao(
       DataSource dataSource,
       StairwayInstanceDao stairwayInstanceDao,
       ExceptionSerializer exceptionSerializer,
-      HookWrapper hookWrapper) {
+      HookWrapper hookWrapper,
+      Duration completedFlightAvailable) {
     this.dataSource = dataSource;
     this.stairwayInstanceDao = stairwayInstanceDao;
     this.exceptionSerializer = exceptionSerializer;
     this.hookWrapper = hookWrapper;
+
+    int visibility = 0;
+    if (completedFlightAvailable != null) {
+      try {
+        visibility = Math.toIntExact(completedFlightAvailable.getSeconds());
+      } catch (ArithmeticException e) {
+        // Treat huge duration as equivalent to forever
+      }
+    }
+    this.flightVisibilitySeconds = visibility;
   }
 
   /**
@@ -742,25 +755,43 @@ class FlightDao {
   }
 
   /**
-   * Return flight state for a single flight
+   * Return flight state for a single flight. The status of completed flight is limited by
+   * completeFlightAvailable property.
    *
    * @param flightId flight to get
    * @return FlightState for the flight
+   * @throws FlightNotFound - no flight
+   * @throws DatabaseOperationException - unexpected error in the operation
+   * @throws InterruptedException - interrupt
    */
   FlightState getFlightState(String flightId)
       throws DatabaseOperationException, InterruptedException {
-    return DbRetry.retry("flight.getFlightState", () -> getFlightStateInner(flightId));
+    return DbRetry.retry("flight.getFlightState", () -> getFlightStateInner(flightId, true));
   }
 
-  private FlightState getFlightStateInner(String flightId)
+  FlightState controlGetFlightState(String flightId)
+      throws DatabaseOperationException, InterruptedException {
+    return DbRetry.retry("flight.getFlightState", () -> getFlightStateInner(flightId, false));
+  }
+
+  private FlightState getFlightStateInner(String flightId, boolean enforceVisibilityLimit)
       throws SQLException, DatabaseOperationException {
 
-    final String sqlOneFlight =
+    final String sqlOneFlightBase =
         "SELECT stairway_id, flightid, submit_time, "
             + " completed_time, output_parameters, status, serialized_exception"
             + " FROM "
             + FLIGHT_TABLE
             + " WHERE flightid = :flightId";
+
+    boolean enforceVisibility = enforceVisibilityLimit && (flightVisibilitySeconds > 0);
+
+    String sqlOneFlight = sqlOneFlightBase;
+    if (enforceVisibility) {
+      sqlOneFlight =
+          sqlOneFlightBase
+              + " AND (completed_time IS NULL OR completed_time + CAST(:visibility AS INTERVAL) > CURRENT_TIMESTAMP)";
+    }
 
     try (Connection connection = dataSource.getConnection();
         NamedParameterPreparedStatement oneFlightStatement =
@@ -768,6 +799,10 @@ class FlightDao {
 
       startReadOnlyTransaction(connection);
       oneFlightStatement.setString("flightId", flightId);
+      if (enforceVisibility) {
+        oneFlightStatement.setString(
+            "visibility", String.format("%d seconds", flightVisibilitySeconds));
+      }
 
       try (ResultSet rs = oneFlightStatement.getPreparedStatement().executeQuery()) {
         List<FlightState> flightStateList = makeFlightStateList(connection, rs);
@@ -844,11 +879,24 @@ class FlightDao {
     // Make an empty filter if one is not provided
     FlightFilter filter = (inFilter != null) ? inFilter : new FlightFilter();
 
-    return DbRetry.retry("flight.getFlights", () -> getFlightsInner(offset, limit, filter));
+    return DbRetry.retry("flight.getFlights", () -> getFlightsInner(offset, limit, filter, true));
   }
 
-  private List<FlightState> getFlightsInner(int offset, int limit, FlightFilter filter)
+  List<FlightState> controlGetFlights(int offset, int limit, FlightFilter inFilter)
+      throws DatabaseOperationException, InterruptedException {
+
+    // Make an empty filter if one is not provided
+    FlightFilter filter = (inFilter != null) ? inFilter : new FlightFilter();
+
+    return DbRetry.retry("flight.getFlights", () -> getFlightsInner(offset, limit, filter, false));
+  }
+
+  private List<FlightState> getFlightsInner(
+      int offset, int limit, FlightFilter filter, boolean enforceVisibilityLimit)
       throws SQLException, DatabaseOperationException {
+
+    // Set visibility in the filter object so it will generate the right SQL and parameters
+    filter.setVisibility(enforceVisibilityLimit, flightVisibilitySeconds);
     String sql = filter.makeSql();
 
     try (Connection connection = dataSource.getConnection();
