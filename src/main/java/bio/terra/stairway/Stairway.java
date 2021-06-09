@@ -51,7 +51,6 @@ public class Stairway {
   private final FlightFactory flightFactory;
   private final Duration retentionCheckInterval;
   private final Duration completedFlightRetention;
-  private final Duration completedFlightAvailable;
 
   // Initialized state
   private StairwayThreadPool threadPool;
@@ -62,7 +61,6 @@ public class Stairway {
   private Queue workQueue;
   private Thread workQueueListenerThread;
   private ScheduledExecutorService scheduledPool;
-  private Control control;
 
   public static class Builder {
     private Integer maxParallelFlights;
@@ -79,7 +77,6 @@ public class Stairway {
     private String workQueueSubscriptionId;
     private Duration retentionCheckInterval;
     private Duration completedFlightRetention;
-    private Duration completedFlightAvailable;
 
     /**
      * Determines the size of the thread pool used for running Stairway flights. Default is
@@ -265,21 +262,6 @@ public class Stairway {
     }
 
     /**
-     * Specify how long flight results are to be available through {@link Stairway#getFlightState}
-     * and {@link Stairway#getFlights}. This allows you to bound the length of time you need to
-     * retain associated information or support deprecated result classes.
-     *
-     * <p>Defaults to always available.
-     *
-     * @param completedFlightAvailable duration of availability computed from completed time
-     * @return this
-     */
-    public Builder completedFlightAvailable(Duration completedFlightAvailable) {
-      this.completedFlightAvailable = completedFlightAvailable;
-      return this;
-    }
-
-    /**
      * Construct a Stairway instance based on the builder inputs
      *
      * @return Stairway
@@ -373,7 +355,6 @@ public class Stairway {
     this.applicationContext = builder.applicationContext;
     this.quietingDown = new AtomicBoolean();
     this.hookWrapper = new HookWrapper(builder.stairwayHooks);
-    this.completedFlightAvailable = builder.completedFlightAvailable;
     this.completedFlightRetention = builder.completedFlightRetention;
     this.retentionCheckInterval = builder.retentionCheckInterval;
   }
@@ -403,14 +384,7 @@ public class Stairway {
     }
 
     stairwayInstanceDao = new StairwayInstanceDao(dataSource);
-    flightDao = new FlightDao(
-        dataSource,
-        stairwayInstanceDao,
-        exceptionSerializer,
-        hookWrapper,
-        completedFlightAvailable);
-
-    control = new Control(flightDao);
+    flightDao = new FlightDao(dataSource, stairwayInstanceDao, exceptionSerializer, hookWrapper);
 
     if (forceCleanStart) {
       // Drop all tables and recreate the database
@@ -984,10 +958,6 @@ public class Stairway {
     }
     logger.info("Launching flight " + flight.context().flightDesc());
     threadPool.submit(flight);
-  }
-
-  public Control getControl() {
-    return control;
   }
 
   @Override
