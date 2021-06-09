@@ -10,10 +10,13 @@ import bio.terra.stairway.exception.MigrateException;
 import bio.terra.stairway.exception.QueueException;
 import bio.terra.stairway.exception.StairwayExecutionException;
 import java.io.IOException;
+import java.time.Duration;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.UUID;
 import java.util.concurrent.LinkedBlockingQueue;
+import java.util.concurrent.ScheduledExecutorService;
+import java.util.concurrent.ScheduledThreadPoolExecutor;
 import java.util.concurrent.ThreadPoolExecutor;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
@@ -31,6 +34,7 @@ public class Stairway {
   private static final int DEFAULT_MAX_PARALLEL_FLIGHTS = 20;
   private static final int DEFAULT_MAX_QUEUED_FLIGHTS = 2;
   private static final int MIN_QUEUED_FLIGHTS = 0;
+  private static final int SCHEDULED_POOL_CORE_THREADS = 5;
 
   // Constructor parameters
   private final Object applicationContext;
@@ -43,210 +47,19 @@ public class Stairway {
   private final int maxParallelFlights;
   private final int maxQueuedFlights;
   private final boolean workQueueEnabled;
-  private final boolean keepFlightLog;
   private final HookWrapper hookWrapper;
   private final FlightFactory flightFactory;
-
+  private final Duration retentionCheckInterval;
+  private final Duration completedFlightRetention;
+  private final AtomicBoolean quietingDown;
   // Initialized state
   private StairwayThreadPool threadPool;
   private String stairwayId;
-  private final AtomicBoolean quietingDown;
   private StairwayInstanceDao stairwayInstanceDao;
   private FlightDao flightDao;
   private Queue workQueue;
   private Thread workQueueListenerThread;
-
-  public static class Builder {
-    private Integer maxParallelFlights;
-    private Integer maxQueuedFlights;
-    private Object applicationContext;
-    private ExceptionSerializer exceptionSerializer;
-    private String stairwayName;
-    private String stairwayClusterName;
-    private final List<StairwayHook> stairwayHooks = new ArrayList<>();
-    private boolean enableWorkQueue;
-    private boolean keepFlightLog = true;
-    private FlightFactory flightFactory;
-    private String workQueueProjectId;
-    private String workQueueTopicId;
-    private String workQueueSubscriptionId;
-
-    /**
-     * Determines the size of the thread pool used for running Stairway flights. Default is
-     * DEFAULT_MAX_PARALLEL_FLIGHTS (20 at this moment)
-     *
-     * @param maxParallelFlights maximum parallel flights to run
-     * @return this
-     */
-    public Builder maxParallelFlights(int maxParallelFlights) {
-      this.maxParallelFlights = maxParallelFlights;
-      return this;
-    }
-
-    /**
-     * If we are running a cluster work queue, then this parameter determines the number of flights
-     * we allow to queue locally. If the queue depth is, larger than this max, then we stop taking
-     * work off of the work queue and we add new submitted flights to the cluster work queue.
-     * Default is DEFAULT_MAX_QUEUED_FLIGHTS (1 at this moment)
-     *
-     * <p>If maxQueuedFlights is smaller than MIN_QUEUED_FLIGHTS (0 at this moment), then it is set
-     * to MIN_QUEUED_FLIGHTS. For the admission policy to work properly, MIN_QUEUED_FLIGHT
-     * <b>must</b> be greater than 0.
-     *
-     * @param maxQueuedFlights maximum flights to queue in our local thread pool
-     * @return this
-     */
-    public Builder maxQueuedFlights(int maxQueuedFlights) {
-      this.maxQueuedFlights = maxQueuedFlights;
-      return this;
-    }
-
-    /**
-     * @param applicationContext application context passed along to Flight constructors. Default is
-     *     null.
-     * @return this
-     */
-    public Builder applicationContext(Object applicationContext) {
-      this.applicationContext = applicationContext;
-      return this;
-    }
-
-    /**
-     * @param exceptionSerializer Application-specific exception serializer. Default is the Stairway
-     *     exception serializer
-     * @return this
-     */
-    public Builder exceptionSerializer(ExceptionSerializer exceptionSerializer) {
-      this.exceptionSerializer = exceptionSerializer;
-      return this;
-    }
-
-    /**
-     * @param stairwayName Unique name of this Stairway instance. Used to identify which Stairway
-     *     owns which flight. Default is "stairway" + random UUID
-     * @return this
-     */
-    public Builder stairwayName(String stairwayName) {
-      this.stairwayName = stairwayName;
-      return this;
-    }
-
-    /**
-     * Unique name of the cluster in which this instance runs. If this Stairway runs in a cluster of
-     * Stairway instances, then this must be supplied or they will not work together. This is used
-     * to find/create the shared Stairway work queue. Default is "stairwaycluster" + random UUID
-     *
-     * @param stairwayClusterName Stairway cluster name
-     * @return this
-     */
-    public Builder stairwayClusterName(String stairwayClusterName) {
-      this.stairwayClusterName = stairwayClusterName;
-      return this;
-    }
-
-    /**
-     * You must explicitly enable the work queue when running in a cluster configuration. That
-     * allows for testing where a work queue is not used or created.
-     *
-     * @param enableWorkQueue said true to enable the work queue
-     * @return this
-     */
-    public Builder enableWorkQueue(boolean enableWorkQueue) {
-      this.enableWorkQueue = enableWorkQueue;
-      return this;
-    }
-
-    /**
-     * For debugging flights and stairway, it can sometimes be useful to skip cleaning up the
-     * flightlog table at the completion of a flight. This flag can be set on Stairway create to
-     * request keeping the flightlog instead of cleaning it.
-     *
-     * @param keepFlightLog true to keep the flight log. Default is true;
-     * @return this
-     */
-    @Deprecated
-    public Builder keepFlightLog(boolean keepFlightLog) {
-      this.keepFlightLog = keepFlightLog;
-      return this;
-    }
-
-    /**
-     * Flight factory Stairway Flight objects need to be created by class and by name. In all known
-     * configurations, Stairway's flight factory can be used. This is an escape hatch in case we run
-     * into a configuration that requires special handling for flight creates. Specifying the class
-     * loader is simpler and covers the known cases.
-     *
-     * @param flightFactory flight factory to use
-     * @return this
-     */
-    public Builder flightFactory(FlightFactory flightFactory) {
-      this.flightFactory = flightFactory;
-      return this;
-    }
-
-    /**
-     * Each call to stairwayHook adds hook object to a list of hooks. The hooks are processed in the
-     * order in which they are added to the builder.
-     *
-     * @param stairwayHook object containing hooks for logging at beginning and end of flight and
-     *     step of stairway
-     * @return this
-     */
-    public Builder stairwayHook(StairwayHook stairwayHook) {
-      this.stairwayHooks.add(stairwayHook);
-      return this;
-    }
-
-    /**
-     * Specify the project id in which to find/create the work queue topic and subscription If not
-     * supplied, no queue will be used.
-     *
-     * @param workQueueProjectId a goggle project id
-     * @return this
-     */
-    public Builder workQueueProjectId(String workQueueProjectId) {
-      this.workQueueProjectId = workQueueProjectId;
-      return this;
-    }
-
-    /**
-     * Specify the topic id of the work queue. if no id is supplied, then a topic and subscription
-     * will be created based on the cluster name.
-     *
-     * @param workQueueTopicId the name of the topic to use in the work queue project
-     * @return this
-     */
-    public Builder workQueueTopicId(String workQueueTopicId) {
-      this.workQueueTopicId = workQueueTopicId;
-      return this;
-    }
-
-    /**
-     * Specify these subscription id for the work queue. If the topic id is not supplied, then this
-     * parameter is ignored. If the topic id is supplied, then this parameter it must be supplied.
-     *
-     * @param workQueueSubscriptionId the name of the subscription to use in the work queue project
-     * @return this
-     */
-    public Builder workQueueSubscriptionId(String workQueueSubscriptionId) {
-      this.workQueueSubscriptionId = workQueueSubscriptionId;
-      return this;
-    }
-
-    /**
-     * Construct a Stairway instance based on the builder inputs
-     *
-     * @return Stairway
-     * @throws StairwayExecutionException on invalid input
-     */
-    public Stairway build() throws StairwayExecutionException {
-      return new Stairway(this);
-    }
-  }
-
-  public static Stairway.Builder newBuilder() {
-    return new Stairway.Builder();
-  }
+  private ScheduledExecutorService scheduledPool;
 
   /**
    * We do initialization in three steps. The constructor does the first step of constructing the
@@ -325,9 +138,17 @@ public class Stairway {
     }
 
     this.applicationContext = builder.applicationContext;
-    this.keepFlightLog = builder.keepFlightLog;
     this.quietingDown = new AtomicBoolean();
     this.hookWrapper = new HookWrapper(builder.stairwayHooks);
+    this.completedFlightRetention = builder.completedFlightRetention;
+    this.retentionCheckInterval =
+        (builder.retentionCheckInterval == null)
+            ? Duration.ofDays(1)
+            : builder.retentionCheckInterval;
+  }
+
+  public static Stairway.Builder newBuilder() {
+    return new Stairway.Builder();
   }
 
   /**
@@ -355,9 +176,7 @@ public class Stairway {
     }
 
     stairwayInstanceDao = new StairwayInstanceDao(dataSource);
-    flightDao =
-        new FlightDao(
-            dataSource, stairwayInstanceDao, exceptionSerializer, hookWrapper, keepFlightLog);
+    flightDao = new FlightDao(dataSource, stairwayInstanceDao, exceptionSerializer, hookWrapper);
 
     if (forceCleanStart) {
       // Drop all tables and recreate the database
@@ -369,7 +188,7 @@ public class Stairway {
       migrate.upgrade("stairway/db/changelog.xml", dataSource);
     }
 
-    createThreadPool();
+    configureThreadPools();
     setupWorkQueue(forceCleanStart);
     return stairwayInstanceDao.getList();
   }
@@ -409,8 +228,7 @@ public class Stairway {
     startWorkQueueListener();
   }
 
-  private void createThreadPool() {
-    // TODO: tune the keep alive time
+  private void configureThreadPools() {
     threadPool =
         new StairwayThreadPool(
             maxParallelFlights,
@@ -418,6 +236,16 @@ public class Stairway {
             0L,
             TimeUnit.MILLISECONDS,
             new LinkedBlockingQueue<Runnable>());
+
+    scheduledPool = new ScheduledThreadPoolExecutor(SCHEDULED_POOL_CORE_THREADS);
+    // If we have retention settings then set up the regular flight cleaner
+    if (retentionCheckInterval != null && completedFlightRetention != null) {
+      scheduledPool.scheduleWithFixedDelay(
+          new CompletedFlightCleaner(completedFlightRetention, flightDao),
+          retentionCheckInterval.toSeconds(),
+          retentionCheckInterval.toSeconds(),
+          TimeUnit.SECONDS);
+    }
   }
 
   private void setupWorkQueue(boolean forceClean) throws QueueException {
@@ -965,5 +793,214 @@ public class Stairway {
         .append(stairwayId)
         .append(quietingDown)
         .toHashCode();
+  }
+
+  public static class Builder {
+    private final List<StairwayHook> stairwayHooks = new ArrayList<>();
+    private Integer maxParallelFlights;
+    private Integer maxQueuedFlights;
+    private Object applicationContext;
+    private ExceptionSerializer exceptionSerializer;
+    private String stairwayName;
+    private String stairwayClusterName;
+    private boolean enableWorkQueue;
+    private FlightFactory flightFactory;
+    private String workQueueProjectId;
+    private String workQueueTopicId;
+    private String workQueueSubscriptionId;
+    private Duration retentionCheckInterval;
+    private Duration completedFlightRetention;
+
+    /**
+     * Determines the size of the thread pool used for running Stairway flights. Default is
+     * DEFAULT_MAX_PARALLEL_FLIGHTS (20 at this moment)
+     *
+     * @param maxParallelFlights maximum parallel flights to run
+     * @return this
+     */
+    public Builder maxParallelFlights(int maxParallelFlights) {
+      this.maxParallelFlights = maxParallelFlights;
+      return this;
+    }
+
+    /**
+     * If we are running a cluster work queue, then this parameter determines the number of flights
+     * we allow to queue locally. If the queue depth is, larger than this max, then we stop taking
+     * work off of the work queue and we add new submitted flights to the cluster work queue.
+     * Default is DEFAULT_MAX_QUEUED_FLIGHTS (1 at this moment)
+     *
+     * <p>If maxQueuedFlights is smaller than MIN_QUEUED_FLIGHTS (0 at this moment), then it is set
+     * to MIN_QUEUED_FLIGHTS. For the admission policy to work properly, MIN_QUEUED_FLIGHT
+     * <b>must</b> be greater than 0.
+     *
+     * @param maxQueuedFlights maximum flights to queue in our local thread pool
+     * @return this
+     */
+    public Builder maxQueuedFlights(int maxQueuedFlights) {
+      this.maxQueuedFlights = maxQueuedFlights;
+      return this;
+    }
+
+    /**
+     * @param applicationContext application context passed along to Flight constructors. Default is
+     *     null.
+     * @return this
+     */
+    public Builder applicationContext(Object applicationContext) {
+      this.applicationContext = applicationContext;
+      return this;
+    }
+
+    /**
+     * @param exceptionSerializer Application-specific exception serializer. Default is the Stairway
+     *     exception serializer
+     * @return this
+     */
+    public Builder exceptionSerializer(ExceptionSerializer exceptionSerializer) {
+      this.exceptionSerializer = exceptionSerializer;
+      return this;
+    }
+
+    /**
+     * @param stairwayName Unique name of this Stairway instance. Used to identify which Stairway
+     *     owns which flight. Default is "stairway" + random UUID
+     * @return this
+     */
+    public Builder stairwayName(String stairwayName) {
+      this.stairwayName = stairwayName;
+      return this;
+    }
+
+    /**
+     * Unique name of the cluster in which this instance runs. If this Stairway runs in a cluster of
+     * Stairway instances, then this must be supplied or they will not work together. This is used
+     * to find/create the shared Stairway work queue. Default is "stairwaycluster" + random UUID
+     *
+     * @param stairwayClusterName Stairway cluster name
+     * @return this
+     */
+    public Builder stairwayClusterName(String stairwayClusterName) {
+      this.stairwayClusterName = stairwayClusterName;
+      return this;
+    }
+
+    /**
+     * You must explicitly enable the work queue when running in a cluster configuration. That
+     * allows for testing where a work queue is not used or created.
+     *
+     * @param enableWorkQueue said true to enable the work queue
+     * @return this
+     */
+    public Builder enableWorkQueue(boolean enableWorkQueue) {
+      this.enableWorkQueue = enableWorkQueue;
+      return this;
+    }
+
+    /**
+     * Use the retention controls instead of this method. It is a no-op.
+     *
+     * @param keepFlightLog ignored
+     * @return this
+     */
+    @Deprecated
+    public Builder keepFlightLog(boolean keepFlightLog) {
+      return this;
+    }
+
+    /**
+     * Flight factory Stairway Flight objects need to be created by class and by name. In all known
+     * configurations, Stairway's flight factory can be used. This is an escape hatch in case we run
+     * into a configuration that requires special handling for flight creates. Specifying the class
+     * loader is simpler and covers the known cases.
+     *
+     * @param flightFactory flight factory to use
+     * @return this
+     */
+    public Builder flightFactory(FlightFactory flightFactory) {
+      this.flightFactory = flightFactory;
+      return this;
+    }
+
+    /**
+     * Each call to stairwayHook adds hook object to a list of hooks. The hooks are processed in the
+     * order in which they are added to the builder.
+     *
+     * @param stairwayHook object containing hooks for logging at beginning and end of flight and
+     *     step of stairway
+     * @return this
+     */
+    public Builder stairwayHook(StairwayHook stairwayHook) {
+      this.stairwayHooks.add(stairwayHook);
+      return this;
+    }
+
+    /**
+     * Specify the project id in which to find/create the work queue topic and subscription If not
+     * supplied, no queue will be used.
+     *
+     * @param workQueueProjectId a goggle project id
+     * @return this
+     */
+    public Builder workQueueProjectId(String workQueueProjectId) {
+      this.workQueueProjectId = workQueueProjectId;
+      return this;
+    }
+
+    /**
+     * Specify the topic id of the work queue. if no id is supplied, then a topic and subscription
+     * will be created based on the cluster name.
+     *
+     * @param workQueueTopicId the name of the topic to use in the work queue project
+     * @return this
+     */
+    public Builder workQueueTopicId(String workQueueTopicId) {
+      this.workQueueTopicId = workQueueTopicId;
+      return this;
+    }
+
+    /**
+     * Specify these subscription id for the work queue. If the topic id is not supplied, then this
+     * parameter is ignored. If the topic id is supplied, then this parameter it must be supplied.
+     *
+     * @param workQueueSubscriptionId the name of the subscription to use in the work queue project
+     * @return this
+     */
+    public Builder workQueueSubscriptionId(String workQueueSubscriptionId) {
+      this.workQueueSubscriptionId = workQueueSubscriptionId;
+      return this;
+    }
+
+    /**
+     * Control the frequency of clean up passes over the retained flights. Defaults to one day.
+     *
+     * @param retentionCheckInterval duration between retention checks for this stairway instance
+     * @return this
+     */
+    public Builder retentionCheckInterval(Duration retentionCheckInterval) {
+      this.retentionCheckInterval = retentionCheckInterval;
+      return this;
+    }
+
+    /**
+     * Specify the length of time that completed flights should be retained in the stairway
+     * database. Defaults to retaining forever.
+     *
+     * @param completedFlightRetention duration before clean up
+     * @return this
+     */
+    public Builder completedFlightRetention(Duration completedFlightRetention) {
+      this.completedFlightRetention = completedFlightRetention;
+      return this;
+    }
+
+    /**
+     * Construct a Stairway instance based on the builder inputs
+     *
+     * @return Stairway
+     * @throws StairwayExecutionException on invalid input
+     */
+    public Stairway build() throws StairwayExecutionException {
+      return new Stairway(this);
+    }
   }
 }

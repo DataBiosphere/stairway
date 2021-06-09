@@ -28,8 +28,8 @@ import org.apache.commons.lang3.StringUtils;
  * parameter.
  */
 public class FlightFilter {
-  private List<FlightFilterPredicate> flightPredicates;
-  private List<FlightFilterPredicate> inputPredicates;
+  private final List<FlightFilterPredicate> flightPredicates;
+  private final List<FlightFilterPredicate> inputPredicates;
   private int parameterId;
 
   public FlightFilter() {
