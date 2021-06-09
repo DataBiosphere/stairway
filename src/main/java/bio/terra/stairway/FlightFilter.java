@@ -241,8 +241,7 @@ public class FlightFilter {
 
   /**
    * Generate the filter for the flight table. The right hand side of any comparison op is generated
-   * as a named parameter. This is the method that injects or does not inject the flight visibility
-   * limit.
+   * as a named parameter.
    */
   private void makeFlightFilter(StringBuilder sb, String prefix) {
     if (flightPredicates.size() > 0) {
