@@ -26,28 +26,31 @@ public class FlightCleanerTest {
   @Test
   public void successTest() throws Exception {
     final String stairwayName = "flightCleanerTest";
+    final int ITERATIONS = 5;
+    final int CHECK_INTERVAL = 5;
+    final int RETENTION = (ITERATIONS - 1) * CHECK_INTERVAL;
 
     // Start with a clean and shiny database environment.
     Stairway stairway =
         Stairway.newBuilder()
             .stairwayName(stairwayName)
-            .completedFlightRetention(Duration.ofMinutes(1))
-            .retentionCheckInterval(Duration.ofSeconds(15))
+            .completedFlightRetention(Duration.ofSeconds(RETENTION))
+            .retentionCheckInterval(Duration.ofSeconds(CHECK_INTERVAL))
             .enableWorkQueue(false)
             .build();
 
     List<String> recordedStairways = stairway.initialize(TestUtil.makeDataSource(), true, true);
     stairway.recoverAndStart(recordedStairways);
 
-    for (int i = 0; i < 5; i++) {
+    for (int i = 0; i < ITERATIONS; i++) {
       logger.info("Flight count: {}", countFlights(stairway));
       runFlights(stairway);
-      TimeUnit.SECONDS.sleep(15);
+      TimeUnit.SECONDS.sleep(CHECK_INTERVAL);
     }
 
-    for (int i = 0; i < 5; i++) {
+    for (int i = 0; i < ITERATIONS; i++) {
       logger.info("Flight count: {}", countFlights(stairway));
-      TimeUnit.SECONDS.sleep(15);
+      TimeUnit.SECONDS.sleep(CHECK_INTERVAL);
     }
 
     int count = countFlights(stairway);

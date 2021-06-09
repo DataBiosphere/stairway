@@ -848,20 +848,11 @@ class FlightDao {
     // Make an empty filter if one is not provided
     FlightFilter filter = (inFilter != null) ? inFilter : new FlightFilter();
 
-    return DbRetry.retry("flight.getFlights", () -> getFlightsInner(offset, limit, filter, true));
-  }
-
-  List<FlightState> controlGetFlights(int offset, int limit, FlightFilter inFilter)
-      throws DatabaseOperationException, InterruptedException {
-
-    // Make an empty filter if one is not provided
-    FlightFilter filter = (inFilter != null) ? inFilter : new FlightFilter();
-
-    return DbRetry.retry("flight.getFlights", () -> getFlightsInner(offset, limit, filter, false));
+    return DbRetry.retry("flight.getFlights", () -> getFlightsInner(offset, limit, filter));
   }
 
   private List<FlightState> getFlightsInner(
-      int offset, int limit, FlightFilter filter, boolean enforceVisibilityLimit)
+      int offset, int limit, FlightFilter filter)
       throws SQLException, DatabaseOperationException {
 
     String sql = filter.makeSql();
