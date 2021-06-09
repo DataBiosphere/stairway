@@ -485,7 +485,7 @@ class FlightDao {
    * @param deleteOlderThan time before which flights can be removed
    * @throws DatabaseOperationException on any database error
    * @throws InterruptedException thread shutdown
-   * @returns count of deleted lights
+   * @return count of deleted lights
    */
   int deleteCompletedFlights(Instant deleteOlderThan)
       throws DatabaseOperationException, InterruptedException {

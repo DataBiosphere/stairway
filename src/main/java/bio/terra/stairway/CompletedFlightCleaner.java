@@ -28,7 +28,7 @@ class CompletedFlightCleaner implements Runnable {
       int count = flightDao.deleteCompletedFlights(deleteOlderThan);
       logger.info("Cleaned up {} completed flights", count);
     } catch (DatabaseOperationException | InterruptedException ex) {
-      // Simply return
+      logger.warn("Error removing flights", ex);
     }
   }
 }
