@@ -1,0 +1,1 @@
+Stairway Tool ${application.formatted-version}
