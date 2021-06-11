@@ -125,11 +125,13 @@ public class FlightMap {
 
     for (FlightInput input : inputList) {
       final String key = input.getKey();
-      final Object object = map.get(key);
-      if (object == null) {
+      if (!map.containsKey(key)) {
         throw new RuntimeException(String.format("Key '%s' not found in map.", key));
       }
-      getObjectMapper().readValue(input.getValue(), object.getClass());
+      final Object object = map.get(key);
+      if (object != null) {
+        getObjectMapper().readValue(input.getValue(), object.getClass());
+      }
     }
   }
 
