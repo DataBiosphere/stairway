@@ -2,17 +2,18 @@ buildscript {
     repositories {
         mavenCentral()
     }
-    dependencies {
-        classpath group: 'com.jfrog.artifactory', name: 'com.jfrog.artifactory.gradle.plugin', version: '4.13.0', ext: 'pom'
-    }
 }
 
 plugins {
     id 'java'
     id 'application'
     id 'com.github.spotbugs' version '4.0.8'
-    id 'com.diffplug.gradle.spotless' version '3.27.2'
+    id "io.spring.dependency-management" version "1.0.10.RELEASE"
     id "org.springframework.boot" version "2.4.0"
+// Spotless is disabled here because the plugin fails to be processed by gradle when in this
+// multi-project configuration. I have submitted an issue and a simple repro, so hoping for
+// some resolution.
+//   id 'com.diffplug.gradle.spotless' version '3.27.2'
 }
 
 version = gradle.version
@@ -21,9 +22,6 @@ mainClassName = 'bio.terra.stairctl.Application'
 
 repositories {
     mavenCentral()
-//    maven {
-//        url 'https://broadinstitute.jfrog.io/broadinstitute/libs-release-local/'
-//    }
     maven {
         url 'https://broadinstitute.jfrog.io/broadinstitute/libs-snapshot-local/'
     }
@@ -41,27 +39,19 @@ dependencies {
         sl4j = "1.7.30"
         springboot = "2.4.5"
         springshell = "2.0.1.RELEASE"
-        stairway = "0.0.47-SNAPSHOT"
-
     }
 
-    // This allows you to build with a local Stairway JAR file, instead of the one from the repository
-    // For example, ./gradlew -Pstairwayjar=/Users/dd/code/stairway/build/libs/stairway-0.0.4-SNAPSHOT.jar
-    // Or define the environment variable ORG_GRADLE_PROJECT_stairwayjar
-    if (project.hasProperty("stairwayjar")) {
-        implementation files(project.ext.get("stairwayjar"))
-        implementation group: 'org.apache.commons', name: 'commons-collections4', version: '4.4'
-        implementation group: 'org.openapitools', name: 'jackson-databind-nullable', version: '0.2.1'
-    } else {
-        implementation group: "bio.terra", name: "stairway", version: "${stairway}"
-    }
+    //
+    implementation project(":library")
+    //implementation files("/Users/ddietterich/codestair/PF-501-stairctl/library/build/libs/library-0.0.56-SNAPSHOT.jar")
 
     implementation group: 'org.springframework.boot', name: 'spring-boot-starter', version: "${springboot}"
     implementation group: 'org.springframework.shell', name: 'spring-shell-starter', version: "${springshell}"
 
-    implementation group: 'org.apache.commons', name: 'commons-dbcp2', version: '2.8.0'
-    implementation group: 'org.apache.commons', name: 'commons-pool2', version: '2.9.0'
-    implementation group: 'org.apache.commons', name: 'commons-lang3', version: '3.11'
+    // Versions via spring dependency management
+    implementation group: 'org.apache.commons', name: 'commons-dbcp2'
+    implementation group: 'org.apache.commons', name: 'commons-pool2'
+    implementation group: 'org.apache.commons', name: 'commons-lang3'
 
     implementation group: 'ch.qos.logback', name: 'logback-classic', version: "${logback}"
     implementation group: 'org.slf4j', name: 'slf4j-api', version: "${sl4j}"
@@ -81,12 +71,14 @@ dependencies {
 
 }
 
+/*
+Disabled - see note above
 spotless {
     java {
         googleJavaFormat()
     }
 }
-
+*/
 spotbugs {
     effort = 'max'
     // This makes the "html" reports come out in plain text so you can just open the file in IntelliJ
@@ -112,4 +104,5 @@ spotbugsTest {
     }
 }
 
-compileJava.dependsOn tasks.spotlessApply
+// Disabled - see note above
+//compileJava.dependsOn tasks.spotlessApply

@@ -1,6 +1,6 @@
 stairway:
-  username: drmanager
-  password: drpasswd
-  uri: jdbc:postgresql://127.0.0.1:5432/stairway
+  username: stairwayuser
+  password: xyzzystairwaypw
+  uri: jdbc:postgresql://127.0.0.1:5432/stairwaylib
   name: stairctl
-  clusterName: stairtoolCluster
+  clusterName: stairctlCluster

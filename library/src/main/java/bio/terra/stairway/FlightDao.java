@@ -851,8 +851,7 @@ class FlightDao {
     return DbRetry.retry("flight.getFlights", () -> getFlightsInner(offset, limit, filter));
   }
 
-  private List<FlightState> getFlightsInner(
-      int offset, int limit, FlightFilter filter)
+  private List<FlightState> getFlightsInner(int offset, int limit, FlightFilter filter)
       throws SQLException, DatabaseOperationException {
 
     String sql = filter.makeSql();

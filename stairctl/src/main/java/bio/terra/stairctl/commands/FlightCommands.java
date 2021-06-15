@@ -1,9 +1,11 @@
 package bio.terra.stairctl.commands;
 
 import bio.terra.stairctl.StairwayService;
-import bio.terra.stairway.FlightState;
+import bio.terra.stairway.Control;
 import bio.terra.stairway.FlightStatus;
 import java.util.List;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.shell.standard.ShellComponent;
 import org.springframework.shell.standard.ShellMethod;
@@ -11,6 +13,7 @@ import org.springframework.shell.standard.ShellOption;
 
 @ShellComponent
 public class FlightCommands {
+  private static final Logger logger = LoggerFactory.getLogger(FlightCommands.class);
   private final StairwayService stairwayService;
 
   @Autowired
@@ -23,33 +26,30 @@ public class FlightCommands {
   @ShellMethod(value = "Force a flight to FATAL state (dismal failure)", key = "force fatal")
   public void forceFatal(String flightId) throws Exception {
     try {
-      FlightState flight = stairwayService.get().forceFatal(flightId);
-      Output.flightState(flight);
+      Control.Flight flight = stairwayService.getControl().forceFatal(flightId);
+      Output.flightSummary(flight);
     } catch (Exception ex) {
-      System.err.println("Force fatal failed: " + ex.getMessage());
-      ex.printStackTrace();
+      Output.error("Force fatal failed", ex);
     }
   }
 
   @ShellMethod(value = "Force a flight to the READY state (disown it)", key = "force ready")
   public void forceReady(String flightId) throws Exception {
     try {
-      FlightState flight = stairwayService.get().disownFlight(flightId);
-      Output.flightState(flight);
+      Control.Flight flight = stairwayService.getControl().flightDisown(flightId);
+      Output.flightSummary(flight);
     } catch (Exception ex) {
-      System.err.println("Disown flight failed: " + ex.getMessage());
-      ex.printStackTrace();
+      Output.error("Disown flight failed", ex);
     }
   }
 
   @ShellMethod(value = "Get one flight", key = "get flight")
   public void getFlight(String flightId) throws Exception {
     try {
-      FlightState flight = stairwayService.get().getFlight(flightId);
-      Output.flightState(flight);
+      Control.Flight flight = stairwayService.getControl().getFlight(flightId);
+      Output.flightSummary(flight);
     } catch (Exception ex) {
-      System.err.println("Get flight failed: " + ex.getMessage());
-      ex.printStackTrace();
+      Output.error("Get flight failed", ex);
     }
   }
 
@@ -84,11 +84,10 @@ public class FlightCommands {
       throws Exception {
 
     try {
-      List<FlightState> flightList = stairwayService.get().listFlights(offset, limit, status);
-      Output.flightStateList(offset, flightList);
+      List<Control.Flight> flightList = stairwayService.getControl().listFlightsSimple(offset, limit, status);
+      Output.flightList(offset, flightList);
     } catch (Exception ex) {
-      System.err.println("List flights failed: " + ex.getMessage());
-      ex.printStackTrace();
+      Output.error("List flights failed", ex);
     }
   }
 
@@ -105,11 +104,11 @@ public class FlightCommands {
       throws Exception {
 
     try {
-      List<FlightState> flightList = stairwayService.get().listOwned(offset, limit);
-      Output.flightStateList(offset, flightList);
+      List<Control.Flight> flightList = stairwayService.getControl().listOwned(offset, limit);
+      Output.flightList(offset, flightList);
     } catch (Exception ex) {
-      System.err.println("List owned failed: " + ex.getMessage());
-      ex.printStackTrace();
+      Output.error("List owned failed", ex);
     }
   }
+
 }

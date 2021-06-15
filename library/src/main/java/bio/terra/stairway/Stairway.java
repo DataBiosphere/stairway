@@ -52,6 +52,7 @@ public class Stairway {
   private final Duration retentionCheckInterval;
   private final Duration completedFlightRetention;
   private final AtomicBoolean quietingDown;
+
   // Initialized state
   private StairwayThreadPool threadPool;
   private String stairwayId;
@@ -60,6 +61,7 @@ public class Stairway {
   private Queue workQueue;
   private Thread workQueueListenerThread;
   private ScheduledExecutorService scheduledPool;
+  private Control control;
 
   /**
    * We do initialization in three steps. The constructor does the first step of constructing the
@@ -177,6 +179,7 @@ public class Stairway {
 
     stairwayInstanceDao = new StairwayInstanceDao(dataSource);
     flightDao = new FlightDao(dataSource, stairwayInstanceDao, exceptionSerializer, hookWrapper);
+    control = new Control(this, dataSource, flightDao, stairwayInstanceDao);
 
     if (forceCleanStart) {
       // Drop all tables and recreate the database
@@ -575,6 +578,10 @@ public class Stairway {
       pollCount++;
     }
     throw new FlightException("Flight did not complete in the allowed wait time");
+  }
+
+  public Control getControl() {
+    return control;
   }
 
   /**

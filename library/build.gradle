@@ -12,7 +12,7 @@ plugins {
     id 'java-library'
     id 'maven-publish'
     id 'com.jfrog.artifactory' version '4.13.0'
-//    id 'com.diffplug.gradle.spotless' version '3.27.2'
+    id 'com.diffplug.gradle.spotless' version '3.27.2'
     id 'com.github.spotbugs' version '4.0.8'
 }
 
@@ -130,13 +130,12 @@ artifactory {
     }
 }
 
-/*
 spotless {
     java {
         googleJavaFormat()
     }
 }
-*/
+
 spotbugs {
     effort = 'max'
     // This makes the "html" reports come out in plain text so you can just open the file in IntelliJ
@@ -162,5 +161,4 @@ spotbugsTest {
     }
 }
 
-//compileJava.dependsOn tasks.spotlessApply
-
+compileJava.dependsOn tasks.spotlessApply

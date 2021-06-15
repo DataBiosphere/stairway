@@ -1,19 +1,22 @@
 package bio.terra.stairctl.commands;
 
-import bio.terra.stairway.FlightState;
-import org.apache.commons.lang3.StringUtils;
-
+import bio.terra.stairway.Control;
 import java.time.Instant;
 import java.util.List;
+import org.apache.commons.lang3.StringUtils;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 public class Output {
-  private static final String FLIGHT_LIST_FORMAT = "%6s %-22s %-27s %-27s %-12s %-5s %-30s";
+  private static final Logger logger = LoggerFactory.getLogger(Output.class);
+
+  private static final String FLIGHT_LIST_FORMAT = "%6s %-22s %-30s %-27s %-27s %-12s %-30s";
   private static final String FLIGHT_LIST_DASH =
-      "------ ---------------------- --------------------------- --------------------------- ------------ ----- ------------------------------";
+      "------ ---------------------- ------------------------------ --------------------------- --------------------------- ------------ ------------------------------";
   private static final String STAIRWAY_LIST_FORMAT = "%-40s";
   private static final String STAIRWAY_LIST_DASH = "----------------------------------------";
 
-  public static void flightStateList(int offset, List<FlightState> flightList) {
+  public static void flightList(int offset, List<Control.Flight> flightList) {
     if (flightList.isEmpty()) {
       System.out.println("\nNo flights found");
     } else {
@@ -23,23 +26,23 @@ public class Output {
               FLIGHT_LIST_FORMAT,
               "\nOffset",
               "FlightId",
+              "Class",
               "Submitted",
               "Completed",
               "Status",
-              "Active",
               "StairwayId"));
       System.out.println(FLIGHT_LIST_DASH);
-      for (FlightState flight : flightList) {
+      for (Control.Flight flight : flightList) {
         System.out.println(
             String.format(
                 FLIGHT_LIST_FORMAT,
                 counter++,
                 flight.getFlightId(),
+                shortenClassName(flight.getClassName()),
                 flight.getSubmitted().toString(),
                 flight.getCompleted().map(Instant::toString).orElse(StringUtils.EMPTY),
-                flight.getFlightStatus(),
-                flight.isActive(),
-                fixNull(flight.getStairwayId())));
+                flight.getStatus(),
+                flight.getStairwayId().orElse(StringUtils.EMPTY)));
       }
       System.out.println();
     }
@@ -58,20 +61,26 @@ public class Output {
     }
   }
 
-  public static void flightState(FlightState flight) {
+  public static void flightSummary(Control.Flight flight) {
     System.out.println("\nflightId  : " + flight.getFlightId());
+    System.out.println("class     : " + flight.getClassName());
     System.out.println("submitted : " + flight.getSubmitted().toString());
     System.out.println(
         "completed : " + flight.getCompleted().map(Instant::toString).orElse(StringUtils.EMPTY));
-    System.out.println("status    : " + flight.getFlightStatus());
-    System.out.println("active    : " + flight.isActive());
-    System.out.println("stairwayId: " + fixNull(flight.getStairwayId()));
+    System.out.println("status    : " + flight.getStatus());
+    System.out.println("exception : " + flight.getException().orElse(StringUtils.EMPTY));
+    System.out.println("stairwayId: " + flight.getStairwayId().orElse(StringUtils.EMPTY));
   }
 
-  private static String fixNull(String in) {
-    if (in == null) {
-      return StringUtils.EMPTY;
+  public static void error(String userMessage, Exception ex) {
+    System.err.println(": " + ex.getMessage());
+    logger.error(userMessage + ": ", ex);
+  }
+
+  private static String shortenClassName(String in) {
+    if (in.length() <= 30) {
+      return in;
     }
-    return in;
+    return "..." + StringUtils.right(in, 27);
   }
 }

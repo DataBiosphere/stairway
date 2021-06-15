@@ -1,11 +1,10 @@
 package bio.terra.stairctl.commands;
 
 import bio.terra.stairctl.StairwayService;
+import java.util.List;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.shell.standard.ShellComponent;
 import org.springframework.shell.standard.ShellMethod;
-
-import java.util.List;
 
 @ShellComponent
 public class StairwayCommands {
@@ -20,7 +19,7 @@ public class StairwayCommands {
   public void listStairways() throws Exception {
 
     try {
-      List<String> stairwayList = stairwayService.get().listStairways();
+      List<String> stairwayList = stairwayService.getControl().listStairways();
       Output.stairwayList(stairwayList);
     } catch (Exception ex) {
       System.err.println("List flights failed: " + ex.getMessage());
