@@ -47,8 +47,9 @@ public class FlightCommands {
 
   @ShellMethod(value = "Get one flight", key = "get flight")
   public void getFlight(
-      boolean log,
-      boolean input,
+      @ShellOption(help = "display log summary") boolean log,
+      @ShellOption(help = "display log detail with working map") boolean logmap,
+      @ShellOption(help = "display input map") boolean input,
       String flightId) throws Exception {
     try {
       Control.Flight flight = control.getFlight(flightId);
@@ -58,9 +59,9 @@ public class FlightCommands {
       }
       Output.flightSummary(flight, inputKeyValue);
 
-      if (log) {
+      if (log || logmap) {
         List<Control.LogEntry> logEntryList = control.logQuery(flightId);
-        Output.logList( logEntryList);
+        Output.logList(flight, logEntryList, logmap);
       }
     } catch (Exception ex) {
       Output.error("Get flight failed", ex);
