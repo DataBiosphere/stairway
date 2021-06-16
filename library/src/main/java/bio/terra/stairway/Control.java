@@ -41,6 +41,42 @@ public class Control {
   private static final String flightOrderPage =
       " ORDER BY submit_time DESC OFFSET :offset LIMIT :limit";
 
+  public int countFlights(String status) throws SQLException {
+    StringBuilder sb = new StringBuilder();
+    sb.append("SELECT COUNT(*) as total FROM flight");
+    if (status != null) {
+      try {
+        FlightStatus.valueOf(status);
+      } catch (IllegalArgumentException ex) {
+        throw new IllegalArgumentException(
+            "Invalid status value. Values are "
+                + Arrays.stream(FlightStatus.values())
+                    .map(FlightStatus::toString)
+                    .collect(Collectors.joining(", ")));
+      }
+      sb.append(" WHERE status = :status");
+    }
+
+    try (Connection connection = dataSource.getConnection();
+        NamedParameterPreparedStatement statement =
+            new NamedParameterPreparedStatement(connection, sb.toString())) {
+      DbUtils.startReadOnlyTransaction(connection);
+      if (status != null) {
+        statement.setString("status", status);
+      }
+
+      int flightCount = 0;
+      try (ResultSet rs = statement.getPreparedStatement().executeQuery()) {
+        while (rs.next()) {
+          flightCount = rs.getInt("total");
+        }
+      }
+
+      DbUtils.commitTransaction(connection);
+      return flightCount;
+    }
+  }
+
   public List<Control.Flight> listFlightsSimple(int offset, int limit, String status)
       throws SQLException {
 

@@ -1,6 +1,9 @@
-stairway:
-  username: stairwayuser
-  password: xyzzystairwaypw
-  uri: jdbc:postgresql://127.0.0.1:5432/stairwaylib
-  name: stairctl
-  clusterName: stairctlCluster
+# This provides default values for connecting to a Stairway database
+# These defaults can be overridden with environment variables
+# and further overridden with options on the connect command.
+stairctl:
+  username: ${STAIRCTL_USERNAME:stairwayuser}
+  password: ${STAIRCTL_PASSWORD:stairwaypw}
+  host: ${STAIRCTL_HOST:127.0.0.1}
+  port: ${STAIRCTL_PORT:5432}
+  dbname: ${STAIRCTL_DBNAME:stairwaylib}

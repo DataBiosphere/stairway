@@ -1,5 +1,6 @@
 package bio.terra.stairctl.commands;
 
+import bio.terra.stairctl.ConnectParams;
 import bio.terra.stairway.Control;
 import bio.terra.stairway.Control.KeyValue;
 import bio.terra.stairway.Control.LogEntry;
@@ -19,9 +20,9 @@ import org.slf4j.LoggerFactory;
 public class Output {
   private static final Logger logger = LoggerFactory.getLogger(Output.class);
 
-  private static final String FLIGHT_LIST_FORMAT = "%6s %-22s %-30s %-27s %-27s %-12s %-30s";
+  private static final String FLIGHT_LIST_FORMAT = "%6s %-36s %-30s %-27s %-27s %-12s %-30s";
   private static final String FLIGHT_LIST_DASH =
-      "------ ---------------------- ------------------------------ --------------------------- --------------------------- ------------ ------------------------------";
+      "------ ------------------------------------ ------------------------------ --------------------------- --------------------------- ------------ ------------------------------";
   private static final String STAIRWAY_LIST_FORMAT = "%-40s";
   private static final String STAIRWAY_LIST_DASH = "----------------------------------------";
   private static final String LOG_LIST_FORMAT = "%s%6s %-9s %-27s %13s %-5s %s";
@@ -180,6 +181,16 @@ public class Output {
       System.out.println(String.format(inputTitle, indent, "inputMap"));
       keyValue(indent + "  ", inputMap);
     }
+  }
+
+  public static void showConnection(ConnectParams connectParams) {
+    List<ImmutablePair<String, String>> pairList = new ArrayList<>();
+    pairList.add(new ImmutablePair<>("dbname", connectParams.getDbname()));
+    pairList.add(new ImmutablePair<>("username", connectParams.getUsername()));
+    pairList.add(new ImmutablePair<>("host", connectParams.getHost()));
+    pairList.add(new ImmutablePair<>("port", connectParams.getPort()));
+    System.out.println("Stairway Connection:");
+    display("  ", pairList);
   }
 
   private static int display(String indent, List<ImmutablePair<String, String>> pairList) {

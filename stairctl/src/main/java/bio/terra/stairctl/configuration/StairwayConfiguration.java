@@ -1,18 +1,19 @@
 package bio.terra.stairctl.configuration;
 
+import bio.terra.stairctl.ConnectParams;
 import org.springframework.boot.context.properties.ConfigurationProperties;
 import org.springframework.boot.context.properties.EnableConfigurationProperties;
 import org.springframework.context.annotation.Configuration;
 
 @Configuration
 @EnableConfigurationProperties
-@ConfigurationProperties(prefix = "stairway")
+@ConfigurationProperties(prefix = "stairctl")
 public class StairwayConfiguration {
   public String username;
   public String password;
-  public String uri;
-  public String name;
-  public String clusterName;
+  public String host;
+  public String port;
+  public String dbname;
 
   public String getUsername() {
     return username;
@@ -30,27 +31,36 @@ public class StairwayConfiguration {
     this.password = password;
   }
 
-  public String getUri() {
-    return uri;
+  public String getHost() {
+    return host;
   }
 
-  public void setUri(String uri) {
-    this.uri = uri;
+  public void setHost(String host) {
+    this.host = host;
   }
 
-  public String getName() {
-    return name;
+  public String getPort() {
+    return port;
   }
 
-  public void setName(String name) {
-    this.name = name;
+  public void setPort(String port) {
+    this.port = port;
   }
 
-  public String getClusterName() {
-    return clusterName;
+  public String getDbname() {
+    return dbname;
   }
 
-  public void setClusterName(String clusterName) {
-    this.clusterName = clusterName;
+  public void setDbname(String dbname) {
+    this.dbname = dbname;
+  }
+
+  public ConnectParams makeConnectParams() {
+    return new ConnectParams()
+        .username(username)
+        .password(password)
+        .dbname(dbname)
+        .host(host)
+        .port(port);
   }
 }
