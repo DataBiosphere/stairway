@@ -31,6 +31,7 @@ public class FlightCommands {
   // so they will not be available.
   @ShellMethodAvailability({
     "count flights",
+    "count owned",
     "force fatal",
     "force ready",
     "get flight",
