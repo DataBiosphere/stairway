@@ -15,10 +15,12 @@ import org.springframework.shell.standard.ShellOption;
 public class FlightCommands {
   private static final Logger logger = LoggerFactory.getLogger(FlightCommands.class);
   private final StairwayService stairwayService;
+  private final Control control;
 
   @Autowired
   public FlightCommands(StairwayService stairwayService) {
     this.stairwayService = stairwayService;
+    this.control = stairwayService.getControl();
   }
 
   // -- Flight commands in alphabetical order --
@@ -26,7 +28,7 @@ public class FlightCommands {
   @ShellMethod(value = "Force a flight to FATAL state (dismal failure)", key = "force fatal")
   public void forceFatal(String flightId) throws Exception {
     try {
-      Control.Flight flight = stairwayService.getControl().forceFatal(flightId);
+      Control.Flight flight = control.forceFatal(flightId);
       Output.flightSummary(flight);
     } catch (Exception ex) {
       Output.error("Force fatal failed", ex);
@@ -36,7 +38,7 @@ public class FlightCommands {
   @ShellMethod(value = "Force a flight to the READY state (disown it)", key = "force ready")
   public void forceReady(String flightId) throws Exception {
     try {
-      Control.Flight flight = stairwayService.getControl().flightDisown(flightId);
+      Control.Flight flight = control.flightDisown(flightId);
       Output.flightSummary(flight);
     } catch (Exception ex) {
       Output.error("Disown flight failed", ex);
@@ -44,10 +46,22 @@ public class FlightCommands {
   }
 
   @ShellMethod(value = "Get one flight", key = "get flight")
-  public void getFlight(String flightId) throws Exception {
+  public void getFlight(
+      boolean log,
+      boolean input,
+      String flightId) throws Exception {
     try {
-      Control.Flight flight = stairwayService.getControl().getFlight(flightId);
-      Output.flightSummary(flight);
+      Control.Flight flight = control.getFlight(flightId);
+      List<Control.KeyValue> inputKeyValue = null;
+      if (input) {
+        inputKeyValue = control.inputQuery(flightId);
+      }
+      Output.flightSummary(flight, inputKeyValue);
+
+      if (log) {
+        List<Control.LogEntry> logEntryList = control.logQuery(flightId);
+        Output.logList( logEntryList);
+      }
     } catch (Exception ex) {
       Output.error("Get flight failed", ex);
     }
@@ -84,7 +98,7 @@ public class FlightCommands {
       throws Exception {
 
     try {
-      List<Control.Flight> flightList = stairwayService.getControl().listFlightsSimple(offset, limit, status);
+      List<Control.Flight> flightList = control.listFlightsSimple(offset, limit, status);
       Output.flightList(offset, flightList);
     } catch (Exception ex) {
       Output.error("List flights failed", ex);
@@ -104,7 +118,7 @@ public class FlightCommands {
       throws Exception {
 
     try {
-      List<Control.Flight> flightList = stairwayService.getControl().listOwned(offset, limit);
+      List<Control.Flight> flightList = control.listOwned(offset, limit);
       Output.flightList(offset, flightList);
     } catch (Exception ex) {
       Output.error("List owned failed", ex);

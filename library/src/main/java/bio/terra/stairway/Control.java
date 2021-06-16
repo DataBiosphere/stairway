@@ -11,6 +11,7 @@ import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
 import java.util.Optional;
+import java.util.UUID;
 import java.util.stream.Collectors;
 import javax.sql.DataSource;
 
@@ -73,7 +74,6 @@ public class Control {
   }
 
   public List<Control.Flight> listOwned(int offset, int limit) throws SQLException {
-
     StringBuilder sb = new StringBuilder();
     sb.append("SELECT").append(flightSelectFrom);
     sb.append(" WHERE stairway_id IS NOT NULL ");
@@ -155,6 +155,62 @@ public class Control {
     return getFlight(flightId);
   }
 
+  public List<Control.KeyValue> inputQuery(String flightId) throws SQLException {
+    final String sql = "SELECT key, value FROM flightinput WHERE flightid = :flightid";
+
+    try (Connection connection = dataSource.getConnection();
+        NamedParameterPreparedStatement statement =
+            new NamedParameterPreparedStatement(connection, sql)) {
+      DbUtils.startReadOnlyTransaction(connection);
+      statement.setString("flightid", flightId);
+      List<Control.KeyValue> keyValueList = keyValueQuery(statement);
+      DbUtils.commitTransaction(connection);
+      return keyValueList;
+    }
+  }
+
+  public List<Control.LogEntry> logQuery(String flightId) throws SQLException {
+    final String sqllog =
+        "SELECT log_time, step_index, status, serialized_exception,"
+            + " rerun, direction, id FROM flightlog WHERE flightid = :flightid";
+
+    final String sqlmap = "SELECT key, value FROM flightworking WHERE flightlog_id = :id";
+
+    try (Connection connection = dataSource.getConnection();
+        NamedParameterPreparedStatement logStatement =
+            new NamedParameterPreparedStatement(connection, sqllog);
+        NamedParameterPreparedStatement mapStatement =
+            new NamedParameterPreparedStatement(connection, sqlmap)) {
+      DbUtils.startReadOnlyTransaction(connection);
+      logStatement.setString("flightid", flightId);
+
+      List<Control.LogEntry> logList = new ArrayList<>();
+      try (ResultSet rs = logStatement.getPreparedStatement().executeQuery()) {
+        while (rs.next()) {
+          LogEntry logEntry = new LogEntry();
+          logEntry
+              .flightId(flightId)
+              .logTime(rs.getTimestamp("log_time").toInstant())
+              .stepIndex(rs.getInt("step_index"))
+              .exception(rs.getString("serialized_exception"))
+              .rerun(rs.getBoolean("rerun"))
+              .direction(Direction.valueOf(rs.getString("direction")))
+              .id(rs.getObject("id", UUID.class));
+          logList.add(logEntry);
+        }
+      }
+
+      // We could do this as a join, but this is simpler and we reuse the keyValueQuery
+      for (Control.LogEntry logEntry : logList) {
+        mapStatement.setUuid("id", logEntry.getId());
+        logEntry.workingMap(keyValueQuery(mapStatement));
+      }
+
+      DbUtils.commitTransaction(connection);
+      return logList;
+    }
+  }
+
   private List<Control.Flight> flightQuery(
       NamedParameterPreparedStatement statement, int offset, int limit) throws SQLException {
 
@@ -177,6 +233,20 @@ public class Control {
       }
     }
     return flightList;
+  }
+
+  private List<Control.KeyValue> keyValueQuery(NamedParameterPreparedStatement statement)
+      throws SQLException {
+
+    List<Control.KeyValue> keyValueList = new ArrayList<>();
+    try (ResultSet rs = statement.getPreparedStatement().executeQuery()) {
+      while (rs.next()) {
+        KeyValue keyValue = new KeyValue();
+        keyValue.key(rs.getString("key")).value(rs.getString("value"));
+        keyValueList.add(keyValue);
+      }
+    }
+    return keyValueList;
   }
 
   // -- Stairway methods --
@@ -258,6 +328,126 @@ public class Control {
     public Flight stairwayId(String stairwayId) {
       this.stairwayId = stairwayId;
       return this;
+    }
+  }
+
+  // Holds flight map data as a pair of strings; either inputs or working map
+  // Comparable by key for an alphabetical display
+  public static class KeyValue implements Comparable<KeyValue> {
+    private String key;
+    private String value;
+
+    public String getKey() {
+      return key;
+    }
+
+    public KeyValue key(String key) {
+      this.key = key;
+      return this;
+    }
+
+    public String getValue() {
+      return value;
+    }
+
+    public KeyValue value(String value) {
+      this.value = value;
+      return this;
+    }
+
+    @Override
+    public int compareTo(KeyValue o) {
+      return key.compareTo(o.key);
+    }
+  }
+
+  // Holds one log record with its working map
+  // Comparable by log timestamp for a sequenced display
+  public static class LogEntry implements Comparable<LogEntry> {
+    private String flightId;
+    private Instant logTime;
+    private List<KeyValue> workingMap;
+    private int stepIndex;
+    private String exception;
+    private boolean rerun;
+    private Direction direction;
+    private UUID id;
+
+    public String getFlightId() {
+      return flightId;
+    }
+
+    public LogEntry flightId(String flightId) {
+      this.flightId = flightId;
+      return this;
+    }
+
+    public Instant getLogTime() {
+      return logTime;
+    }
+
+    public LogEntry logTime(Instant logTime) {
+      this.logTime = logTime;
+      return this;
+    }
+
+    public List<KeyValue> getWorkingMap() {
+      return workingMap;
+    }
+
+    public LogEntry workingMap(List<KeyValue> workingMap) {
+      this.workingMap = workingMap;
+      return this;
+    }
+
+    public int getStepIndex() {
+      return stepIndex;
+    }
+
+    public LogEntry stepIndex(int stepIndex) {
+      this.stepIndex = stepIndex;
+      return this;
+    }
+
+    public Optional<String> getException() {
+      return Optional.ofNullable(exception);
+    }
+
+    public LogEntry exception(String exception) {
+      this.exception = exception;
+      return this;
+    }
+
+    public boolean isRerun() {
+      return rerun;
+    }
+
+    public LogEntry rerun(boolean rerun) {
+      this.rerun = rerun;
+      return this;
+    }
+
+    public Direction getDirection() {
+      return direction;
+    }
+
+    public LogEntry direction(Direction direction) {
+      this.direction = direction;
+      return this;
+    }
+
+    public UUID getId() {
+      return id;
+    }
+
+    public LogEntry id(UUID id) {
+      this.id = id;
+      return this;
+    }
+
+    @Override
+    public int compareTo(LogEntry o) {
+      return this.logTime.compareTo(o.logTime);
     }
   }
 }
