@@ -61,6 +61,17 @@ public class FlightCommands {
     }
   }
 
+  @ShellMethod(value = "Count owned flights", key = "count owned")
+  public void countOwned() throws Exception {
+
+    try {
+      int count = stairwayService.getControl().countOwned();
+      System.out.println("Found " + count + " owned flights");
+    } catch (Exception ex) {
+      Output.error("Count flights failed", ex);
+    }
+  }
+
   @ShellMethod(value = "Force a flight to FATAL state (dismal failure)", key = "force fatal")
   public void forceFatal(String flightId) throws Exception {
     try {

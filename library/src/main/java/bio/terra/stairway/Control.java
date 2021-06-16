@@ -41,6 +41,16 @@ public class Control {
   private static final String flightOrderPage =
       " ORDER BY submit_time DESC OFFSET :offset LIMIT :limit";
 
+  private int countQuery(NamedParameterPreparedStatement statement) throws SQLException {
+    int flightCount = 0;
+    try (ResultSet rs = statement.getPreparedStatement().executeQuery()) {
+      while (rs.next()) {
+        flightCount = rs.getInt("total");
+      }
+    }
+    return flightCount;
+  }
+
   public int countFlights(String status) throws SQLException {
     StringBuilder sb = new StringBuilder();
     sb.append("SELECT COUNT(*) as total FROM flight");
@@ -65,13 +75,19 @@ public class Control {
         statement.setString("status", status);
       }
 
-      int flightCount = 0;
-      try (ResultSet rs = statement.getPreparedStatement().executeQuery()) {
-        while (rs.next()) {
-          flightCount = rs.getInt("total");
-        }
-      }
+      int flightCount = countQuery(statement);
+      DbUtils.commitTransaction(connection);
+      return flightCount;
+    }
+  }
 
+  public int countOwned() throws SQLException {
+    final String sql = "SELECT COUNT(*) AS total FROM flight WHERE stairway_id IS NOT NULL";
+    try (Connection connection = dataSource.getConnection();
+        NamedParameterPreparedStatement statement =
+            new NamedParameterPreparedStatement(connection, sql)) {
+      DbUtils.startReadOnlyTransaction(connection);
+      int flightCount = countQuery(statement);
       DbUtils.commitTransaction(connection);
       return flightCount;
     }
