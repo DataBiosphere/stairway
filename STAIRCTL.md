@@ -106,8 +106,13 @@ count on every list command. Instead, we provide count commands.
 command.
 
 ### `get flight` command
-By default, the `get flight` command provides a summary of the flight.
-
+By default, the `get flight` command provides a summary of the flight. It takes a flight id.
+You can get more data by setting switches:
+* `--input` will display the input paramters
+* `--log` will display a tabular summary of the log
+* `--logmap` will display details of the log including the working map at each point
+For example, `get flight --input --logmap --flight-id a63fc80f-f8a7-4cbc-be58-6cebc98ac21f`
+will provide the maximum, noisiest retrieval.
 
 ## Flight Use Cases
 This section provides a few capabilities of StairCtl.
