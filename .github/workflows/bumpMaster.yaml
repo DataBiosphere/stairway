@@ -3,29 +3,49 @@ on:
   push:
     branches:
       - master
+  workflow_dispatch:
+    inputs:
+      bump:
+        description: 'Part of the version to bump: major, minor, patch'
+        required: false
+        default: 'patch'
+      branch:
+        description: 'Branch to run the workflow on'
+        required: false
+        default: 'master'
 jobs:
-  update_image:
-    strategy:
-      matrix:
-        os: [ubuntu-latest]
-    runs-on: ${{ matrix.os }}
+  master-tag-publish:
+    runs-on: ubuntu-latest
     steps:
+      - name: Set part of semantic version to bump
+        id: semver
+        run: |
+          SEMVER_PART=""
+          CHECKOUT_BRANCH="$GITHUB_REF"
+          if ${{github.event_name == 'push' }}; then
+            SEMVER_PART="patch"
+          elif ${{github.event_name == 'workflow_dispatch' }}; then
+            SEMVER_PART=${{ github.event.inputs.bump }}
+            CHECKOUT_BRANCH=${{ github.event.inputs.branch }}
+          fi
+          echo ::set-output name=semver-part::$SEMVER_PART
+          echo ::set-output name=checkout-branch::$CHECKOUT_BRANCH
       - name: Checkout
         uses: actions/checkout@v2
         with:
-          ref: master
+          ref: ${{ steps.controls.outputs.checkout-branch }}
       - name: "Bump the tag to a new version"
         uses: databiosphere/github-actions/actions/bumper@v0.0.3
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           DEFAULT_BUMP: patch
           RELEASE_BRANCHES: master,develop
-          VERSION_FILE_PATH: build.gradle
-          VERSION_LINE_MATCH: ^version
+          VERSION_FILE_PATH: settings.gradle
+          VERSION_LINE_MATCH: "^gradle.ext.version\\s*=\\s*\".*\""
       - name: "Publish to Artifactory"
         uses: broadinstitute/gradle-command-action@v1
         with:
-          arguments: artifactoryPublish
+          arguments: ":library:artifactoryPublish"
         env:
           ARTIFACTORY_USER: ${{ secrets.ARTIFACTORY_USER }}
           ARTIFACTORY_PASSWORD: ${{ secrets.ARTIFACTORY_PASSWORD }}

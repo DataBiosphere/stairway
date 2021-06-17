@@ -31,7 +31,7 @@ public class Output {
 
   public static void flightList(int offset, List<Control.Flight> flightList) {
     if (flightList.isEmpty()) {
-      System.out.println("\nNo flights found");
+      System.out.println("%nNo flights found");
     } else {
       int counter = offset;
       System.out.println(
@@ -174,7 +174,7 @@ public class Output {
     pairList.add(
         new ImmutablePair<>("stairwayId", flight.getStairwayId().orElse(StringUtils.EMPTY)));
 
-    System.out.println(String.format("\nFlight: %s", flight.getFlightId()));
+    System.out.println(String.format("%nFlight: %s", flight.getFlightId()));
     int maxLength = display(indent, pairList);
     if (inputMap != null) {
       String inputTitle = "%s%-" + maxLength + "s:";

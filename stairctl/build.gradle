@@ -10,10 +10,8 @@ plugins {
     id 'com.github.spotbugs' version '4.0.8'
     id "io.spring.dependency-management" version "1.0.10.RELEASE"
     id "org.springframework.boot" version "2.4.0"
-// Spotless is disabled here because the plugin fails to be processed by gradle when in this
-// multi-project configuration. I have submitted an issue and a simple repro, so hoping for
-// some resolution.
-//   id 'com.diffplug.gradle.spotless' version '3.27.2'
+    // Spotless doesn't work still
+    //id 'com.diffplug.spotless' version '5.13.0'
 }
 
 version = gradle.version

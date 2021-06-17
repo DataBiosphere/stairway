@@ -19,7 +19,7 @@ public class ConnectCommands {
   @ShellMethod(value = "Connect to a Stairway database", key = "connect")
   public void connect(
       @ShellOption(value = {"-u", "-U", "--username"}, defaultValue = ShellOption.NULL) String username,
-      @ShellOption(value = {"-p", "--password"}, defaultValue = ShellOption.NULL) String password,
+      @ShellOption(value = {"-w", "--password"}, defaultValue = ShellOption.NULL) String password,
       @ShellOption(value = {"-d", "--dbname"}, defaultValue = ShellOption.NULL) String dbname,
       @ShellOption(value = {"-h", "--host"}, defaultValue = ShellOption.NULL) String host,
       @ShellOption(value = {"-p", "--port"}, defaultValue = ShellOption.NULL) String port)

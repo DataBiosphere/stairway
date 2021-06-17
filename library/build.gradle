@@ -12,7 +12,7 @@ plugins {
     id 'java-library'
     id 'maven-publish'
     id 'com.jfrog.artifactory' version '4.13.0'
-    id 'com.diffplug.gradle.spotless' version '3.27.2'
+    id 'com.diffplug.spotless' version '5.13.0'
     id 'com.github.spotbugs' version '4.0.8'
 }
 
@@ -103,6 +103,7 @@ java {
 publishing {
     publications {
         stairwayLibrary(MavenPublication) {
+            artifactId = "stairway"
             from components.java
         }
     }

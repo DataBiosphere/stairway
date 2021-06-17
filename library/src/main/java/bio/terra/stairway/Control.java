@@ -2,6 +2,7 @@ package bio.terra.stairway;
 
 import bio.terra.stairway.exception.DatabaseOperationException;
 import bio.terra.stairway.exception.FlightException;
+import edu.umd.cs.findbugs.annotations.SuppressFBWarnings;
 import java.sql.Connection;
 import java.sql.ResultSet;
 import java.sql.SQLException;
@@ -15,6 +16,9 @@ import java.util.UUID;
 import java.util.stream.Collectors;
 import javax.sql.DataSource;
 
+@SuppressFBWarnings(
+    value = "RCN_REDUNDANT_NULLCHECK_WOULD_HAVE_BEEN_A_NPE",
+    justification = "Spotbugs doesn't understand resource try construct")
 public class Control {
   private final Stairway stairway;
   private final DataSource dataSource;
@@ -411,6 +415,30 @@ public class Control {
     public int compareTo(KeyValue o) {
       return key.compareTo(o.key);
     }
+
+    @Override
+    public boolean equals(Object o) {
+      if (this == o) {
+        return true;
+      }
+      if (o == null || getClass() != o.getClass()) {
+        return false;
+      }
+
+      KeyValue keyValue = (KeyValue) o;
+
+      if (key != null ? !key.equals(keyValue.key) : keyValue.key != null) {
+        return false;
+      }
+      return value != null ? value.equals(keyValue.value) : keyValue.value == null;
+    }
+
+    @Override
+    public int hashCode() {
+      int result = key != null ? key.hashCode() : 0;
+      result = 31 * result + (value != null ? value.hashCode() : 0);
+      return result;
+    }
   }
 
   // Holds one log record with its working map
@@ -500,6 +528,56 @@ public class Control {
     @Override
     public int compareTo(LogEntry o) {
       return this.logTime.compareTo(o.logTime);
+    }
+
+    @Override
+    public boolean equals(Object o) {
+      if (this == o) {
+        return true;
+      }
+      if (o == null || getClass() != o.getClass()) {
+        return false;
+      }
+
+      LogEntry logEntry = (LogEntry) o;
+
+      if (stepIndex != logEntry.stepIndex) {
+        return false;
+      }
+      if (rerun != logEntry.rerun) {
+        return false;
+      }
+      if (flightId != null ? !flightId.equals(logEntry.flightId) : logEntry.flightId != null) {
+        return false;
+      }
+      if (logTime != null ? !logTime.equals(logEntry.logTime) : logEntry.logTime != null) {
+        return false;
+      }
+      if (workingMap != null
+          ? !workingMap.equals(logEntry.workingMap)
+          : logEntry.workingMap != null) {
+        return false;
+      }
+      if (exception != null ? !exception.equals(logEntry.exception) : logEntry.exception != null) {
+        return false;
+      }
+      if (direction != logEntry.direction) {
+        return false;
+      }
+      return id != null ? id.equals(logEntry.id) : logEntry.id == null;
+    }
+
+    @Override
+    public int hashCode() {
+      int result = flightId != null ? flightId.hashCode() : 0;
+      result = 31 * result + (logTime != null ? logTime.hashCode() : 0);
+      result = 31 * result + (workingMap != null ? workingMap.hashCode() : 0);
+      result = 31 * result + stepIndex;
+      result = 31 * result + (exception != null ? exception.hashCode() : 0);
+      result = 31 * result + (rerun ? 1 : 0);
+      result = 31 * result + (direction != null ? direction.hashCode() : 0);
+      result = 31 * result + (id != null ? id.hashCode() : 0);
+      return result;
     }
   }
 }
