@@ -32,6 +32,8 @@ For more information on developing flights in Stairway see: [Stairway Flight Dev
 
 For information on developing Stairway see [Developing Stairway](DEVELOPMENT.md)
 
+For information on the StairCtl debug/recovery tool, see [StairCtl](STAIRCTL.md)
+
 ## Overview
 This section provides an overview of Stairway concepts.
 

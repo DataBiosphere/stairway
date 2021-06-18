@@ -1,0 +1,90 @@
+buildscript {
+    repositories {
+        mavenCentral()
+    }
+}
+
+plugins {
+    id 'java'
+    id 'application'
+    id 'com.github.spotbugs' version '4.0.8'
+    id "io.spring.dependency-management" version "1.0.10.RELEASE"
+    id "org.springframework.boot" version "2.4.0"
+    // Spotless will only work in one project of a composite build, so we do not include it here. See PF-867.
+}
+
+version = gradle.version
+sourceCompatibility = JavaVersion.VERSION_11
+mainClassName = 'bio.terra.stairctl.Application'
+
+repositories {
+    mavenCentral()
+    maven {
+        url 'https://broadinstitute.jfrog.io/broadinstitute/libs-snapshot-local/'
+    }
+}
+
+dependencies {
+    // alphabetical
+    ext {
+        commonsLang3 = "3.9"
+        findbugsAnnotations = "3.0.1"
+        hamcrest = "2.2"
+        jackson = "2.10.2"
+        junit = "5.7.1"
+        logback = "1.2.3"
+        sl4j = "1.7.30"
+        springboot = "2.4.5"
+        springshell = "2.0.1.RELEASE"
+    }
+
+    implementation project(":library")
+
+    implementation group: 'org.springframework.boot', name: 'spring-boot-starter', version: "${springboot}"
+    implementation group: 'org.springframework.shell', name: 'spring-shell-starter', version: "${springshell}"
+
+    // Versions via spring dependency management
+    implementation group: 'org.apache.commons', name: 'commons-dbcp2'
+    implementation group: 'org.apache.commons', name: 'commons-pool2'
+    implementation group: 'org.apache.commons', name: 'commons-lang3'
+
+    implementation group: 'ch.qos.logback', name: 'logback-classic', version: "${logback}"
+    implementation group: 'org.slf4j', name: 'slf4j-api', version: "${sl4j}"
+
+    implementation group: 'com.fasterxml.jackson.core', name: 'jackson-core', version: "${jackson}"
+    implementation group: 'com.fasterxml.jackson.datatype', name: 'jackson-datatype-jsr310', version: "${jackson}"
+
+    // Findbugs annotations, so we can selectively suppress findbugs findings
+    implementation group: 'com.google.code.findbugs', name: 'annotations', version: "${findbugsAnnotations}"
+
+    runtimeOnly group: "org.postgresql", name: "postgresql", version: "42.2.18"
+    runtimeOnly group: 'org.codehaus.groovy', name: 'groovy', version: '3.0.7'
+
+    testImplementation group: 'org.junit.jupiter', name: 'junit-jupiter-api', version: "${junit}"
+    testImplementation group: 'org.hamcrest', name: 'hamcrest', version: "${hamcrest}"
+}
+
+spotbugs {
+    effort = 'max'
+    // This makes the "html" reports come out in plain text so you can just open the file in IntelliJ
+    // and look at your bugs instead of having to switch to a browser.
+    extraArgs = [ '-emacs']
+}
+spotbugsMain {
+    reports {
+        html {
+            enabled = true
+            destination = file("$buildDir/reports/spotbugs/main.txt")
+            stylesheet = 'fancy.xsl'
+        }
+    }
+}
+spotbugsTest {
+    reports {
+        html {
+            enabled = true
+            destination = file("$buildDir/reports/spotbugs/test.txt")
+            stylesheet = 'fancy.xsl'
+        }
+    }
+}
