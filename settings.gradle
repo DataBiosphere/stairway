@@ -2,4 +2,4 @@ rootProject.name = 'stairway'
 include 'library'
 include 'stairctl'
 
-gradle.ext.version = "0.0.56-SNAPSHOT"
+gradle.ext.version = "0.0.57-SNAPSHOT"
