@@ -45,6 +45,13 @@ public class StairwayService {
               .build();
 
       stairway.initialize(dataSource, false, false);
+
+      // At this point, we have an initialized Stairway connected to its database.
+      // This gives us the access we need to manipulate the database state.
+      // We do not call the final step of Stairway startup: recoverAndStart().
+      // We cannot, because we do not have the application classes that would be needed
+      // to actually execute flights.
+
       control = stairway.getControl();
       currentConnectParams = connectParams;
       System.out.println("Connected to Stairway");

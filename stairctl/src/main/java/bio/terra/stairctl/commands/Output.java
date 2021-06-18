@@ -2,7 +2,7 @@ package bio.terra.stairctl.commands;
 
 import bio.terra.stairctl.ConnectParams;
 import bio.terra.stairway.Control;
-import bio.terra.stairway.Control.KeyValue;
+import bio.terra.stairway.Control.FlightMapEntry;
 import bio.terra.stairway.Control.LogEntry;
 import java.time.Duration;
 import java.time.Instant;
@@ -11,6 +11,7 @@ import java.util.Comparator;
 import java.util.List;
 import java.util.Optional;
 import javax.annotation.Nullable;
+import org.apache.commons.lang3.ClassUtils;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.commons.lang3.tuple.ImmutablePair;
 import org.apache.commons.lang3.tuple.Pair;
@@ -20,9 +21,11 @@ import org.slf4j.LoggerFactory;
 public class Output {
   private static final Logger logger = LoggerFactory.getLogger(Output.class);
 
-  private static final String FLIGHT_LIST_FORMAT = "%6s %-36s %-30s %-27s %-27s %-12s %-30s";
+  private static final int CLASS_DISPLAY_LENGTH = 36;
+  private static final String FLIGHT_LIST_FORMAT =
+      "%6s %-36s %-" + CLASS_DISPLAY_LENGTH + "s %-27s %-27s %-12s %-30s";
   private static final String FLIGHT_LIST_DASH =
-      "------ ------------------------------------ ------------------------------ --------------------------- --------------------------- ------------ ------------------------------";
+      "------ ------------------------------------ ------------------------------------ --------------------------- --------------------------- ------------ ------------------------------";
   private static final String STAIRWAY_LIST_FORMAT = "%-40s";
   private static final String STAIRWAY_LIST_DASH = "----------------------------------------";
   private static final String LOG_LIST_FORMAT = "%s%6s %-9s %-27s %13s %-5s %s";
@@ -87,7 +90,7 @@ public class Output {
 
     for (int i = 0; i <= lastIndex; i++) {
       Instant endInstant =
-          (i == lastIndex) ? flight.getCompleted().get() : logEntryList.get(i + 1).getLogTime();
+          (i == lastIndex) ? flight.getCompleted().orElse(null) : logEntryList.get(i + 1).getLogTime();
       LogEntry logEntry = logEntryList.get(i);
       String durationString = formatDuration(logEntry.getLogTime(), endInstant);
       if (showDetail) {
@@ -134,10 +137,10 @@ public class Output {
     keyValue(indent + "  ", logEntry.getWorkingMap());
   }
 
-  public static void keyValue(String indent, List<Control.KeyValue> keyValueList) {
-    keyValueList.sort(KeyValue::compareTo);
+  public static void keyValue(String indent, List<FlightMapEntry> keyValueList) {
+    keyValueList.sort(FlightMapEntry::compareTo);
     List<ImmutablePair<String, String>> pairList = new ArrayList<>();
-    for (Control.KeyValue keyValue : keyValueList) {
+    for (FlightMapEntry keyValue : keyValueList) {
       pairList.add(new ImmutablePair<>(keyValue.getKey(), keyValue.getValue()));
     }
     display(indent, pairList);
@@ -161,14 +164,18 @@ public class Output {
     flightSummary(flight, null);
   }
 
-  public static void flightSummary(Control.Flight flight, List<Control.KeyValue> inputMap) {
+  public static void flightSummary(Control.Flight flight, List<FlightMapEntry> inputMap) {
     final String indent = "  ";
+
     List<ImmutablePair<String, String>> pairList = new ArrayList<>();
     pairList.add(new ImmutablePair<>("class", flight.getClassName()));
     pairList.add(new ImmutablePair<>("submitted", flight.getSubmitted().toString()));
     pairList.add(
         new ImmutablePair<>(
             "completed", flight.getCompleted().map(Instant::toString).orElse(StringUtils.EMPTY)));
+    pairList.add(
+        new ImmutablePair<>(
+            "duration", formatDuration(flight.getSubmitted(), flight.getCompleted().orElse(null))));
     pairList.add(new ImmutablePair<>("status", flight.getStatus().toString()));
     pairList.add(new ImmutablePair<>("exception", flight.getException().orElse(StringUtils.EMPTY)));
     pairList.add(
@@ -193,6 +200,14 @@ public class Output {
     display("  ", pairList);
   }
 
+  /**
+   * This method makes an aligned display of pairs of names and values. It computes the longest name
+   * and uses that to generate a String format for presenting the data.
+   *
+   * @param indent string to prefix each line with
+   * @param pairList pairs of field names and field data
+   * @return max name length, to allow the caller to align with what we displayed
+   */
   private static int display(String indent, List<ImmutablePair<String, String>> pairList) {
     // Compute the max length of the first string
     Optional<String> longest =
@@ -214,9 +229,10 @@ public class Output {
   }
 
   private static String shortenClassName(String in) {
-    if (in.length() <= 30) {
-      return in;
+    String shortName = ClassUtils.getAbbreviatedName(in, CLASS_DISPLAY_LENGTH);
+    if (shortName.length() > CLASS_DISPLAY_LENGTH) {
+      return ".." + StringUtils.right(in, CLASS_DISPLAY_LENGTH - 2);
     }
-    return "..." + StringUtils.right(in, 27);
+    return shortName;
   }
 }

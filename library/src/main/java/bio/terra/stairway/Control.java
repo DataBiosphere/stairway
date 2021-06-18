@@ -1,21 +1,28 @@
 package bio.terra.stairway;
 
+import static bio.terra.stairway.DbUtils.commitTransaction;
+
 import bio.terra.stairway.exception.DatabaseOperationException;
 import bio.terra.stairway.exception.FlightException;
 import edu.umd.cs.findbugs.annotations.SuppressFBWarnings;
-import java.sql.Connection;
 import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.sql.Timestamp;
 import java.time.Instant;
 import java.util.ArrayList;
-import java.util.Arrays;
 import java.util.List;
+import java.util.Objects;
 import java.util.Optional;
 import java.util.UUID;
-import java.util.stream.Collectors;
 import javax.sql.DataSource;
 
+/**
+ * This class provides an API for out-of-band debugging and recovering Stairway flights. It caters
+ * to the use cases of the stairctl tool. The methods are constrained to only access the database,
+ * and do not rely on any application-specific state. Once the FlightDao stops performing
+ * deserialization, we may be able to share more methods with it. For now, at least, there is some
+ * duplication of function between FlightDao and Control.
+ */
 @SuppressFBWarnings(
     value = "RCN_REDUNDANT_NULLCHECK_WOULD_HAVE_BEEN_A_NPE",
     justification = "Spotbugs doesn't understand resource try construct")
@@ -38,12 +45,14 @@ public class Control {
 
   // -- Flight methods --
 
-  private static final String flightSelectFrom =
+  private static final String FLIGHT_SELECT_FROM =
       " flightid, submit_time, class_name, completed_time, status,"
           + "serialized_exception, stairway_id FROM flight ";
 
-  private static final String flightOrderPage =
+  private static final String FLIGHT_ORDER_PAGE =
       " ORDER BY submit_time DESC OFFSET :offset LIMIT :limit";
+
+  private static final String FLIGHT_SELECT_COUNT = "SELECT COUNT(*) AS total FROM flight";
 
   private int countQuery(NamedParameterPreparedStatement statement) throws SQLException {
     int flightCount = 0;
@@ -55,28 +64,19 @@ public class Control {
     return flightCount;
   }
 
-  public int countFlights(String status) throws SQLException {
-    StringBuilder sb = new StringBuilder();
-    sb.append("SELECT COUNT(*) as total FROM flight");
-    if (status != null) {
-      try {
-        FlightStatus.valueOf(status);
-      } catch (IllegalArgumentException ex) {
-        throw new IllegalArgumentException(
-            "Invalid status value. Values are "
-                + Arrays.stream(FlightStatus.values())
-                    .map(FlightStatus::toString)
-                    .collect(Collectors.joining(", ")));
-      }
-      sb.append(" WHERE status = :status");
+  public int countFlights(FlightStatus status) throws SQLException {
+    String sql;
+    if (status == null) {
+      sql = FLIGHT_SELECT_COUNT;
+    } else {
+      sql = FLIGHT_SELECT_COUNT + " WHERE status = :status";
     }
 
-    try (Connection connection = dataSource.getConnection();
-        NamedParameterPreparedStatement statement =
-            new NamedParameterPreparedStatement(connection, sb.toString())) {
+    try (var connection = dataSource.getConnection();
+        var statement = new NamedParameterPreparedStatement(connection, sql)) {
       DbUtils.startReadOnlyTransaction(connection);
       if (status != null) {
-        statement.setString("status", status);
+        statement.setString("status", status.toString());
       }
 
       int flightCount = countQuery(statement);
@@ -86,10 +86,9 @@ public class Control {
   }
 
   public int countOwned() throws SQLException {
-    final String sql = "SELECT COUNT(*) AS total FROM flight WHERE stairway_id IS NOT NULL";
-    try (Connection connection = dataSource.getConnection();
-        NamedParameterPreparedStatement statement =
-            new NamedParameterPreparedStatement(connection, sql)) {
+    final String sql = FLIGHT_SELECT_COUNT + " WHERE stairway_id IS NOT NULL";
+    try (var connection = dataSource.getConnection();
+        var statement = new NamedParameterPreparedStatement(connection, sql)) {
       DbUtils.startReadOnlyTransaction(connection);
       int flightCount = countQuery(statement);
       DbUtils.commitTransaction(connection);
@@ -97,31 +96,21 @@ public class Control {
     }
   }
 
-  public List<Control.Flight> listFlightsSimple(int offset, int limit, String status)
+  public List<Control.Flight> listFlightsSimple(int offset, int limit, FlightStatus status)
       throws SQLException {
 
     StringBuilder sb = new StringBuilder();
-    sb.append("SELECT").append(flightSelectFrom);
+    sb.append("SELECT").append(FLIGHT_SELECT_FROM);
     if (status != null) {
-      try {
-        FlightStatus.valueOf(status);
-      } catch (IllegalArgumentException ex) {
-        throw new IllegalArgumentException(
-            "Invalid status value. Values are "
-                + Arrays.stream(FlightStatus.values())
-                    .map(FlightStatus::toString)
-                    .collect(Collectors.joining(", ")));
-      }
       sb.append(" WHERE status = :status");
     }
-    sb.append(flightOrderPage);
+    sb.append(FLIGHT_ORDER_PAGE);
 
-    try (Connection connection = dataSource.getConnection();
-        NamedParameterPreparedStatement statement =
-            new NamedParameterPreparedStatement(connection, sb.toString())) {
+    try (var connection = dataSource.getConnection();
+        var statement = new NamedParameterPreparedStatement(connection, sb.toString())) {
       DbUtils.startReadOnlyTransaction(connection);
       if (status != null) {
-        statement.setString("status", status);
+        statement.setString("status", status.toString());
       }
       List<Control.Flight> flightList = flightQuery(statement, offset, limit);
       DbUtils.commitTransaction(connection);
@@ -131,13 +120,12 @@ public class Control {
 
   public List<Control.Flight> listOwned(int offset, int limit) throws SQLException {
     StringBuilder sb = new StringBuilder();
-    sb.append("SELECT").append(flightSelectFrom);
+    sb.append("SELECT").append(FLIGHT_SELECT_FROM);
     sb.append(" WHERE stairway_id IS NOT NULL ");
-    sb.append(flightOrderPage);
+    sb.append(FLIGHT_ORDER_PAGE);
 
-    try (Connection connection = dataSource.getConnection();
-        NamedParameterPreparedStatement statement =
-            new NamedParameterPreparedStatement(connection, sb.toString())) {
+    try (var connection = dataSource.getConnection();
+        var statement = new NamedParameterPreparedStatement(connection, sb.toString())) {
       DbUtils.startReadOnlyTransaction(connection);
       List<Control.Flight> flightList = flightQuery(statement, offset, limit);
       DbUtils.commitTransaction(connection);
@@ -147,13 +135,12 @@ public class Control {
 
   public Control.Flight getFlight(String flightId) throws SQLException {
     StringBuilder sb = new StringBuilder();
-    sb.append("SELECT").append(flightSelectFrom);
+    sb.append("SELECT").append(FLIGHT_SELECT_FROM);
     sb.append(" WHERE flightid = :flightid ");
-    sb.append(flightOrderPage);
+    sb.append(FLIGHT_ORDER_PAGE);
 
-    try (Connection connection = dataSource.getConnection();
-        NamedParameterPreparedStatement statement =
-            new NamedParameterPreparedStatement(connection, sb.toString())) {
+    try (var connection = dataSource.getConnection();
+        var statement = new NamedParameterPreparedStatement(connection, sb.toString())) {
       statement.setString("flightid", flightId);
       DbUtils.startReadOnlyTransaction(connection);
       List<Control.Flight> flightStateList = flightQuery(statement, 0, 1);
@@ -165,28 +152,25 @@ public class Control {
     }
   }
 
-  public Control.Flight flightDisown(String flightId)
+  // We cannot use the regular disown code path, because it will only transition
+  // from RUNNING --> READY. We want to force a transition from other states.
+  // For example, restarting a dismal failure due to retry exhaustion.
+  public Control.Flight forceReady(String flightId)
       throws SQLException, DatabaseOperationException, InterruptedException, FlightException {
-    Control.Flight flight = getFlight(flightId);
-    if (flight.getStairwayId().isEmpty()) {
-      throw new IllegalStateException("Flight is not owned: " + flightId);
-    }
 
-    // Dummy up a flight context and use that to call the flight doa to disown.
-    // When we have fixed serdes, we can use real flight contexts
-    FlightMap fakeFlightMap = new FlightMap();
-    FlightContext fakeFlightContext = new FlightContext(fakeFlightMap, null, null);
-    fakeFlightContext.setFlightStatus(FlightStatus.READY);
-    fakeFlightContext.setFlightId(flightId);
-    flightDao.exit(fakeFlightContext);
+    final String sql =
+        "UPDATE flight SET status = 'READY', stairway_id = NULL WHERE flightid = :flightid";
 
+    testFlightState(flightId, FlightStatus.READY);
+    updateFlight(flightId, sql);
     return getFlight(flightId);
   }
 
   public Control.Flight forceFatal(String flightId) throws SQLException {
     // We do not assume anything about the current state. We just force to a FATAL
     // disowned state so no attempt will be made to recover.
-    // TODO: need a way to annotate what we did to the flight.
+    // TODO (PF-865): understand if we need a way to log/audit what we did to the flight.
+    //  or perhaps just an annotation on the flight itself that it was modified.
     final String sql =
         "UPDATE flight "
             + " SET completed_time = CURRENT_TIMESTAMP,"
@@ -194,34 +178,21 @@ public class Control {
             + " stairway_id = NULL"
             + " WHERE flightid = :flightid";
 
-    Control.Flight flight = getFlight(flightId);
-    if (flight.getStatus() == FlightStatus.FATAL) {
-      throw new IllegalStateException("Flight is already fatal");
-    }
-
-    try (Connection connection = dataSource.getConnection();
-        NamedParameterPreparedStatement statement =
-            new NamedParameterPreparedStatement(connection, sql)) {
-      statement.setString("flightid", flightId);
-      DbUtils.startTransaction(connection);
-      statement.getPreparedStatement().executeUpdate();
-      DbUtils.commitTransaction(connection);
-    }
-
+    testFlightState(flightId, FlightStatus.FATAL);
+    updateFlight(flightId, sql);
     return getFlight(flightId);
   }
 
-  public List<Control.KeyValue> inputQuery(String flightId) throws SQLException {
+  public List<FlightMapEntry> inputQuery(String flightId) throws SQLException {
     final String sql = "SELECT key, value FROM flightinput WHERE flightid = :flightid";
 
-    try (Connection connection = dataSource.getConnection();
-        NamedParameterPreparedStatement statement =
-            new NamedParameterPreparedStatement(connection, sql)) {
+    try (var connection = dataSource.getConnection();
+        var statement = new NamedParameterPreparedStatement(connection, sql)) {
       DbUtils.startReadOnlyTransaction(connection);
       statement.setString("flightid", flightId);
-      List<Control.KeyValue> keyValueList = keyValueQuery(statement);
+      List<FlightMapEntry> flightMapEntries = flightMapQuery(statement);
       DbUtils.commitTransaction(connection);
-      return keyValueList;
+      return flightMapEntries;
     }
   }
 
@@ -232,11 +203,9 @@ public class Control {
 
     final String sqlmap = "SELECT key, value FROM flightworking WHERE flightlog_id = :id";
 
-    try (Connection connection = dataSource.getConnection();
-        NamedParameterPreparedStatement logStatement =
-            new NamedParameterPreparedStatement(connection, sqllog);
-        NamedParameterPreparedStatement mapStatement =
-            new NamedParameterPreparedStatement(connection, sqlmap)) {
+    try (var connection = dataSource.getConnection();
+        var logStatement = new NamedParameterPreparedStatement(connection, sqllog);
+        var mapStatement = new NamedParameterPreparedStatement(connection, sqlmap)) {
       DbUtils.startReadOnlyTransaction(connection);
       logStatement.setString("flightid", flightId);
 
@@ -256,10 +225,10 @@ public class Control {
         }
       }
 
-      // We could do this as a join, but this is simpler and we reuse the keyValueQuery
+      // We could do this as a join, but this is simpler and we reuse the flightMapQuery
       for (Control.LogEntry logEntry : logList) {
         mapStatement.setUuid("id", logEntry.getId());
-        logEntry.workingMap(keyValueQuery(mapStatement));
+        logEntry.workingMap(flightMapQuery(mapStatement));
       }
 
       DbUtils.commitTransaction(connection);
@@ -291,18 +260,36 @@ public class Control {
     return flightList;
   }
 
-  private List<Control.KeyValue> keyValueQuery(NamedParameterPreparedStatement statement)
+  private List<FlightMapEntry> flightMapQuery(NamedParameterPreparedStatement statement)
       throws SQLException {
 
-    List<Control.KeyValue> keyValueList = new ArrayList<>();
+    List<FlightMapEntry> flightMapEntries = new ArrayList<>();
     try (ResultSet rs = statement.getPreparedStatement().executeQuery()) {
       while (rs.next()) {
-        KeyValue keyValue = new KeyValue();
-        keyValue.key(rs.getString("key")).value(rs.getString("value"));
-        keyValueList.add(keyValue);
+        FlightMapEntry entry = new FlightMapEntry();
+        entry.key(rs.getString("key")).value(rs.getString("value"));
+        flightMapEntries.add(entry);
       }
     }
-    return keyValueList;
+    return flightMapEntries;
+  }
+
+  private void testFlightState(String flightId, FlightStatus status) throws SQLException {
+    Control.Flight flight = getFlight(flightId);
+    if (flight.getStatus() == status) {
+      throw new IllegalStateException("Flight is already " + status.toString());
+    }
+  }
+
+  private void updateFlight(String flightId, String sql) throws SQLException {
+    try (var connection = dataSource.getConnection();
+        var statement = new NamedParameterPreparedStatement(connection, sql)) {
+
+      DbUtils.startTransaction(connection);
+      statement.setString("flightid", flightId);
+      statement.getPreparedStatement().executeUpdate();
+      commitTransaction(connection);
+    }
   }
 
   // -- Stairway methods --
@@ -389,7 +376,7 @@ public class Control {
 
   // Holds flight map data as a pair of strings; either inputs or working map
   // Comparable by key for an alphabetical display
-  public static class KeyValue implements Comparable<KeyValue> {
+  public static class FlightMapEntry implements Comparable<FlightMapEntry> {
     private String key;
     private String value;
 
@@ -397,7 +384,7 @@ public class Control {
       return key;
     }
 
-    public KeyValue key(String key) {
+    public FlightMapEntry key(String key) {
       this.key = key;
       return this;
     }
@@ -406,13 +393,13 @@ public class Control {
       return value;
     }
 
-    public KeyValue value(String value) {
+    public FlightMapEntry value(String value) {
       this.value = value;
       return this;
     }
 
     @Override
-    public int compareTo(KeyValue o) {
+    public int compareTo(FlightMapEntry o) {
       return key.compareTo(o.key);
     }
 
@@ -424,20 +411,13 @@ public class Control {
       if (o == null || getClass() != o.getClass()) {
         return false;
       }
-
-      KeyValue keyValue = (KeyValue) o;
-
-      if (key != null ? !key.equals(keyValue.key) : keyValue.key != null) {
-        return false;
-      }
-      return value != null ? value.equals(keyValue.value) : keyValue.value == null;
+      FlightMapEntry entry = (FlightMapEntry) o;
+      return Objects.equals(key, entry.key) && Objects.equals(value, entry.value);
     }
 
     @Override
     public int hashCode() {
-      int result = key != null ? key.hashCode() : 0;
-      result = 31 * result + (value != null ? value.hashCode() : 0);
-      return result;
+      return Objects.hash(key, value);
     }
   }
 
@@ -446,7 +426,7 @@ public class Control {
   public static class LogEntry implements Comparable<LogEntry> {
     private String flightId;
     private Instant logTime;
-    private List<KeyValue> workingMap;
+    private List<FlightMapEntry> workingMap;
     private int stepIndex;
     private String exception;
     private boolean rerun;
@@ -471,11 +451,11 @@ public class Control {
       return this;
     }
 
-    public List<KeyValue> getWorkingMap() {
+    public List<FlightMapEntry> getWorkingMap() {
       return workingMap;
     }
 
-    public LogEntry workingMap(List<KeyValue> workingMap) {
+    public LogEntry workingMap(List<FlightMapEntry> workingMap) {
       this.workingMap = workingMap;
       return this;
     }
@@ -538,46 +518,21 @@ public class Control {
       if (o == null || getClass() != o.getClass()) {
         return false;
       }
-
       LogEntry logEntry = (LogEntry) o;
-
-      if (stepIndex != logEntry.stepIndex) {
-        return false;
-      }
-      if (rerun != logEntry.rerun) {
-        return false;
-      }
-      if (flightId != null ? !flightId.equals(logEntry.flightId) : logEntry.flightId != null) {
-        return false;
-      }
-      if (logTime != null ? !logTime.equals(logEntry.logTime) : logEntry.logTime != null) {
-        return false;
-      }
-      if (workingMap != null
-          ? !workingMap.equals(logEntry.workingMap)
-          : logEntry.workingMap != null) {
-        return false;
-      }
-      if (exception != null ? !exception.equals(logEntry.exception) : logEntry.exception != null) {
-        return false;
-      }
-      if (direction != logEntry.direction) {
-        return false;
-      }
-      return id != null ? id.equals(logEntry.id) : logEntry.id == null;
+      return stepIndex == logEntry.stepIndex
+          && rerun == logEntry.rerun
+          && Objects.equals(flightId, logEntry.flightId)
+          && Objects.equals(logTime, logEntry.logTime)
+          && Objects.equals(workingMap, logEntry.workingMap)
+          && Objects.equals(exception, logEntry.exception)
+          && direction == logEntry.direction
+          && Objects.equals(id, logEntry.id);
     }
 
     @Override
     public int hashCode() {
-      int result = flightId != null ? flightId.hashCode() : 0;
-      result = 31 * result + (logTime != null ? logTime.hashCode() : 0);
-      result = 31 * result + (workingMap != null ? workingMap.hashCode() : 0);
-      result = 31 * result + stepIndex;
-      result = 31 * result + (exception != null ? exception.hashCode() : 0);
-      result = 31 * result + (rerun ? 1 : 0);
-      result = 31 * result + (direction != null ? direction.hashCode() : 0);
-      result = 31 * result + (id != null ? id.hashCode() : 0);
-      return result;
+      return Objects.hash(
+          flightId, logTime, workingMap, stepIndex, exception, rerun, direction, id);
     }
   }
 }

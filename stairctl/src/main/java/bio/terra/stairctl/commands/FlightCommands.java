@@ -2,9 +2,12 @@ package bio.terra.stairctl.commands;
 
 import bio.terra.stairctl.StairwayService;
 import bio.terra.stairway.Control;
+import bio.terra.stairway.Control.FlightMapEntry;
 import bio.terra.stairway.FlightStatus;
+import java.util.Arrays;
 import java.util.List;
 import java.util.Optional;
+import java.util.stream.Collectors;
 import org.apache.commons.lang3.StringUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -48,17 +51,19 @@ public class FlightCommands {
   @ShellMethod(value = "Count flights", key = "count flights")
   public void countFlights(
       @ShellOption(
-          value = {"-s", "--status"},
-          defaultValue = ShellOption.NULL)
+              value = {"-s", "--status"},
+              defaultValue = ShellOption.NULL)
           String status)
       throws Exception {
 
+    FlightStatus flightStatus = convertToFlightStatus(status);
     try {
-      int count = stairwayService.getControl().countFlights(status);
-      String context = Optional.ofNullable(status).map(s -> " with status " + s).orElse(StringUtils.EMPTY);
+      int count = stairwayService.getControl().countFlights(flightStatus);
+      String context =
+          Optional.ofNullable(status).map(s -> " with status " + s).orElse(StringUtils.EMPTY);
       System.out.println("Found " + count + " flights" + context);
     } catch (Exception ex) {
-      Output.error("List flights failed", ex);
+      Output.error("Count flights failed", ex);
     }
   }
 
@@ -86,7 +91,7 @@ public class FlightCommands {
   @ShellMethod(value = "Force a flight to the READY state (disown it)", key = "force ready")
   public void forceReady(String flightId) throws Exception {
     try {
-      Control.Flight flight = stairwayService.getControl().flightDisown(flightId);
+      Control.Flight flight = stairwayService.getControl().forceReady(flightId);
       Output.flightSummary(flight);
     } catch (Exception ex) {
       Output.error("Disown flight failed", ex);
@@ -103,7 +108,7 @@ public class FlightCommands {
       throws Exception {
     try {
       Control.Flight flight = stairwayService.getControl().getFlight(flightId);
-      List<Control.KeyValue> inputKeyValue = null;
+      List<FlightMapEntry> inputKeyValue = null;
       if (input) {
         inputKeyValue = stairwayService.getControl().inputQuery(flightId);
       }
@@ -148,9 +153,10 @@ public class FlightCommands {
           String status)
       throws Exception {
 
+    FlightStatus flightStatus = convertToFlightStatus(status);
     try {
       List<Control.Flight> flightList =
-          stairwayService.getControl().listFlightsSimple(offset, limit, status);
+          stairwayService.getControl().listFlightsSimple(offset, limit, flightStatus);
       Output.flightList(offset, flightList);
     } catch (Exception ex) {
       Output.error("List flights failed", ex);
@@ -174,6 +180,21 @@ public class FlightCommands {
       Output.flightList(offset, flightList);
     } catch (Exception ex) {
       Output.error("List owned failed", ex);
+    }
+  }
+
+  private FlightStatus convertToFlightStatus(String status) {
+    if (status == null) {
+      return null;
+    }
+    try {
+      return FlightStatus.valueOf(status);
+    } catch (IllegalArgumentException ex) {
+      throw new IllegalArgumentException(
+          "Invalid status value. Values are "
+              + Arrays.stream(FlightStatus.values())
+                  .map(FlightStatus::toString)
+                  .collect(Collectors.joining(", ")));
     }
   }
 }
