@@ -5,24 +5,14 @@ buildscript {
 }
 
 plugins {
-    id 'java'
+    id 'stairway.java-conventions'
     id 'application'
-    id 'com.github.spotbugs' version '4.0.8'
     id "io.spring.dependency-management" version "1.0.10.RELEASE"
     id "org.springframework.boot" version "2.4.0"
-    // Spotless will only work in one project of a composite build, so we do not include it here. See PF-867.
 }
 
 version = gradle.version
-sourceCompatibility = JavaVersion.VERSION_11
 mainClassName = 'bio.terra.stairctl.Application'
-
-repositories {
-    mavenCentral()
-    maven {
-        url 'https://broadinstitute.jfrog.io/broadinstitute/libs-snapshot-local/'
-    }
-}
 
 dependencies {
     // alphabetical
@@ -38,7 +28,7 @@ dependencies {
         springshell = "2.0.1.RELEASE"
     }
 
-    implementation project(":library")
+    implementation project(":stairway")
 
     implementation group: 'org.springframework.boot', name: 'spring-boot-starter', version: "${springboot}"
     implementation group: 'org.springframework.shell', name: 'spring-shell-starter', version: "${springshell}"
@@ -62,29 +52,4 @@ dependencies {
 
     testImplementation group: 'org.junit.jupiter', name: 'junit-jupiter-api', version: "${junit}"
     testImplementation group: 'org.hamcrest', name: 'hamcrest', version: "${hamcrest}"
-}
-
-spotbugs {
-    effort = 'max'
-    // This makes the "html" reports come out in plain text so you can just open the file in IntelliJ
-    // and look at your bugs instead of having to switch to a browser.
-    extraArgs = [ '-emacs']
-}
-spotbugsMain {
-    reports {
-        html {
-            enabled = true
-            destination = file("$buildDir/reports/spotbugs/main.txt")
-            stylesheet = 'fancy.xsl'
-        }
-    }
-}
-spotbugsTest {
-    reports {
-        html {
-            enabled = true
-            destination = file("$buildDir/reports/spotbugs/test.txt")
-            stylesheet = 'fancy.xsl'
-        }
-    }
 }

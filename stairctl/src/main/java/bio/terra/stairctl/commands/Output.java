@@ -90,7 +90,9 @@ public class Output {
 
     for (int i = 0; i <= lastIndex; i++) {
       Instant endInstant =
-          (i == lastIndex) ? flight.getCompleted().orElse(null) : logEntryList.get(i + 1).getLogTime();
+          (i == lastIndex)
+              ? flight.getCompleted().orElse(null)
+              : logEntryList.get(i + 1).getLogTime();
       LogEntry logEntry = logEntryList.get(i);
       String durationString = formatDuration(logEntry.getLogTime(), endInstant);
       if (showDetail) {

@@ -58,7 +58,6 @@ public class StairwayService {
     } catch (Exception ex) {
       System.err.println("Failed to connect to Stairway or database: " + ex.getMessage());
       logger.error("Failed to connect to Stairway", ex);
-
     }
   }
 
