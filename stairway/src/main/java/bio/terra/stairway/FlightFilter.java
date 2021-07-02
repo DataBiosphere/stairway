@@ -4,6 +4,8 @@ import static bio.terra.stairway.FlightFilterPredicate.Datatype.STRING;
 import static bio.terra.stairway.FlightFilterPredicate.Datatype.TIMESTAMP;
 
 import bio.terra.stairway.exception.FlightFilterException;
+import bio.terra.stairway.impl.FlightDao;
+import bio.terra.stairway.impl.NamedParameterPreparedStatement;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import java.sql.SQLException;
 import java.time.Instant;

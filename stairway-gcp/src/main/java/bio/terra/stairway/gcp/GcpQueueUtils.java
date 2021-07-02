@@ -1,13 +1,6 @@
-package bio.terra.stairway;
-
-// In most cases we expect callers to provide case subscription and a topic. For backward
-// compatibility and
-// testing situation stairways able to create subscriptions and topics itself. This module
-// encapsulates
-// the creation operations.
+package bio.terra.stairway.gcp;
 
 import com.google.api.gax.core.GoogleCredentialsProvider;
-import com.google.api.gax.rpc.AlreadyExistsException;
 import com.google.cloud.pubsub.v1.SubscriptionAdminClient;
 import com.google.cloud.pubsub.v1.SubscriptionAdminSettings;
 import com.google.cloud.pubsub.v1.TopicAdminClient;
@@ -23,23 +16,35 @@ import java.util.concurrent.TimeUnit;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+/**
+ * Utility methods for creating PubSub topics and subscriptions.
+ * The default credentials must have {@code roles/pubsub.editor} or
+ * {@code roles/editor} on the project in order to use these methods.
+ *
+ * It is not necessary to use these to use GcpPubSubQueue. In fact,
+ * it is best to create these object in Terraform or similar and not at run time,
+ * so that the running instance does not need to hold the enhanced permissions.
+ */
 @SuppressFBWarnings(
     value = "RCN_REDUNDANT_NULLCHECK_WOULD_HAVE_BEEN_A_NPE",
     justification = "Spotbugs doesn't understand resource try construct")
-public class QueueCreate {
-  private static final Logger logger = LoggerFactory.getLogger(QueueCreate.class);
+public class GcpQueueUtils {
+  private static final Logger logger = LoggerFactory.getLogger(GcpQueueUtils.class);
 
-  // -- Queue Parameters --
-  // These parameters are used when constructing the queue and the subscriber. I don't think they
-  // need to be settable, but we may want to tune them as we get experience with the queue.
-  private static final int MAX_INBOUND_MESSAGE_BYTES = 10000;
+  // Default values used when making the Gcp PubSub subscription
   private static final long MESSAGE_RETENTION_SECONDS = TimeUnit.DAYS.toSeconds(3);
   private static final int ACK_DEADLINE_SECONDS = 100;
 
+  /**
+   * Create a topic in a project
+   *
+   * @param projectId project in which the topic should be created
+   * @param topicId name of the topic to create
+   * @throws IOException error thrown when the create doesn't work
+   */
   public static void makeTopic(String projectId, String topicId) throws IOException {
     TopicName topicName = TopicName.ofProjectTopicName(projectId, topicId);
 
-    logger.debug("Construct credentials");
     GoogleCredentialsProvider credentialsProvider =
         GoogleCredentialsProvider.newBuilder()
             .setScopesToApply(Collections.singletonList("https://www.googleapis.com/auth/pubsub"))
@@ -47,23 +52,44 @@ public class QueueCreate {
     TopicAdminSettings topicAdminSettings =
         TopicAdminSettings.newBuilder().setCredentialsProvider(credentialsProvider).build();
 
-    logger.debug("Try to create the topic");
     try (TopicAdminClient topicAdminClient = TopicAdminClient.create(topicAdminSettings)) {
       topicAdminClient.createTopic(topicName);
-      logger.debug("Created topic: " + topicId);
-    } catch (AlreadyExistsException ex) {
-      logger.debug("Topic already exists: " + topicId);
     }
   }
 
+  /**
+   * Create a subscription for a topic in a project using default parameters
+   *
+   * @param projectId project in which the subscription should be created
+   * @param topicId topic the subscription is created for
+   * @param subscriptionId name of the subscription to create
+   * @throws IOException error thrown when the create doesn't work
+   */
   public static void makeSubscription(String projectId, String topicId, String subscriptionId)
-      throws IOException {
-    logger.debug("Construct names");
-    TopicName topicName = TopicName.ofProjectTopicName(projectId, topicId);
-    ProjectSubscriptionName subscriptionName =
-        ProjectSubscriptionName.of(projectId, subscriptionId);
+        throws IOException {
+    makeSubscription(projectId, topicId, subscriptionId, MESSAGE_RETENTION_SECONDS, ACK_DEADLINE_SECONDS);
+  }
 
-    logger.debug("Construct credentials");
+  /**
+   * Create a subscription for a topic specifying all parameters
+   *
+   * @param projectId project in which the subscription should be created
+   * @param topicId topic the subscription is created for
+   * @param subscriptionId name of the subscription to create
+   * @param messageRetentionSeconds seconds to retain the message in the queue
+   * @param ackDeadlineSeconds seconds Stairway has to handle the message
+   * @throws IOException error thrown when the create doesn't work
+   */
+  public static void makeSubscription(
+      String projectId,
+      String topicId,
+      String subscriptionId,
+      long messageRetentionSeconds,
+      int ackDeadlineSeconds) throws IOException {
+
+    TopicName topicName = TopicName.ofProjectTopicName(projectId, topicId);
+    ProjectSubscriptionName subscriptionName = ProjectSubscriptionName.of(projectId, subscriptionId);
+
     GoogleCredentialsProvider credentialsProvider =
         GoogleCredentialsProvider.newBuilder()
             .setScopesToApply(Collections.singletonList("https://www.googleapis.com/auth/pubsub"))
@@ -72,39 +98,39 @@ public class QueueCreate {
     SubscriptionAdminSettings subscriptionAdminSettings =
         SubscriptionAdminSettings.newBuilder().setCredentialsProvider(credentialsProvider).build();
 
-    logger.debug("Try to create the subscription");
     try (SubscriptionAdminClient subscriptionAdminClient =
         SubscriptionAdminClient.create(subscriptionAdminSettings)) {
       Subscription request =
           Subscription.newBuilder()
               .setName(subscriptionName.toString())
               .setTopic(topicName.toString())
-              .setAckDeadlineSeconds(ACK_DEADLINE_SECONDS)
-              .setMessageRetentionDuration(
-                  Duration.newBuilder().setSeconds(MESSAGE_RETENTION_SECONDS))
+              .setAckDeadlineSeconds(ackDeadlineSeconds)
+              .setMessageRetentionDuration(Duration.newBuilder().setSeconds(messageRetentionSeconds))
               .build();
 
       subscriptionAdminClient.createSubscription(request);
-      logger.debug("Created subscription: " + subscriptionId);
-    } catch (AlreadyExistsException ex) {
-      logger.debug("Subscription already exists: " + subscriptionId);
     }
   }
 
-  public static void deleteQueue(String projectId, String topicId, String subscriptionId) {
+  /**
+   * Delete the topic and subscription used for the queue
+   *
+   * @param projectId project where the topic and subscription live
+   * @param topicId identifier of the topic to delete
+   * @param subscriptionId identifier of the subscription to delete
+   * @throws IOException error thrown when one of the deletes does not work
+   */
+  public static void deleteQueue(String projectId, String topicId, String subscriptionId)
+      throws IOException {
     TopicName topicName = TopicName.ofProjectTopicName(projectId, topicId);
 
     try (TopicAdminClient topicAdminClient = TopicAdminClient.create()) {
       topicAdminClient.deleteTopic(topicName);
-    } catch (IOException ex) {
-      logger.warn("Failed to delete topic: " + topicName, ex);
     }
 
     try (SubscriptionAdminClient subscriptionAdminClient = SubscriptionAdminClient.create()) {
       ProjectSubscriptionName subscription = ProjectSubscriptionName.of(projectId, subscriptionId);
       subscriptionAdminClient.deleteSubscription(subscription);
-    } catch (IOException ex) {
-      logger.warn("Failed to delete subscription: " + subscriptionId, ex);
     }
   }
 }

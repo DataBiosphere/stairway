@@ -1,4 +1,4 @@
-package bio.terra.stairway;
+package bio.terra.stairway.impl;
 
 import bio.terra.stairway.exception.DatabaseOperationException;
 import java.time.Duration;

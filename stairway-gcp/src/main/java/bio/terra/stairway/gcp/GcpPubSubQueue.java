@@ -1,13 +1,5 @@
-package bio.terra.stairway;
+package bio.terra.stairway.gcp;
 
-// For starters, let's just code for pubsub. When the API seems right, we can push it down into a
-// Google package
-// and lay an interface on top.
-//
-// I created a topic via GCP console called stairway-queue
-// I created a subscription via GCP console called stairway-queue-sub
-
-import bio.terra.stairway.exception.StairwayExecutionException;
 import com.google.api.core.ApiFuture;
 import com.google.api.gax.rpc.DeadlineExceededException;
 import com.google.cloud.pubsub.v1.Publisher;
@@ -24,50 +16,40 @@ import com.google.pubsub.v1.PullResponse;
 import com.google.pubsub.v1.ReceivedMessage;
 import edu.umd.cs.findbugs.annotations.SuppressFBWarnings;
 import java.io.IOException;
+import java.time.Duration;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.TimeUnit;
+import org.apache.commons.lang3.ObjectUtils;
+import org.apache.commons.lang3.Validate;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-/**
- * ServiceQueue implements a service-wide queue for Stairway. The initial implementation is only for
- * GCP. When we have more than one cloud, we can make this an interface and push implementations
- * down to cloud-specific packages.
- */
 @SuppressFBWarnings(
     value = "RCN_REDUNDANT_NULLCHECK_WOULD_HAVE_BEEN_A_NPE",
     justification = "Spotbugs doesn't understand resource try construct")
-class Queue {
-  private static final Logger logger = LoggerFactory.getLogger(Queue.class);
+class GcpPubSubQueue implements QueueInterface {
+  private static final Logger logger = LoggerFactory.getLogger(GcpPubSubQueue.class);
 
-  // -- Queue Parameters --
-  // These parameters are used when constructing the queue and the subscriber. I don't think they
-  // need
-  // to be settable, but we may want to tune them as we get experience with the queue.
+  // Stairway expects that the only traffic in this queue is its own messages.
+  // This byte limit is super-generous for what we currently use.
   private static final int MAX_INBOUND_MESSAGE_BYTES = 10000;
-  private static final long MESSAGE_RETENTION_SECONDS = TimeUnit.DAYS.toSeconds(3);
-  private static final int ACK_DEADLINE_SECONDS = 100;
 
-  private final String projectId;
-  private final String subscriptionId;
-  private final String topicId;
-
-  private final Stairway stairway;
   private final Publisher publisher;
   private final String subscriptionName;
   private SubscriberStub subscriberStub;
 
-  public Queue(Stairway stairway, String projectId, String topicId, String subscriptionId)
-      throws IOException {
-    this.projectId = projectId;
-    this.topicId = topicId;
-    this.subscriptionId = subscriptionId;
-    subscriptionName = ProjectSubscriptionName.format(projectId, subscriptionId);
+  // Get a builder to make the queue
+  public static GcpPubSubQueue.Builder newBuilder() {
+    return new GcpPubSubQueue.Builder();
+  }
+
+  public GcpPubSubQueue(GcpPubSubQueue.Builder builder) throws IOException {
+    subscriptionName = ProjectSubscriptionName.format(builder.projectId, builder.subscriptionId);
 
     // Setup the publisher
-    ProjectTopicName topicName = ProjectTopicName.of(projectId, topicId);
+    ProjectTopicName topicName = ProjectTopicName.of(builder.projectId, builder.topicId);
     publisher = Publisher.newBuilder(topicName).build();
 
     // Build the stub for issuing pulls from the queue
@@ -79,8 +61,6 @@ class Queue {
                     .build())
             .build();
     subscriberStub = GrpcSubscriberStub.create(subscriberStubSettings);
-
-    this.stairway = stairway;
   }
 
   @Override
@@ -130,10 +110,11 @@ class Queue {
     return pullResponse;
   }
 
+  @Override
   public void dispatchMessages(
-      int numOfMessages, QueueProcessFunction<String, Stairway, Boolean> processFunction)
-      throws InterruptedException {
-
+      Object dispatchContext,
+      int numOfMessages,
+      QueueProcessFunction processFunction) throws InterruptedException {
     try {
       PullResponse pullResponse = pullFromQueue(numOfMessages, false);
       if (pullResponse == null) {
@@ -145,7 +126,7 @@ class Queue {
         String smess = message.getMessage().getData().toStringUtf8();
         logger.info("Received message: " + smess);
 
-        Boolean processSucceeded = processFunction.apply(smess, stairway);
+        Boolean processSucceeded = processFunction.apply(smess, dispatchContext);
         if (processSucceeded) {
           ackIds.add(message.getAckId());
         }
@@ -162,14 +143,15 @@ class Queue {
         subscriberStub.acknowledgeCallable().call(acknowledgeRequest);
       }
     } catch (InterruptedException ex) {
+      // Propagate InterruptedException. Otherwise, log the error and keep going.
       throw ex;
     } catch (Exception ex) {
-      // TODO: Is this the right error handling?
       logger.warn("Unexpected exception dispatching messages - continuing", ex);
     }
   }
 
-  public void queueMessage(String message) throws InterruptedException, StairwayExecutionException {
+  @Override
+  public void enqueueMessage(String message) throws InterruptedException, StairwayExecutionException {
     ByteString data = ByteString.copyFromUtf8(message);
     PubsubMessage pubsubMessage = PubsubMessage.newBuilder().setData(data).build();
 
@@ -183,8 +165,7 @@ class Queue {
     }
   }
 
-  // NOTE: this is only for use in controlled tests. It should not be used to empty a queue in
-  // production.
+  @Override
   public void purgeQueue() {
     // Sometimes we get an empty response even when there are messages, so receive empty twice
     // before calling it purged.
@@ -208,5 +189,46 @@ class Queue {
         subscriberStub.acknowledgeCallable().call(acknowledgeRequest);
       }
     }
+  }
+
+  public static class Builder {
+    private String projectId;
+    private String topicId;
+    private String subscriptionId;
+
+    /**
+     * @param projectId GCP Project holding the topic and subscription
+     * @return this
+     */
+    public Builder projectId(String projectId) {
+      this.projectId = projectId;
+      return this;
+    }
+
+    /**
+     * @param topicId identifier of the PubSub topic to enqueue messages
+     * @return this
+     */
+    public Builder topicId(String topicId) {
+      this.topicId = topicId;
+      return this;
+    }
+
+    /**
+     * @param subscriptionId identifier of the PubSub subscription read messages
+     * @return this
+     */
+    public Builder subscriptionId(String subscriptionId) {
+      this.subscriptionId = subscriptionId;
+      return this;
+    }
+
+    public GcpPubSubQueue build() {
+      Validate.notEmpty(projectId, "A projectId is required");
+      Validate.notEmpty(topicId, "A topicId is required");
+      Validate.notEmpty(subscriptionId, "A subscriptionId is required");
+      return new GcpPubSubQueue(this);
+    }
+
   }
 }

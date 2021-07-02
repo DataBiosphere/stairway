@@ -1,4 +1,4 @@
-package bio.terra.stairway;
+package bio.terra.stairway.impl;
 
 import java.util.concurrent.BlockingQueue;
 import java.util.concurrent.ThreadPoolExecutor;

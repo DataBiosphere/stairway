@@ -1,6 +1,7 @@
-package bio.terra.stairway;
+package bio.terra.stairway.queue;
 
 import bio.terra.stairway.exception.DatabaseOperationException;
+import bio.terra.stairway.impl.StairwayImpl;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -19,12 +20,13 @@ class QueueMessageReady extends QueueMessage {
   }
 
   @Override
-  public void process(Stairway stairway) throws InterruptedException {
+  public void process(Object dispatchContext) throws InterruptedException {
+    StairwayImpl stairwayImpl = (StairwayImpl) dispatchContext;
     try {
-      boolean resumed = stairway.resume(flightId);
+      boolean resumed = stairwayImpl.resume(flightId);
       logger.info(
           "Stairway "
-              + stairway.getStairwayName()
+              + stairwayImpl.getStairwayName()
               + (resumed ? " resumed flight: " : " did not resume flight: ")
               + flightId);
     } catch (DatabaseOperationException ex) {

@@ -17,13 +17,9 @@ mainClassName = 'bio.terra.stairctl.Application'
 dependencies {
     // alphabetical
     ext {
-        commonsLang3 = "3.9"
-        findbugsAnnotations = "3.0.1"
-        hamcrest = "2.2"
         jackson = "2.10.2"
         junit = "5.7.1"
         logback = "1.2.3"
-        sl4j = "1.7.30"
         springboot = "2.4.5"
         springshell = "2.0.1.RELEASE"
     }
@@ -39,17 +35,10 @@ dependencies {
     implementation group: 'org.apache.commons', name: 'commons-lang3'
 
     implementation group: 'ch.qos.logback', name: 'logback-classic', version: "${logback}"
-    implementation group: 'org.slf4j', name: 'slf4j-api', version: "${sl4j}"
 
     implementation group: 'com.fasterxml.jackson.core', name: 'jackson-core', version: "${jackson}"
     implementation group: 'com.fasterxml.jackson.datatype', name: 'jackson-datatype-jsr310', version: "${jackson}"
 
-    // Findbugs annotations, so we can selectively suppress findbugs findings
-    implementation group: 'com.google.code.findbugs', name: 'annotations', version: "${findbugsAnnotations}"
-
     runtimeOnly group: "org.postgresql", name: "postgresql", version: "42.2.18"
     runtimeOnly group: 'org.codehaus.groovy', name: 'groovy', version: '3.0.7'
-
-    testImplementation group: 'org.junit.jupiter', name: 'junit-jupiter-api', version: "${junit}"
-    testImplementation group: 'org.hamcrest', name: 'hamcrest', version: "${hamcrest}"
 }

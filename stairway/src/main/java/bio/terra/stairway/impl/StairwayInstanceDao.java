@@ -1,8 +1,8 @@
-package bio.terra.stairway;
+package bio.terra.stairway.impl;
 
-import static bio.terra.stairway.DbUtils.commitTransaction;
-import static bio.terra.stairway.DbUtils.startReadOnlyTransaction;
-import static bio.terra.stairway.DbUtils.startTransaction;
+import static bio.terra.stairway.impl.DbUtils.commitTransaction;
+import static bio.terra.stairway.impl.DbUtils.startReadOnlyTransaction;
+import static bio.terra.stairway.impl.DbUtils.startTransaction;
 
 import bio.terra.stairway.exception.DatabaseOperationException;
 import edu.umd.cs.findbugs.annotations.SuppressFBWarnings;

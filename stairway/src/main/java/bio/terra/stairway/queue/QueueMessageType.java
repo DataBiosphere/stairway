@@ -1,11 +1,11 @@
-package bio.terra.stairway;
+package bio.terra.stairway.queue;
 
 /**
  * An instance of this class, serialized with the name "type" must be included in all QueueMessages.
  * That lets all message classes be easily serialized/deserialized POJOs without inheritance. This
  * class must remain constant across other changes to the message format.
  */
-public class QueueMessageType {
+class QueueMessageType {
   private String version;
   private QueueMessageEnum messageEnum;
 

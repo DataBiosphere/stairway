@@ -1,4 +1,4 @@
-package bio.terra.stairway;
+package bio.terra.stairway.impl;
 
 import edu.umd.cs.findbugs.annotations.SuppressFBWarnings;
 import java.sql.Connection;

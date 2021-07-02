@@ -1,5 +1,7 @@
-package bio.terra.stairway;
+package bio.terra.stairway.queue;
 
+import bio.terra.stairway.QueueInterface;
+import bio.terra.stairway.impl.StairwayImpl;
 import java.util.concurrent.TimeUnit;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -9,11 +11,11 @@ class WorkQueueListener implements Runnable {
   private static final int MAX_MESSAGES_PER_PULL = 2;
   private static final int NO_PULL_SLEEP_SECONDS = 5;
 
-  private final Stairway stairway;
-  private final Queue workQueue;
+  private final StairwayImpl stairwayImpl;
+  private final QueueInterface workQueue;
 
-  public WorkQueueListener(Stairway stairway, Queue workQueue) {
-    this.stairway = stairway;
+  public WorkQueueListener(StairwayImpl stairwayImpl, QueueInterface workQueue) {
+    this.stairwayImpl = stairwayImpl;
     this.workQueue = workQueue;
   }
 
@@ -33,10 +35,10 @@ class WorkQueueListener implements Runnable {
   @Override
   public void run() {
     try {
-      while (!stairway.isQuietingDown()) {
-        if (stairway.spaceAvailable()) {
+      while (!stairwayImpl.isQuietingDown()) {
+        if (stairwayImpl.spaceAvailable()) {
           logger.debug("Asking the work queue for messages: " + MAX_MESSAGES_PER_PULL);
-          workQueue.dispatchMessages(MAX_MESSAGES_PER_PULL, QueueMessage::processMessage);
+          workQueue.dispatchMessages(stairwayImpl, MAX_MESSAGES_PER_PULL, QueueMessage::processMessage);
         } else {
           // No room to queue messages. Take a rest.
           TimeUnit.SECONDS.sleep(NO_PULL_SLEEP_SECONDS);

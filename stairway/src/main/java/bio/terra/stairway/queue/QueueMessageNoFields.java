@@ -1,5 +1,6 @@
-package bio.terra.stairway;
+package bio.terra.stairway.queue;
 
+import bio.terra.stairway.Stairway;
 import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 
 // We use this class to read the type information, to guide deserializing the right type

@@ -1,5 +1,9 @@
-package bio.terra.stairway;
+package bio.terra.stairway.impl;
 
+import bio.terra.stairway.Flight;
+import bio.terra.stairway.FlightDebugInfo;
+import bio.terra.stairway.FlightFactory;
+import bio.terra.stairway.FlightMap;
 import bio.terra.stairway.exception.MakeFlightException;
 import java.lang.reflect.Constructor;
 import java.lang.reflect.InvocationTargetException;

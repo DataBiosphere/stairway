@@ -1,6 +1,6 @@
 package bio.terra.stairway;
 
-import static bio.terra.stairway.StairwayMapper.getObjectMapper;
+import static bio.terra.stairway.impl.StairwayMapper.getObjectMapper;
 
 import bio.terra.stairway.exception.JsonConversionException;
 import com.fasterxml.jackson.core.JsonProcessingException;
@@ -32,10 +32,11 @@ public class FlightMap {
 
   /**
    * Alternate constructor, used by the DAO to re-create FlightMap from its serialized form.
+   * Not intended for client use.
    *
    * @param inputList input list form of the input parameters
    */
-  FlightMap(List<FlightInput> inputList) {
+  public FlightMap(List<FlightInput> inputList) {
     map = new HashMap<>();
     for (FlightInput input : inputList) {
       try {

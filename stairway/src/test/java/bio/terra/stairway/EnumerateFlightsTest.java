@@ -8,6 +8,7 @@ import bio.terra.stairway.fixtures.FlightsTestPojo;
 import bio.terra.stairway.fixtures.TestUtil;
 import bio.terra.stairway.flights.TestFlight;
 import bio.terra.stairway.flights.TestFlightRetry;
+import bio.terra.stairway.impl.FlightDao;
 import java.time.Instant;
 import java.util.ArrayList;
 import java.util.Arrays;

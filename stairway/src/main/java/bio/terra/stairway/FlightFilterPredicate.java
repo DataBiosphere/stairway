@@ -1,5 +1,7 @@
 package bio.terra.stairway;
 
+import bio.terra.stairway.impl.NamedParameterPreparedStatement;
+import bio.terra.stairway.impl.StairwayMapper;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import java.sql.SQLException;
 import java.time.Instant;

@@ -4,6 +4,8 @@ import static org.hamcrest.CoreMatchers.equalTo;
 import static org.hamcrest.MatcherAssert.assertThat;
 import static org.junit.jupiter.api.Assertions.fail;
 
+import bio.terra.stairway.queue.QueueMessage;
+import bio.terra.stairway.queue.QueueMessageReady;
 import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
 

@@ -1,4 +1,4 @@
-package bio.terra.stairway;
+package bio.terra.stairway.queue;
 
 import com.fasterxml.jackson.annotation.JsonIgnore;
 

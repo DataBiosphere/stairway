@@ -1,4 +1,4 @@
-package bio.terra.stairway;
+package bio.terra.stairway.queue;
 
 import bio.terra.stairway.exception.StairwayExecutionException;
 import com.fasterxml.jackson.core.JsonProcessingException;
@@ -25,7 +25,7 @@ abstract class QueueMessage {
 
   protected static final String FORMAT_VERSION = "1";
 
-  abstract void process(Stairway stairway) throws InterruptedException;
+  abstract void process(Object dispatchContext) throws InterruptedException;
 
   static String serialize(QueueMessage message) throws StairwayExecutionException {
     try {
@@ -35,12 +35,12 @@ abstract class QueueMessage {
     }
   }
 
-  static Boolean processMessage(String message, Stairway stairway) throws InterruptedException {
+  static Boolean processMessage(String message, Object dispatchContext) throws InterruptedException {
     QueueMessage qm = deserialize(message);
     if (qm == null) {
       return false;
     }
-    qm.process(stairway);
+    qm.process(dispatchContext);
     return true;
   }
 
