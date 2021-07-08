@@ -19,9 +19,7 @@ public class StairwayCommands {
 
   // None of the stairway command work if we are not connected, so list all commands here
   // so they will not be available.
-  @ShellMethodAvailability({
-      "list stairways"
-  })
+  @ShellMethodAvailability({"list stairways"})
   public Availability availabilityCheck() {
     return stairwayService.isConnected()
         ? Availability.available()

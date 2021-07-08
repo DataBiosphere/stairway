@@ -1,5 +1,5 @@
-rootProject.name = 'stairway'
-include 'library'
+rootProject.name = 'stairwaySaga'
+include 'stairway'
 include 'stairctl'
 
 gradle.ext.version = "0.0.57-SNAPSHOT"

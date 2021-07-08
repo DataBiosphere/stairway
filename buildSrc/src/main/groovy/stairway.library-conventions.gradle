@@ -1,0 +1,40 @@
+// Java Library conventions common for all of the code
+plugins {
+    id 'java-library'
+    id 'maven-publish'
+    id 'com.jfrog.artifactory'
+    id 'stairway.java-conventions'
+}
+
+group = 'bio.terra'
+sourceCompatibility = JavaVersion.VERSION_11
+
+repositories {
+    mavenCentral()
+    google()
+}
+
+// Modify the standard :test task to only include unit-tagged tests.
+test {
+    useJUnitPlatform {
+        includeTags 'unit'
+    }
+}
+
+java {
+    // Builds Javadoc into the published package as part of the 'assemble' task.
+    withJavadocJar()
+    // Builds sources into the published package as part of the 'assemble' task.
+    withSourcesJar()
+}
+
+publishing {
+    publications {
+        "$project.name"(MavenPublication) {
+            groupId project.group
+            artifactId project.name
+            version gradle.version
+            from components.java
+        }
+    }
+}
