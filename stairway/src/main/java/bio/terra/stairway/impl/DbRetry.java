@@ -1,6 +1,7 @@
 package bio.terra.stairway.impl;
 
 import bio.terra.stairway.exception.DatabaseOperationException;
+import bio.terra.stairway.exception.StairwayException;
 import java.sql.SQLException;
 import java.util.concurrent.ThreadLocalRandom;
 import java.util.concurrent.TimeUnit;
@@ -22,13 +23,13 @@ class DbRetry {
    */
   @FunctionalInterface
   interface DbFunction<R> {
-    R apply() throws SQLException, DatabaseOperationException, InterruptedException;
+    R apply() throws SQLException, StairwayException, InterruptedException;
   }
 
   /** Void version of the custom functional interface */
   @FunctionalInterface
   interface DbVoidFunction {
-    void apply() throws SQLException, DatabaseOperationException, InterruptedException;
+    void apply() throws SQLException, StairwayException, InterruptedException;
   }
 
   private static final Logger logger = LoggerFactory.getLogger(DbRetry.class);
@@ -49,36 +50,40 @@ class DbRetry {
 
   /**
    * Retry a value-returning database function
+   * <p> SQLExceptions are caught and may cause retry or be converted into * some
+   * StairwayException.
    *
    * @param logString string used in error messages and log messages
    * @param function method to call and retry
    * @param <T> function return value
    * @return T
-   * @throws DatabaseOperationException database errors
+   * @throws StairwayException general stairway exceptions
    * @throws InterruptedException thread shutdown
    */
   static <T> T retry(String logString, DbFunction<T> function)
-      throws DatabaseOperationException, InterruptedException {
+      throws StairwayException, InterruptedException {
     DbRetry dbRetry = new DbRetry(logString);
     return dbRetry.perform(function);
   }
 
   /**
    * Retry a void database function
+   * <p> SQLExceptions are caught and may cause retry or be converted into * some
+   * StairwayException.
    *
    * @param logString string used in error messages and log messages
    * @param function void method to call and retry
-   * @throws DatabaseOperationException database errors
+   * @throws StairwayException general stairway exceptions
    * @throws InterruptedException thread shutdown
    */
   static void retryVoid(String logString, DbVoidFunction function)
-      throws DatabaseOperationException, InterruptedException {
+      throws StairwayException, InterruptedException {
     DbRetry dbRetry = new DbRetry(logString);
     dbRetry.performVoid(function);
   }
 
   private <T> T perform(DbFunction<T> function)
-      throws DatabaseOperationException, InterruptedException {
+      throws StairwayException, InterruptedException {
     for (int retry = 0; retry < MAX_RETRIES; retry++) {
       try {
         return function.apply();
@@ -93,7 +98,7 @@ class DbRetry {
   }
 
   private void performVoid(DbVoidFunction function)
-      throws DatabaseOperationException, InterruptedException {
+      throws StairwayException, InterruptedException {
     for (int retry = 0; retry < MAX_RETRIES; retry++) {
       try {
         function.apply();

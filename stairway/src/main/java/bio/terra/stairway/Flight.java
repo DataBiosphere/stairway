@@ -4,23 +4,21 @@ import static bio.terra.stairway.FlightStatus.READY;
 import static bio.terra.stairway.FlightStatus.READY_TO_RESTART;
 import static bio.terra.stairway.FlightStatus.WAITING;
 
-import bio.terra.stairway.exception.DatabaseOperationException;
 import bio.terra.stairway.exception.RetryException;
+import bio.terra.stairway.exception.StairwayException;
 import bio.terra.stairway.exception.StairwayExecutionException;
-import bio.terra.stairway.impl.FlightDao;
-import bio.terra.stairway.impl.HookWrapper;
-import java.util.HashSet;
 import java.util.LinkedList;
 import java.util.List;
-import java.util.Set;
 import org.apache.commons.lang3.builder.ToStringBuilder;
 import org.apache.commons.lang3.builder.ToStringStyle;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 /**
- * Manage the atomic execution of a series of Steps This base class has the mechanisms for executing
- * the series of steps.
+ * Manage the atomic execution of a series of Steps
+ *
+ * This base class has the mechanisms for executing the series of steps, retrying, maintaining state
+ * in a database,
  *
  * <p>In order for the flight to be re-created on recovery, the construction and configuration have
  * to result in the same flight given the same input.
@@ -40,33 +38,23 @@ public class Flight implements Runnable {
 
   private final List<StepRetry> steps;
   private final List<String> stepClassNames;
-  private FlightDao flightDao;
+  private FlightSupport flightSupport;
   private FlightContext flightContext;
   private final Object applicationContext;
-
-  // These sets will only be populated if the corresponding debugInfo field is populated. If so,
-  // each set keeps track of which steps have already been failed so we do not infinitely
-  // retry.
-  private final Set<Integer> debugStepsFailed;
-  private final Set<String> debugDoStepsFailed;
-  private final Set<String> debugUndoStepsFailed;
 
   public Flight(FlightMap inputParameters, Object applicationContext) {
     this.applicationContext = applicationContext;
     steps = new LinkedList<>();
     stepClassNames = new LinkedList<>();
     flightContext = new FlightContext(inputParameters, this.getClass().getName(), stepClassNames);
-    debugStepsFailed = new HashSet<>();
-    debugDoStepsFailed = new HashSet<>();
-    debugUndoStepsFailed = new HashSet<>();
   }
 
   public void setDebugInfo(FlightDebugInfo debugInfo) {
     this.context().setDebugInfo(debugInfo);
   }
 
-  public HookWrapper hookWrapper() {
-    return context().getStairway().getHookWrapper();
+  public void setFlightSupport(FlightSupport flightSupport) {
+    this.flightSupport = flightSupport;
   }
 
   public FlightContext context() {
@@ -99,13 +87,9 @@ public class Flight implements Runnable {
    */
   public void run() {
     try {
-      hookWrapper().startFlight(flightContext);
+      flightSupport.startFlightHook(flightContext);
 
-      // We use flightDao all over the place, so we put it in a private to avoid passing it through
-      // all of the method argument lists.
-      flightDao = context().getStairway().getFlightDao();
-
-      if (context().getStairway().isQuietingDown()) {
+      if (flightSupport.isQuietingDown()) {
         logger.info("Disowning flight starting during quietDown: " + context().getFlightId());
         flightExit(READY);
         return;
@@ -122,7 +106,7 @@ public class Flight implements Runnable {
       logger.error("Flight failed with exception", ex);
     }
     try {
-      hookWrapper().endFlight(flightContext);
+      flightSupport.endFlightHook(flightContext);
     } catch (Exception ex) {
       logger.warn("End flight hook failed with exception", ex);
     }
@@ -131,7 +115,7 @@ public class Flight implements Runnable {
   private void flightExit(FlightStatus flightStatus) {
     try {
       context().setFlightStatus(flightStatus);
-      context().getStairway().exitFlight(context());
+      flightSupport.exitFlight(context());
     } catch (Exception ex) {
       logger.error("Failed to exit flight cleanly", ex);
     }
@@ -167,7 +151,7 @@ public class Flight implements Runnable {
         context().setDirection(Direction.SWITCH);
 
         // Record the step failure and direction change in the database
-        flightDao.step(context());
+        flightSupport.recordStep(context());
       }
 
       // Part 2 - running backwards. We either succeed and return the original failure
@@ -180,7 +164,7 @@ public class Flight implements Runnable {
 
       // Part 3 - dismal failure - undo failed!
       // Record the undo failure
-      flightDao.step(context());
+      flightSupport.recordStep(context());
       context().setResult(undoResult);
       logger.error(
           "DISMAL FAILURE: non-retry-able error during undo. Flight: {}({}) Step: {}({})",
@@ -209,9 +193,10 @@ public class Flight implements Runnable {
    *
    * @return StepResult recording the success or failure of the most recent step
    * @throws InterruptedException on thread pool shutdown
+   * @throws StairwayException some stairway exception
    */
   private StepResult runSteps()
-      throws InterruptedException, StairwayExecutionException, DatabaseOperationException {
+      throws InterruptedException, StairwayException {
     // Initialize with current result, in case we are all done already
     StepResult result = context().getResult();
 
@@ -228,36 +213,36 @@ public class Flight implements Runnable {
         context().setDirection(Direction.UNDO);
       }
 
-      if (context().getDebugInfo() != null && this.context().getDebugInfo().getRestartEachStep()) {
+      if (flightSupport.getDebugRestartEachStep(flightContext)) {
         StepResult newResult =
             new StepResult(
                 StepStatus.STEP_RESULT_RESTART_FLIGHT, result.getException().orElse(null));
-        flightDao.step(context());
+        flightSupport.recordStep(context());
         return newResult;
       }
       switch (result.getStepStatus()) {
         case STEP_RESULT_SUCCESS:
           // Finished a step; run the next one
           context().setRerun(false);
-          flightDao.step(context());
+          flightSupport.recordStep(context());
           context().nextStepIndex();
           break;
 
         case STEP_RESULT_RERUN:
           // Rerun the same step
           context().setRerun(true);
-          flightDao.step(context());
+          flightSupport.recordStep(context());
           break;
 
         case STEP_RESULT_WAIT:
           // Finished a step; yield execution
           context().setRerun(false);
-          flightDao.step(context());
+          flightSupport.recordStep(context());
           return result;
 
         case STEP_RESULT_STOP:
           // Stop executing - leave rerun setting as is; we'll need to pick up where we left off
-          flightDao.step(context());
+          flightSupport.recordStep(context());
           return result;
 
         case STEP_RESULT_FAILURE_RETRY:
@@ -281,14 +266,14 @@ public class Flight implements Runnable {
     do {
       try {
         // Do or undo based on direction we are headed
-        hookWrapper().startStep(flightContext);
+        flightSupport.startStepHook(flightContext);
 
         if (context().isDoing()) {
           result = currentStep.step.doStep(context());
-          result = debugStatusReplacement(result);
+          result = flightSupport.debugStatusReplacement(flightContext, steps.size(), result);
         } else {
           result = currentStep.step.undoStep(context());
-          result = debugStatusReplacement(result);
+          result = flightSupport.debugStatusReplacement(flightContext, steps.size(), result);
         }
       } catch (InterruptedException ex) {
         // Interrupted exception - we assume this means that the thread pool is shutting down and
@@ -305,13 +290,13 @@ public class Flight implements Runnable {
                 : StepStatus.STEP_RESULT_FAILURE_FATAL;
         result = new StepResult(stepStatus, ex);
       } finally {
-        hookWrapper().endStep(flightContext);
+        flightSupport.endStepHook(flightContext);
       }
 
       switch (result.getStepStatus()) {
         case STEP_RESULT_SUCCESS:
         case STEP_RESULT_RERUN:
-          if (context().getStairway().isQuietingDown()) {
+          if (flightSupport.isQuietingDown()) {
             // If we are quieting down, we force a stop
             result = new StepResult(StepStatus.STEP_RESULT_STOP, null);
           }
@@ -324,7 +309,7 @@ public class Flight implements Runnable {
           return result;
 
         case STEP_RESULT_FAILURE_RETRY:
-          if (context().getStairway().isQuietingDown()) {
+          if (flightSupport.isQuietingDown()) {
             logger.info("Quieting down - not retrying: " + context().prettyStepState());
             return result;
           }
@@ -343,71 +328,6 @@ public class Flight implements Runnable {
     return result;
   }
 
-  /**
-   * Helper function to replace the StepResult returned by a step based on {@link FlightDebugInfo}.
-   *
-   * @param initialResult the StepResult initially returned by the step.
-   * @return StepResult to use for the step. May be the initial result.
-   */
-  private StepResult debugStatusReplacement(StepResult initialResult) {
-    if (context().getDebugInfo() == null) {
-      return initialResult;
-    }
-    FlightDebugInfo debugInfo = context().getDebugInfo();
-    // If we are in debug mode, in the DO and a failure is set for this step AND we have not already
-    // failed here, then insert a failure. We do this right after the step completes but
-    // before the flight logs it so that we can look for dangerous UNDOs.
-    if (context().isDoing()
-        && debugInfo.getFailAtSteps() != null
-        && debugInfo.getFailAtSteps().containsKey(context().getStepIndex())
-        && !debugStepsFailed.contains(context().getStepIndex())) {
-      StepStatus failStatus = debugInfo.getFailAtSteps().get(context().getStepIndex());
-      logger.info(
-          "Failed for debug mode fail step at step {} with result {}",
-          context().getStepIndex(),
-          failStatus);
-      debugStepsFailed.add(context().getStepIndex());
-      return new StepResult(failStatus);
-    }
-    String currentStepClassName = context().getStepClassName();
-    // If we are in debug mode, doing, and a a failure is set for this step class name for do and we
-    // have not already failed for this Step class, then insert a failure.
-    if (context().isDoing()
-        && debugInfo.getDoStepFailures() != null
-        && debugInfo.getDoStepFailures().containsKey(currentStepClassName)
-        && !debugDoStepsFailed.contains(currentStepClassName)) {
-      StepStatus failStatus = debugInfo.getDoStepFailures().get(currentStepClassName);
-      logger.info(
-          "Failed for debug mode fail do step at step {} with result {}",
-          context().getStepIndex(),
-          failStatus);
-      debugDoStepsFailed.add(currentStepClassName);
-      return new StepResult(failStatus);
-    }
-    // If we are in debug mode, undoing, and a a failure is set for this step class name for undo
-    // and we have not already failed for this Step class, then insert a failure.
-    if (!context().isDoing()
-        && debugInfo.getUndoStepFailures() != null
-        && debugInfo.getUndoStepFailures().containsKey(currentStepClassName)
-        && !debugUndoStepsFailed.contains(currentStepClassName)) {
-      StepStatus failStatus = debugInfo.getUndoStepFailures().get(currentStepClassName);
-      logger.info(
-          "Failed for debug mode fail do step at step {} with result {}",
-          context().getStepIndex(),
-          failStatus);
-      debugUndoStepsFailed.add(currentStepClassName);
-      return new StepResult(failStatus);
-    }
-    // If we are in debug mode for failing at the last step, and this is the last step, insert a
-    // failure.
-    if (context().isDoing()
-        && debugInfo.getLastStepFailure()
-        && context().getStepIndex() == steps.size() - 1) {
-      logger.info("Failed for debug mode last step failure.");
-      return new StepResult(StepStatus.STEP_RESULT_FAILURE_FATAL);
-    }
-    return initialResult;
-  }
 
   private StepRetry getCurrentStep() throws StairwayExecutionException {
     int stepIndex = context().getStepIndex();
@@ -422,7 +342,11 @@ public class Flight implements Runnable {
   public String toString() {
     return new ToStringBuilder(this, ToStringStyle.JSON_STYLE)
         .append("steps", steps)
+        .append("stepClassNames", stepClassNames)
+        .append("flightSupport", flightSupport)
         .append("flightContext", flightContext)
+        .append("applicationContext", applicationContext)
         .toString();
   }
+
 }

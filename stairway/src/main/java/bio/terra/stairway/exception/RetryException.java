@@ -1,6 +1,6 @@
 package bio.terra.stairway.exception;
 
-public class RetryException extends StairwayException {
+public class RetryException extends FlightControlException {
   public RetryException(String message) {
     super(message);
   }

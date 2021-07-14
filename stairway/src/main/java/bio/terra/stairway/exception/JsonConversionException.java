@@ -1,6 +1,6 @@
 package bio.terra.stairway.exception;
 
-public class JsonConversionException extends StairwayRuntimeException {
+public class JsonConversionException extends StairwayInternalException {
   public JsonConversionException(String message) {
     super(message);
   }

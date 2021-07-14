@@ -2,13 +2,9 @@ package bio.terra.stairway.impl;
 
 import static bio.terra.stairway.impl.DbUtils.commitTransaction;
 
-import bio.terra.stairway.Control.Flight;
-import bio.terra.stairway.Control.FlightMapEntry;
-import bio.terra.stairway.Control.LogEntry;
+import bio.terra.stairway.Control;
 import bio.terra.stairway.Direction;
 import bio.terra.stairway.FlightStatus;
-import bio.terra.stairway.exception.DatabaseOperationException;
-import bio.terra.stairway.exception.FlightException;
 import edu.umd.cs.findbugs.annotations.SuppressFBWarnings;
 import java.sql.ResultSet;
 import java.sql.SQLException;
@@ -27,7 +23,7 @@ import javax.sql.DataSource;
 @SuppressFBWarnings(
     value = "RCN_REDUNDANT_NULLCHECK_WOULD_HAVE_BEEN_A_NPE",
     justification = "Spotbugs doesn't understand resource try construct")
-public class ControlImpl {
+public class ControlImpl implements Control {
   private final DataSource dataSource;
   private final FlightDao flightDao;
   private final StairwayInstanceDao stairwayInstanceDao;
@@ -154,7 +150,7 @@ public class ControlImpl {
   // from RUNNING --> READY. We want to force a transition from other states.
   // For example, restarting a dismal failure due to retry exhaustion.
   public Flight forceReady(String flightId)
-      throws SQLException, DatabaseOperationException, InterruptedException, FlightException {
+      throws SQLException {
 
     final String sql =
         "UPDATE flight SET status = 'READY', stairway_id = NULL WHERE flightid = :flightid";

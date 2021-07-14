@@ -13,13 +13,14 @@ import bio.terra.stairway.FlightInput;
 import bio.terra.stairway.FlightMap;
 import bio.terra.stairway.FlightState;
 import bio.terra.stairway.FlightStatus;
-import bio.terra.stairway.HookWrapper;
 import bio.terra.stairway.StepResult;
+import bio.terra.stairway.StepStatus;
 import bio.terra.stairway.exception.DatabaseOperationException;
 import bio.terra.stairway.exception.DuplicateFlightIdException;
-import bio.terra.stairway.exception.FlightException;
 import bio.terra.stairway.exception.FlightFilterException;
 import bio.terra.stairway.exception.FlightNotFoundException;
+import bio.terra.stairway.exception.StairwayException;
+import bio.terra.stairway.exception.StairwayExecutionException;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import edu.umd.cs.findbugs.annotations.SuppressFBWarnings;
 import java.sql.Connection;
@@ -75,31 +76,38 @@ class FlightDao {
   private final StairwayInstanceDao stairwayInstanceDao;
   private final ExceptionSerializer exceptionSerializer;
   private final HookWrapper hookWrapper;
+  private final String stairwayId;
 
   FlightDao(
       DataSource dataSource,
       StairwayInstanceDao stairwayInstanceDao,
       ExceptionSerializer exceptionSerializer,
-      HookWrapper hookWrapper) {
+      HookWrapper hookWrapper,
+      String stairwayId) {
     this.dataSource = dataSource;
     this.stairwayInstanceDao = stairwayInstanceDao;
     this.exceptionSerializer = exceptionSerializer;
     this.hookWrapper = hookWrapper;
+    this.stairwayId = stairwayId;
   }
 
   /**
    * Record a new flight
    *
    * @param flightContext description of the flight
+   * @throws StairwayException other stairway exception
    * @throws DatabaseOperationException database error
+   * @throws DuplicateFlightIdException attempt to submit a flight with a duplicate id
    * @throws InterruptedException thread shutdown
    */
-  void submit(FlightContext flightContext) throws DatabaseOperationException, InterruptedException {
+  void submit(FlightContext flightContext)
+      throws StairwayException, DatabaseOperationException, DuplicateFlightIdException,
+          InterruptedException {
     DbRetry.retryVoid("flight.submit", () -> submitInner(flightContext));
   }
 
   private void submitInner(FlightContext flightContext)
-      throws SQLException, DatabaseOperationException, InterruptedException {
+      throws SQLException, DuplicateFlightIdException {
     final String sqlInsertFlight =
         "INSERT INTO "
             + FLIGHT_TABLE
@@ -119,7 +127,7 @@ class FlightDao {
         // If we are submitting to ready, then we don't own the flight
         statement.setString("stairwayId", null);
       } else {
-        statement.setString("stairwayId", flightContext.getStairway().getStairwayId());
+        statement.setString("stairwayId", stairwayId);
       }
       if (flightContext.getDebugInfo() != null) {
         statement.setString("debugInfo", flightContext.getDebugInfo().toString());
@@ -149,10 +157,12 @@ class FlightDao {
    * Record the flight state right after a step
    *
    * @param flightContext description of the flight
+   * @throws StairwayException other stairway exception
    * @throws DatabaseOperationException database error
    * @throws InterruptedException thread shutdown
    */
-  void step(FlightContext flightContext) throws DatabaseOperationException, InterruptedException {
+  void step(FlightContext flightContext)
+      throws StairwayException, DatabaseOperationException, InterruptedException {
     DbRetry.retryVoid("flight.step", () -> stepInner(flightContext));
   }
 
@@ -181,7 +191,8 @@ class FlightDao {
       // TODO(PF-703): Column working_parameters is being phased out in favor of table
       // flightworking.  We continue to write the working map here temporarily for backward
       // compatibility.
-      statement.setString("workingMap", flightContext.getWorkingMap().toJson());
+      FlightMapAccess workingMap = (FlightMapAccess) flightContext.getWorkingMap();
+      statement.setString("workingMap", workingMap.toJson());
 
       statement.setInt("stepIndex", flightContext.getStepIndex());
       statement.setBoolean("rerun", flightContext.isRerun());
@@ -204,11 +215,14 @@ class FlightDao {
    * status for the flight.
    *
    * @param flightContext context object for the flight
-   * @throws DatabaseOperationException on database errors
-   * @throws FlightException on invalid flight state
+   * @throws StairwayException other stairway exception
+   * @throws StairwayExecutionException invalid flight state for exit
+   * @throws DatabaseOperationException database error
+   * @throws InterruptedException thread shutdown
    */
   void exit(FlightContext flightContext)
-      throws DatabaseOperationException, FlightException, InterruptedException {
+      throws StairwayException, StairwayExecutionException, DatabaseOperationException,
+          InterruptedException {
     switch (flightContext.getFlightStatus()) {
       case SUCCESS:
       case ERROR:
@@ -229,7 +243,7 @@ class FlightDao {
       case RUNNING:
       default:
         // invalid states
-        throw new FlightException("Attempt to exit a flight in the running state");
+        throw new StairwayExecutionException("Attempt to exit a flight in the running state");
     }
   }
 
@@ -239,10 +253,12 @@ class FlightDao {
    * do this, another Stairway instance might already have pulled it from the queue and run it.
    *
    * @param flightContext context for this flight
-   * @throws DatabaseOperationException on database errors
+   * @throws StairwayException other stairway exception
+   * @throws DatabaseOperationException database error
    * @throws InterruptedException thread shutdown
    */
-  void queued(FlightContext flightContext) throws DatabaseOperationException, InterruptedException {
+  void queued(FlightContext flightContext)
+      throws StairwayException, DatabaseOperationException, InterruptedException {
     final String sqlUpdateFlight =
         "UPDATE "
             + FLIGHT_TABLE
@@ -256,11 +272,12 @@ class FlightDao {
    * Record that a flight is paused and no longer owned by this Stairway instance
    *
    * @param flightContext context object for the flight
-   * @throws DatabaseOperationException on database errors
+   * @throws StairwayException other stairway exception
+   * @throws DatabaseOperationException database error
    * @throws InterruptedException thread shutdown
    */
   private void disown(FlightContext flightContext)
-      throws DatabaseOperationException, InterruptedException {
+      throws StairwayException, DatabaseOperationException, InterruptedException {
     final String sqlUpdateFlight =
         "UPDATE "
             + FLIGHT_TABLE
@@ -271,7 +288,6 @@ class FlightDao {
   }
 
   private void updateFlightState(String sql, FlightContext flightContext) throws SQLException {
-
     try (Connection connection = dataSource.getConnection();
         NamedParameterPreparedStatement statement =
             new NamedParameterPreparedStatement(connection, sql)) {
@@ -291,10 +307,12 @@ class FlightDao {
    * obsolete stairway instance from the stairway_instance table.
    *
    * @param stairwayId the id of the, presumably deleted, stairway instance
-   * @throws DatabaseOperationException on database error
-   * @throws InterruptedException interruption of the retry loop
+   * @throws StairwayException other stairway exception
+   * @throws DatabaseOperationException database error
+   * @throws InterruptedException thread shutdown
    */
-  void disownRecovery(String stairwayId) throws DatabaseOperationException, InterruptedException {
+  void disownRecovery(String stairwayId)
+      throws StairwayException, DatabaseOperationException, InterruptedException {
     DbRetry.retryVoid("flight.disownRecovery", () -> disownRecoveryInner(stairwayId));
   }
 
@@ -350,10 +368,12 @@ class FlightDao {
    * recovery. We want to resubmit flights that are in the ready state.
    *
    * @return list of flight ids
-   * @throws DatabaseOperationException error on database operations
-   * @throws InterruptedException thread we are on is shutting down
+   * @throws StairwayException other stairway exception
+   * @throws DatabaseOperationException database error
+   * @throws InterruptedException thread shutdown
    */
-  List<String> getReadyFlights() throws DatabaseOperationException, InterruptedException {
+  List<String> getReadyFlights()
+      throws StairwayException, DatabaseOperationException, InterruptedException {
     return DbRetry.retry("flight.getReadyFlights", this::getReadyFlightsInner);
   }
 
@@ -394,11 +414,12 @@ class FlightDao {
    * <p>If the flight is all done, we remove the detailed step data from the log table.
    *
    * @param flightContext flight description
+   * @throws StairwayException other stairway exception
    * @throws DatabaseOperationException database error
    * @throws InterruptedException thread shutdown
    */
   private void complete(FlightContext flightContext)
-      throws DatabaseOperationException, InterruptedException {
+      throws StairwayException, DatabaseOperationException, InterruptedException {
     DbRetry.retryVoid("flight.complete", () -> completeInner(flightContext));
   }
 
@@ -425,8 +446,8 @@ class FlightDao {
 
       // TODO(PF-703): Column output_parameters is being phased out in favor of table flightworking.
       //  We continue to write the output map here temporarily for backward compatibility.
-      statement.setString("outputParameters", flightContext.getWorkingMap().toJson());
-
+      FlightMapAccess workingMap = (FlightMapAccess) flightContext.getWorkingMap();
+      statement.setString("outputParameters", workingMap.toJson());
       statement.setString("status", flightContext.getFlightStatus().name());
       statement.setString("serializedException", serializedException);
       statement.setString("flightId", flightContext.getFlightId());
@@ -441,10 +462,12 @@ class FlightDao {
    * Remove all record of this flight from the database
    *
    * @param flightId flight to remove
-   * @throws DatabaseOperationException on any database error
+   * @throws StairwayException other stairway exception
+   * @throws DatabaseOperationException database error
    * @throws InterruptedException thread shutdown
    */
-  void delete(String flightId) throws DatabaseOperationException, InterruptedException {
+  void delete(String flightId)
+      throws StairwayException, DatabaseOperationException, InterruptedException {
     DbRetry.retryVoid("flight.delete", () -> deleteInner(flightId));
   }
 
@@ -494,12 +517,13 @@ class FlightDao {
    * Remove completed flights from the database that are older than a specific time
    *
    * @param deleteOlderThan time before which flights can be removed
-   * @throws DatabaseOperationException on any database error
+   * @throws StairwayException other stairway exception
+   * @throws DatabaseOperationException database error
    * @throws InterruptedException thread shutdown
    * @return count of deleted lights
    */
   int deleteCompletedFlights(Instant deleteOlderThan)
-      throws DatabaseOperationException, InterruptedException {
+      throws StairwayException, DatabaseOperationException, InterruptedException {
     return DbRetry.retry(
         "flight.deleteCompletedFlights", () -> deleteCompletedFlightsInner(deleteOlderThan));
   }
@@ -561,11 +585,12 @@ class FlightDao {
    * @param flightId identifier of flight to resume
    * @return resumed flight; null if the flight does not exist or is not in the right state to be
    *     resumed
-   * @throws DatabaseOperationException databases failure
+   * @throws StairwayException other stairway exception
+   * @throws DatabaseOperationException database error
    * @throws InterruptedException thread shutdown
    */
   FlightContext resume(String stairwayId, String flightId)
-      throws DatabaseOperationException, InterruptedException {
+      throws StairwayException, DatabaseOperationException, InterruptedException {
     return DbRetry.retry("flight.resume", () -> resumeInner(stairwayId, flightId));
   }
 
@@ -623,11 +648,12 @@ class FlightDao {
    *
    * @param flightId identifier of the flight
    * @return constructed flight context
+   * @throws StairwayException other stairway exception
    * @throws DatabaseOperationException database error
    * @throws InterruptedException thread shutdown
    */
   FlightContext makeFlightContextById(String flightId)
-      throws DatabaseOperationException, InterruptedException {
+      throws StairwayException, DatabaseOperationException, InterruptedException {
     return DbRetry.retry(
         "flight.makeFlightcontextById", () -> makeFlightContextByIdInner(flightId));
   }
@@ -663,7 +689,7 @@ class FlightDao {
   private FlightContext makeFlightContext(Connection connection, String flightId, ResultSet rs)
       throws InterruptedException, DatabaseOperationException, SQLException {
     List<FlightInput> inputList = retrieveInputParameters(connection, flightId);
-    FlightMap inputParameters = new FlightMap(inputList);
+    FlightMapAccess inputParameters = new FlightMapAccess(inputList);
     FlightDebugInfo debugInfo = null;
     try {
       debugInfo =
@@ -724,6 +750,7 @@ class FlightDao {
             } else {
               stepResult =
                   new StepResult(
+                      StepStatus.STEP_RESULT_FAILURE_FATAL,
                       exceptionSerializer.deserialize(rsflight.getString("serialized_exception")));
             }
 
@@ -744,8 +771,8 @@ class FlightDao {
 
             // If we built a working map from the data, replace the flight context's default working
             // map with it.
-            FlightMap.create(workingList, workingMapJson)
-                .ifPresent(workingMap -> flightContext.setWorkingMap(workingMap));
+            FlightMapAccess.create(workingList, workingMapJson)
+                .ifPresent(flightContext::setWorkingMap);
           }
         }
       }
@@ -758,17 +785,19 @@ class FlightDao {
    *
    * @param flightId flight to get
    * @return FlightState for the flight
-   * @throws FlightNotFound - no flight
-   * @throws DatabaseOperationException - unexpected error in the operation
+   * @throws StairwayException - other Stairway error
+   * @throws DatabaseOperationException - database error
+   * @throws FlightNotFoundException - flightId is unknown to Stairway
    * @throws InterruptedException - interrupt
    */
   FlightState getFlightState(String flightId)
-      throws DatabaseOperationException, InterruptedException {
+      throws StairwayException, DatabaseOperationException, FlightNotFoundException,
+          InterruptedException {
     return DbRetry.retry("flight.getFlightState", () -> getFlightStateInner(flightId));
   }
 
   private FlightState getFlightStateInner(String flightId)
-      throws SQLException, DatabaseOperationException {
+      throws SQLException, FlightNotFoundException, DatabaseOperationException {
 
     final String sqlOneFlight =
         "SELECT stairway_id, flightid, submit_time, "
@@ -850,20 +879,22 @@ class FlightDao {
    * @param limit max number of results to return
    * @param inFilter filters to apply to the flights
    * @return list of FlightState objects for the filtered, paged flights
+   * @throws StairwayException other Stairway error
    * @throws DatabaseOperationException on all database issues
    * @throws InterruptedException thread shutdown
    */
   List<FlightState> getFlights(int offset, int limit, FlightFilter inFilter)
-      throws DatabaseOperationException, InterruptedException {
+      throws StairwayException, DatabaseOperationException, InterruptedException {
 
     // Make an empty filter if one is not provided
-    FlightFilter filter = (inFilter != null) ? inFilter : new FlightFilter();
+    FlightFilterAccess filter =
+        (inFilter != null) ? (FlightFilterAccess) inFilter : new FlightFilterAccess();
 
     return DbRetry.retry("flight.getFlights", () -> getFlightsInner(offset, limit, filter));
   }
 
-  private List<FlightState> getFlightsInner(int offset, int limit, FlightFilter filter)
-      throws SQLException, DatabaseOperationException {
+  private List<FlightState> getFlightsInner(int offset, int limit, FlightFilterAccess filter)
+      throws SQLException, StairwayException {
 
     String sql = filter.makeSql();
 
@@ -903,7 +934,7 @@ class FlightDao {
       flightState.setSubmitted(rs.getTimestamp("submit_time").toInstant());
       flightState.setStairwayId(rs.getString("stairway_id"));
       List<FlightInput> flightInput = retrieveInputParameters(connection, flightId);
-      flightState.setInputParameters(new FlightMap(flightInput));
+      flightState.setInputParameters(new FlightMapAccess(flightInput));
 
       // If the flight is in one of the complete states, then we retrieve the completion data
       if (flightState.getFlightStatus() == FlightStatus.SUCCESS
@@ -921,8 +952,7 @@ class FlightDao {
         final List<FlightInput> workingList = retrieveLatestWorkingParameters(connection, flightId);
 
         // If we were able to build a map from the data, use it to set the result map.
-        FlightMap.create(workingList, outputParamsJson)
-            .ifPresent(flightMap -> flightState.setResultMap(flightMap));
+        FlightMapAccess.create(workingList, outputParamsJson).ifPresent(flightState::setResultMap);
       }
 
       flightStateList.add(flightState);
@@ -933,7 +963,8 @@ class FlightDao {
 
   private void storeInputParameters(
       Connection connection, String flightId, FlightMap inputParameters) throws SQLException {
-    List<FlightInput> inputList = inputParameters.makeFlightInputList();
+    FlightMapAccess mapAccess = (FlightMapAccess) inputParameters;
+    List<FlightInput> inputList = mapAccess.makeFlightInputList();
 
     final String sqlInsertInput =
         "INSERT INTO "
@@ -955,7 +986,8 @@ class FlightDao {
 
   private void storeWorkingParameters(
       Connection connection, UUID logId, FlightMap workingParameters) throws SQLException {
-    List<FlightInput> inputList = workingParameters.makeFlightInputList();
+    FlightMapAccess mapAccess = (FlightMapAccess) workingParameters;
+    List<FlightInput> inputList = mapAccess.makeFlightInputList();
 
     final String sqlInsertInput =
         "INSERT INTO "

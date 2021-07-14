@@ -5,6 +5,7 @@ import static bio.terra.stairway.impl.DbUtils.startReadOnlyTransaction;
 import static bio.terra.stairway.impl.DbUtils.startTransaction;
 
 import bio.terra.stairway.exception.DatabaseOperationException;
+import bio.terra.stairway.exception.StairwayException;
 import edu.umd.cs.findbugs.annotations.SuppressFBWarnings;
 import java.sql.Connection;
 import java.sql.ResultSet;
@@ -41,10 +42,11 @@ class StairwayInstanceDao {
    * @param stairwayName string name of this stairway instance; must be unique across stairways in
    *     the database
    * @return short UUID for this stairway instance
+   * @throws StairwayException other Stairway errors
    * @throws DatabaseOperationException on database errors
    * @throws InterruptedException on thread shutdown
    */
-  String findOrCreate(String stairwayName) throws DatabaseOperationException, InterruptedException {
+  String findOrCreate(String stairwayName) throws StairwayException, DatabaseOperationException, InterruptedException {
     return DbRetry.retry("stairwayInstance.findOrCreate", () -> findOrCreateInner(stairwayName));
   }
 
@@ -85,10 +87,11 @@ class StairwayInstanceDao {
    *
    * @param stairwayName a string name for a stairway instance
    * @return the String id of the stairway instance
+   * @throws StairwayException other Stairway errors
    * @throws DatabaseOperationException if the stairway instance was not found
    * @throws InterruptedException on thread shutdown
    */
-  String lookupId(String stairwayName) throws DatabaseOperationException, InterruptedException {
+  String lookupId(String stairwayName) throws StairwayException, DatabaseOperationException, InterruptedException {
     return DbRetry.retry("stairwayInstance.lookupId", () -> lookupIdInner(stairwayName));
   }
 
@@ -111,10 +114,11 @@ class StairwayInstanceDao {
    * to drive recovery of orphaned flights.
    *
    * @return list of the names of the stairway instances known to stairway
+   * @throws StairwayException other Stairway errors
    * @throws DatabaseOperationException on SQL exception
    * @throws InterruptedException on thread shutdown
    */
-  List<String> getList() throws DatabaseOperationException, InterruptedException {
+  List<String> getList() throws StairwayException, DatabaseOperationException, InterruptedException {
     return DbRetry.retry("stairwayInstance.getList", this::getListInner);
   }
 

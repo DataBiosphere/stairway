@@ -1,8 +1,6 @@
 package bio.terra.stairway;
 
-import bio.terra.stairway.exception.DatabaseOperationException;
-import bio.terra.stairway.exception.FlightException;
-import bio.terra.stairway.impl.ControlImpl;
+import bio.terra.stairway.exception.StairwayException;
 import java.sql.SQLException;
 import java.sql.Timestamp;
 import java.time.Instant;
@@ -12,70 +10,39 @@ import java.util.Optional;
 import java.util.UUID;
 
 /**
- * This class provides an API for out-of-band debugging and recovering Stairway flights. It caters
- * to the use cases of the stairctl tool. The methods are constrained to only access the database,
- * and do not rely on any application-specific state. Once the FlightDao stops performing
+ * This class provides an interface for out-of-band debugging and recovering Stairway flights. It
+ * caters to the use cases of the stairctl tool. The methods are constrained to only access the
+ * database, and do not rely on any application-specific state. Once the FlightDao stops performing
  * deserialization, we may be able to share more methods with it. For now, at least, there is some
  * duplication of function between FlightDao and Control.
  */
-public class Control {
-  private final ControlImpl controlImpl;
+public interface Control {
+  int countFlights(FlightStatus status) throws SQLException;
 
-  public Control(ControlImpl controlImpl) {
-    this.controlImpl = controlImpl;
-  }
+  int countOwned() throws SQLException;
 
-  public int countFlights(FlightStatus status) throws SQLException {
-    return controlImpl.countFlights(status);
-  }
+  List<Control.Flight> listFlightsSimple(int offset, int limit, FlightStatus status)
+      throws SQLException;
 
-  public int countOwned() throws SQLException {
-    return controlImpl.countOwned();
-  }
+  List<Control.Flight> listOwned(int offset, int limit) throws SQLException;
 
-  public List<Control.Flight> listFlightsSimple(int offset, int limit, FlightStatus status)
-      throws SQLException {
-    return controlImpl.listFlightsSimple(offset, limit, status);
-  }
+  Control.Flight getFlight(String flightId) throws SQLException;
 
-  public List<Control.Flight> listOwned(int offset, int limit) throws SQLException {
-    return controlImpl.listOwned(offset, limit);
-  }
+  Control.Flight forceReady(String flightId)
+      throws SQLException, StairwayException, InterruptedException;
 
-  Control.Flight getFlight(String flightId) throws SQLException {
-    return controlImpl.getFlight(flightId);
-  }
+  Control.Flight forceFatal(String flightId) throws SQLException;
 
-  // We cannot use the regular disown code path, because it will only transition
-  // from RUNNING --> READY. We want to force a transition from other states.
-  // For example, restarting a dismal failure due to retry exhaustion.
-  public Control.Flight forceReady(String flightId)
-      throws SQLException, DatabaseOperationException, InterruptedException, FlightException {
-    return controlImpl.forceReady(flightId);
-  }
+  List<FlightMapEntry> inputQuery(String flightId) throws SQLException;
 
-  public Control.Flight forceFatal(String flightId) throws SQLException {
-    return controlImpl.forceFatal(flightId);
-  }
+  List<Control.LogEntry> logQuery(String flightId) throws SQLException;
 
-  public List<FlightMapEntry> inputQuery(String flightId) throws SQLException {
-    return controlImpl.inputQuery(flightId);
-  }
-
-  public List<Control.LogEntry> logQuery(String flightId) throws SQLException {
-    return controlImpl.logQuery(flightId);
-  }
-
-  // -- Stairway methods --
-
-  public List<String> listStairways() throws Exception {
-    return controlImpl.listStairways();
-  }
+  List<String> listStairways() throws Exception;
 
   // -- POJOs for returning results --
 
   // Flight - represents a row from the "flight" table
-  public static class Flight {
+  class Flight {
     private String flightId;
     private String className;
     private FlightStatus status;
@@ -150,7 +117,7 @@ public class Control {
 
   // Holds flight map data as a pair of strings; either inputs or working map
   // Comparable by key for an alphabetical display
-  public static class FlightMapEntry implements Comparable<FlightMapEntry> {
+  class FlightMapEntry implements Comparable<FlightMapEntry> {
     private String key;
     private String value;
 
@@ -197,7 +164,7 @@ public class Control {
 
   // Holds one log record with its working map
   // Comparable by log timestamp for a sequenced display
-  public static class LogEntry implements Comparable<LogEntry> {
+  class LogEntry implements Comparable<LogEntry> {
     private String flightId;
     private Instant logTime;
     private List<FlightMapEntry> workingMap;

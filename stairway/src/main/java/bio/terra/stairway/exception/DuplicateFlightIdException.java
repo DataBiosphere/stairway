@@ -6,7 +6,7 @@ package bio.terra.stairway.exception;
  * <p>Because flightIDs are specified by clients, it's useful to distinguish this case from other
  * database errors.
  */
-public class DuplicateFlightIdException extends StairwayRuntimeException {
+public class DuplicateFlightIdException extends StairwayBadRequestException {
   public DuplicateFlightIdException(String message) {
     super(message);
   }

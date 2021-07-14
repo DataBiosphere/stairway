@@ -12,9 +12,6 @@ import liquibase.resource.ClassLoaderResourceAccessor;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-// TODO: This is a cut'n'paste of the template project Migrate. I don't know a good way to share
-// that code
-//  at this point in time. It seems like it should be shared though.
 class Migrate {
   private final Logger logger = LoggerFactory.getLogger(Migrate.class);
 

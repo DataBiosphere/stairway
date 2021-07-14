@@ -9,9 +9,7 @@ import bio.terra.stairway.FlightStatus;
 import bio.terra.stairway.ShortUUID;
 import bio.terra.stairway.Stairway;
 import bio.terra.stairway.exception.DatabaseOperationException;
-import bio.terra.stairway.exception.DatabaseSetupException;
 import bio.terra.stairway.exception.MigrateException;
-import bio.terra.stairway.exception.QueueException;
 import bio.terra.stairway.exception.StairwayException;
 import bio.terra.stairway.exception.StairwayExecutionException;
 import java.util.List;
@@ -132,7 +130,7 @@ public final class TestUtil {
   // that a specific flight is READY and unowned.
   public static Stairway makeStairwayValidateRecovery(
       String stairwayName, String flightId, int hooks)
-      throws DatabaseOperationException, QueueException, MigrateException,
+      throws DatabaseOperationException, MigrateException,
           StairwayExecutionException, InterruptedException, DatabaseSetupException {
     DataSource dataSource = makeDataSource();
 

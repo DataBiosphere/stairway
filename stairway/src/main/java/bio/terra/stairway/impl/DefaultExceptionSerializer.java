@@ -1,7 +1,7 @@
 package bio.terra.stairway.impl;
 
 import bio.terra.stairway.ExceptionSerializer;
-import bio.terra.stairway.exception.FlightException;
+import bio.terra.stairway.exception.StairwayExecutionException;
 import java.lang.reflect.Constructor;
 import java.lang.reflect.InvocationTargetException;
 import org.apache.commons.lang3.StringUtils;
@@ -61,7 +61,7 @@ public class DefaultExceptionSerializer implements ExceptionSerializer {
         | InvocationTargetException ex) {
       // Fall through to common exit code
     }
-    return new FlightException(
+    return new StairwayExecutionException(
         "Exception class: " + exceptionClass + "; Exception message: " + exceptionMessage);
   }
 }
