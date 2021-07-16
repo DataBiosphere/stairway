@@ -597,36 +597,6 @@ public class StairwayImpl implements Stairway {
     flightDao.queued(flightContext);
   }
 
-  // TODO: move to Control
-  /**
-   * Return a list of the names of Stairway instances known to this stairway. They may not all be
-   * active.
-   *
-   * @return List of stairway instance names
-   * @throws DatabaseOperationException unexpected database error
-   * @throws InterruptedException thread shutdown
-   */
-  public List<String> getStairwayInstanceList()
-      throws StairwayException, DatabaseOperationException, InterruptedException {
-    return stairwayInstanceDao.getList();
-  }
-
-  // TODO: move to Control
-  /**
-   * Recover any orphaned flights from a particular Stairway instance
-   *
-   * @param stairwayName name of a stairway instance to recover
-   * @throws DatabaseOperationException database access error
-   * @throws InterruptedException interruption during recovery
-   * @throws StairwayExecutionException stairway error
-   */
-  public void recoverStairway(String stairwayName)
-      throws StairwayException, DatabaseOperationException, InterruptedException, StairwayExecutionException {
-    String stairwayId = stairwayInstanceDao.lookupId(stairwayName);
-    flightDao.disownRecovery(stairwayId);
-    recoverReady();
-  }
-
   /**
    * Recover flights in the READY state. Flights need recovery from the READY state in two cases:
    *

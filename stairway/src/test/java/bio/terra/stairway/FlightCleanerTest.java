@@ -31,13 +31,11 @@ public class FlightCleanerTest {
     final int RETENTION = (ITERATIONS - 1) * CHECK_INTERVAL;
 
     // Start with a clean and shiny database environment.
-    Stairway stairway =
-        Stairway.newBuilder()
-            .stairwayName(stairwayName)
-            .completedFlightRetention(Duration.ofSeconds(RETENTION))
-            .retentionCheckInterval(Duration.ofSeconds(CHECK_INTERVAL))
-            .enableWorkQueue(false)
-            .build();
+    Stairway stairway = new StairwayBuilder()
+        .stairwayName(stairwayName)
+        .completedFlightRetention(Duration.ofSeconds(RETENTION))
+        .retentionCheckInterval(Duration.ofSeconds(CHECK_INTERVAL))
+        .build();
 
     List<String> recordedStairways = stairway.initialize(TestUtil.makeDataSource(), true, true);
     stairway.recoverAndStart(recordedStairways);

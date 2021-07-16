@@ -1,5 +1,7 @@
-package bio.terra.stairway;
+package bio.terra.stairway.impl;
 
+import bio.terra.stairway.FlightInput;
+import bio.terra.stairway.FlightMap;
 import bio.terra.stairway.exception.JsonConversionException;
 import bio.terra.stairway.fixtures.FlightsTestPojo;
 import com.fasterxml.jackson.core.JsonProcessingException;
@@ -94,7 +96,7 @@ public class FlightMapTest {
 
   @Test
   public void toAndFromJson() {
-    FlightMap outMap = new FlightMap();
+    FlightMapAccess outMap = new FlightMapAccess();
 
     // Test that a non-existent key returns null
     Assertions.assertNull(outMap.get("key", Object.class));
@@ -104,7 +106,7 @@ public class FlightMapTest {
     String json = outMap.toJson();
     logger.debug("JSON: '{}'", json);
 
-    FlightMap inMap = new FlightMap();
+    FlightMapAccess inMap = new FlightMapAccess();
     inMap.fromJson(json);
     verifyMap(inMap);
   }
@@ -115,37 +117,37 @@ public class FlightMapTest {
     // JSON created by calling toJson() on a map instance populated by loadMap() using an older
     // version of code.
     String jsonMap =
-        "[\"java.util.HashMap\",{\"myenum\":[\"bio.terra.stairway.FlightMapTest$MyEnum\",\"FOO\"],\"myuuid\":[\"java.util.UUID\",\"2e74e380-cccd-48ad-a0ac-e006b3650dbe\"],\"mystring\":\"StringValue\",\"mykey\":3,\"mypojo\":[\"bio.terra.stairway.fixtures.FlightsTestPojo\",{\"astring\":\"mystring\",\"anint\":99}]}]";
+        "[\"java.util.HashMap\",{\"myenum\":[\"bio.terra.stairway.impl.FlightMapTest$MyEnum\",\"FOO\"],\"myuuid\":[\"java.util.UUID\",\"2e74e380-cccd-48ad-a0ac-e006b3650dbe\"],\"mystring\":\"StringValue\",\"mykey\":3,\"mypojo\":[\"bio.terra.stairway.fixtures.FlightsTestPojo\",{\"astring\":\"mystring\",\"anint\":99}]}]";
 
     logger.debug(" In JSON: {}", jsonMap);
 
     // Verify that a map created from this JSON contains the expected data.
-    FlightMap map = new FlightMap();
+    FlightMapAccess map = new FlightMapAccess();
     map.fromJson(jsonMap);
     verifyMap(map);
   }
 
   @Test
   public void createTest() {
-    FlightMap sourceMap = new FlightMap();
+    FlightMapAccess sourceMap = new FlightMapAccess();
     loadMap(sourceMap);
 
     List<FlightInput> list = sourceMap.makeFlightInputList();
     String json = sourceMap.toJson();
 
     // Ignore list, use JSON
-    Optional<FlightMap> fromListMap = FlightMap.create(list, json);
+    Optional<FlightMapAccess> fromListMap = FlightMapAccess.create(list, json);
     Assertions.assertTrue(fromListMap.isPresent());
     verifyMap(fromListMap.get());
 
     // Null JSON returns empty map
-    Optional<FlightMap> nullJsonEmptyListMap = FlightMap.create(new ArrayList<>(), null);
+    Optional<FlightMapAccess> nullJsonEmptyListMap = FlightMapAccess.create(new ArrayList<>(), null);
     Assertions.assertFalse(nullJsonEmptyListMap.isPresent());
 
     // Missing entry logs error, but still has good content
     List<FlightInput> missingList = new ArrayList<>(list);
     missingList.remove(missingList.size() - 1);
-    Optional<FlightMap> missingMap = FlightMap.create(missingList, json);
+    Optional<FlightMapAccess> missingMap = FlightMapAccess.create(missingList, json);
     Assertions.assertTrue(missingMap.isPresent());
     verifyMap(missingMap.get());
     Assertions.assertThrows(
@@ -156,7 +158,7 @@ public class FlightMapTest {
     FlightInput badKeyInput = new FlightInput("badkey", "badval");
     badKeyList.remove(badKeyList.size() - 1);
     badKeyList.add(badKeyInput);
-    Optional<FlightMap> badListKeyMap = FlightMap.create(badKeyList, json);
+    Optional<FlightMapAccess> badListKeyMap = FlightMapAccess.create(badKeyList, json);
     Assertions.assertTrue(badListKeyMap.isPresent());
     verifyMap(badListKeyMap.get());
     Assertions.assertThrows(
@@ -167,7 +169,7 @@ public class FlightMapTest {
     FlightInput badValueInput = new FlightInput(pojoKey, "badval");
     badValueList.remove(badValueList.size() - 1);
     badValueList.add(badValueInput);
-    Optional<FlightMap> badListValueMap = FlightMap.create(badValueList, json);
+    Optional<FlightMapAccess> badListValueMap = FlightMapAccess.create(badValueList, json);
     Assertions.assertTrue(badListValueMap.isPresent());
     verifyMap(badListValueMap.get());
     Assertions.assertThrows(
@@ -182,7 +184,7 @@ public class FlightMapTest {
 
   @Test
   public void serDesExceptions() {
-    FlightMap map = new FlightMap();
+    FlightMapAccess map = new FlightMapAccess();
 
     // Serializing an unserializable class results in JsonConversionException.
     final String badKey = "bad";

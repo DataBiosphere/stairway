@@ -5,6 +5,7 @@ import static org.hamcrest.MatcherAssert.assertThat;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
+import bio.terra.stairway.fixtures.TestStairwayBuilder;
 import bio.terra.stairway.fixtures.TestUtil;
 import bio.terra.stairway.flights.TestFlight;
 import bio.terra.stairway.flights.TestFlightMultiStepRetry;
@@ -40,7 +41,7 @@ public class DebugInfoTest {
     String flightId = "restartEachStepTrueTest";
 
     FlightDebugInfo debugInfo = FlightDebugInfo.newBuilder().restartEachStep(true).build();
-    Stairway stairway = TestUtil.setupStairway(stairwayName, false);
+    Stairway stairway = new TestStairwayBuilder().name(stairwayName).build();
     FlightMap inputs = new FlightMap();
 
     Integer initialValue = 0;
@@ -66,7 +67,7 @@ public class DebugInfoTest {
     String flightId = "lastStepFailureTrueTest";
 
     FlightDebugInfo debugInfo = FlightDebugInfo.newBuilder().lastStepFailure(true).build();
-    Stairway stairway = TestUtil.setupStairwayWithHooks(stairwayName, false, 1);
+    Stairway stairway = new TestStairwayBuilder().name(stairwayName).testHookCount(1).build();
 
     // Submit the test flight
     FlightMap inputParameters = new FlightMap();
@@ -119,7 +120,7 @@ public class DebugInfoTest {
     failures.put(0, StepStatus.STEP_RESULT_FAILURE_RETRY);
     FlightDebugInfo debugInfo = FlightDebugInfo.newBuilder().failAtSteps(failures).build();
 
-    Stairway stairway = TestUtil.setupStairway(stairwayName, false);
+    Stairway stairway = new TestStairwayBuilder().name(stairwayName).build();
     FlightMap inputs = new FlightMap();
     String filename = makeFilename();
     inputs.put("filename", filename);
@@ -149,7 +150,7 @@ public class DebugInfoTest {
     doFailures.put(TestStepExistence.class.getName(), StepStatus.STEP_RESULT_FAILURE_RETRY);
     FlightDebugInfo debugInfo = FlightDebugInfo.newBuilder().doStepFailures(doFailures).build();
 
-    Stairway stairway = TestUtil.setupStairway(stairwayName, false);
+    Stairway stairway = new TestStairwayBuilder().name(stairwayName).build();
     FlightMap inputs = new FlightMap();
     String filename = makeFilename();
     inputs.put("filename", filename);
@@ -181,7 +182,7 @@ public class DebugInfoTest {
     FlightDebugInfo debugInfo =
         FlightDebugInfo.newBuilder().undoStepFailures(undoFailures).lastStepFailure(true).build();
 
-    Stairway stairway = TestUtil.setupStairway(stairwayName, false);
+    Stairway stairway = new TestStairwayBuilder().name(stairwayName).build();
     FlightMap inputs = new FlightMap();
     String filename = makeFilename();
     inputs.put("filename", filename);
@@ -212,7 +213,7 @@ public class DebugInfoTest {
     failures.put(0, StepStatus.STEP_RESULT_FAILURE_FATAL);
     FlightDebugInfo debugInfo = FlightDebugInfo.newBuilder().failAtSteps(failures).build();
 
-    Stairway stairway = TestUtil.setupStairway(stairwayName, false);
+    Stairway stairway = new TestStairwayBuilder().name(stairwayName).build();
     FlightMap inputs = new FlightMap();
     String filename = makeFilename();
     inputs.put("filename", filename);

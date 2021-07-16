@@ -4,8 +4,11 @@ import static org.hamcrest.CoreMatchers.equalTo;
 import static org.hamcrest.MatcherAssert.assertThat;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 
+import bio.terra.stairway.fixtures.FileQueue;
 import bio.terra.stairway.fixtures.MapKey;
 import bio.terra.stairway.fixtures.TestPauseController;
+import bio.terra.stairway.fixtures.TestStairwayBuilder;
+import bio.terra.stairway.fixtures.TestStairwayBuilder.UseQueue;
 import bio.terra.stairway.fixtures.TestUtil;
 import bio.terra.stairway.flights.TestFlightControlledSleep;
 import java.util.Arrays;
@@ -36,7 +39,11 @@ public class QueueFlightTest {
   @Test
   public void queueFlightTest() throws Exception {
     // Submit directly to queue and make sure we end up in the right state
-    stairway = TestUtil.setupConnectedStairwayWithHooks("queueFlightTest", false, 3);
+    stairway = new TestStairwayBuilder()
+        .name("queueFlightTest")
+        .testHookCount(3)
+        .useQueue(UseQueue.MAKE_QUEUE)
+        .build();
 
     FlightMap inputs = new FlightMap();
     int controlValue = 1;
@@ -104,13 +111,13 @@ public class QueueFlightTest {
     String projectId = TestUtil.getEnvVar("GOOGLE_CLOUD_PROJECT", null);
     assertNotNull(projectId);
 
+    QueueInterface workQueue = FileQueue.makeFileQueue("admissionControl");
+
     DataSource dataSource = TestUtil.makeDataSource();
     stairway =
-        Stairway.newBuilder()
-            .stairwayClusterName("stairway-cluster")
+        new StairwayBuilder()
             .stairwayName("admissionControlTest")
-            .enableWorkQueue(true)
-            .workQueueProjectId(projectId)
+            .workQueue(workQueue)
             .maxParallelFlights(1)
             .maxQueuedFlights(1)
             .build();
@@ -188,19 +195,11 @@ public class QueueFlightTest {
   public void supplyQueueTest() throws Exception {
     String projectId = TestUtil.getEnvVar("GOOGLE_CLOUD_PROJECT", null);
     DataSource dataSource = TestUtil.makeDataSource();
-    String topicId = "supplyQueue-topic";
-    String subscriptionId = "supplyQueue-sub";
-    QueueCreate.makeTopic(projectId, topicId);
-    QueueCreate.makeSubscription(projectId, topicId, subscriptionId);
+    QueueInterface workQueue = FileQueue.makeFileQueue("supplyQueue");
 
-    stairway =
-        Stairway.newBuilder()
-            .stairwayClusterName("stairway-cluster")
+    stairway = new StairwayBuilder()
             .stairwayName("admissionControlTest")
-            .enableWorkQueue(true)
-            .workQueueProjectId(projectId)
-            .workQueueTopicId(topicId)
-            .workQueueSubscriptionId(subscriptionId)
+            .workQueue(workQueue)
             .maxParallelFlights(1)
             .maxQueuedFlights(1)
             .build();

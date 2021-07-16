@@ -1,9 +1,13 @@
-package bio.terra.stairway;
+package bio.terra.stairway.impl;
 
 import static java.time.Instant.now;
 import static org.hamcrest.CoreMatchers.equalTo;
 import static org.hamcrest.MatcherAssert.assertThat;
 
+import bio.terra.stairway.FlightFilter;
+import bio.terra.stairway.FlightFilter.FlightFilterPredicate;
+import bio.terra.stairway.FlightFilterOp;
+import bio.terra.stairway.FlightStatus;
 import bio.terra.stairway.flights.TestFlight;
 import java.time.Instant;
 import org.junit.jupiter.api.Tag;
@@ -14,63 +18,31 @@ public class FilterTest {
 
   @Test
   public void predicateTest() throws Exception {
-    FlightFilterPredicate predicate =
-        new FlightFilterPredicate(
-            "afield",
-            FlightFilterOp.NOT_EQUAL,
-            "avalue",
-            FlightFilterPredicate.Datatype.STRING,
-            "p1");
+    FlightFilterAccess filter = new FlightFilterAccess();
+    filter.addFilterInputParameter("afield", FlightFilterOp.NOT_EQUAL, "avalue");
+    filter.addFilterInputParameter("afield", FlightFilterOp.GREATER_EQUAL, "avalue");
+    filter.addFilterInputParameter("afield", FlightFilterOp.GREATER_THAN, "avalue");
+    filter.addFilterInputParameter("afield", FlightFilterOp.LESS_EQUAL, "avalue");
+    filter.addFilterInputParameter("afield", FlightFilterOp.LESS_THAN, "avalue");
 
-    String flightSql = predicate.makeFlightPredicateSql();
-    assertThat(flightSql, equalTo("F.afield != :p1"));
-    String inputSql = predicate.makeInputPredicateSql();
-    assertThat(inputSql, equalTo("(I.key = 'afield' AND I.value != :p1)"));
-
-    predicate =
-        new FlightFilterPredicate(
-            "afield",
-            FlightFilterOp.GREATER_EQUAL,
-            "avalue",
-            FlightFilterPredicate.Datatype.STRING,
-            "p1");
-
-    flightSql = predicate.makeFlightPredicateSql();
-    assertThat(flightSql, equalTo("F.afield >= :p1"));
-
-    predicate =
-        new FlightFilterPredicate(
-            "afield",
-            FlightFilterOp.GREATER_THAN,
-            "avalue",
-            FlightFilterPredicate.Datatype.STRING,
-            "p1");
-
-    flightSql = predicate.makeFlightPredicateSql();
-    assertThat(flightSql, equalTo("F.afield > :p1"));
-
-    predicate =
-        new FlightFilterPredicate(
-            "afield",
-            FlightFilterOp.LESS_EQUAL,
-            "avalue",
-            FlightFilterPredicate.Datatype.STRING,
-            "p1");
-
-    flightSql = predicate.makeFlightPredicateSql();
-    assertThat(flightSql, equalTo("F.afield <= :p1"));
-
-    predicate =
-        new FlightFilterPredicate(
-            "afield",
-            FlightFilterOp.LESS_THAN,
-            "avalue",
-            FlightFilterPredicate.Datatype.STRING,
-            "p1");
-
-    flightSql = predicate.makeFlightPredicateSql();
-    assertThat(flightSql, equalTo("F.afield < :p1"));
+    testPredicate(filter, 0, "!=");
+    testPredicate(filter, 1, ">=");
+    testPredicate(filter, 2, ">");
+    testPredicate(filter, 3, "<=");
+    testPredicate(filter, 4, "<");
   }
+
+  private void testPredicate(FlightFilterAccess filter, int index, String operand) {
+    String flightCompareSql = String.format("F.afield %s :ff%d", operand, index + 1);
+    String inputCompareSql = String.format("(I.key = 'afield' AND I.value %s :ff%d)", operand, index + 1);
+
+    FlightFilterPredicate predicate = filter.getInputPredicates().get(index);
+    String flightSql = filter.makeFlightPredicateSql(predicate);
+    assertThat(flightSql, equalTo(flightCompareSql));
+    String inputSql = filter.makeInputPredicateSql(predicate);
+    assertThat(inputSql, equalTo(inputCompareSql));
+  }
+
 
   // There next 6 tests are all the possibilities for
   // query forms 1, 2, and 3 with and without flight filters
@@ -82,7 +54,7 @@ public class FilterTest {
             + " FROM flight F"
             + " ORDER BY submit_time LIMIT :limit OFFSET :offset";
 
-    FlightFilter filter = new FlightFilter();
+    FlightFilterAccess filter = new FlightFilterAccess();
     String sql = filter.makeSql();
     assertThat(sql, equalTo(expect));
   }
@@ -98,8 +70,8 @@ public class FilterTest {
 
     Instant submit = now();
     Instant complete = now();
-    FlightFilter filter =
-        new FlightFilter()
+    FlightFilterAccess filter =
+        (FlightFilterAccess) new FlightFilter()
             .addFilterCompletedTime(FlightFilterOp.GREATER_THAN, submit)
             .addFilterFlightClass(FlightFilterOp.EQUAL, TestFlight.class)
             .addFilterFlightStatus(FlightFilterOp.EQUAL, FlightStatus.RUNNING)
@@ -118,8 +90,8 @@ public class FilterTest {
             + " WHERE (I.key = 'email' AND I.value = :ff1)"
             + " ORDER BY submit_time LIMIT :limit OFFSET :offset";
 
-    FlightFilter filter =
-        new FlightFilter()
+    FlightFilterAccess filter =
+        (FlightFilterAccess) new FlightFilter()
             .addFilterInputParameter("email", FlightFilterOp.EQUAL, "ddtest@gmail.com");
 
     String sql = filter.makeSql();
@@ -137,8 +109,8 @@ public class FilterTest {
             + " AND F.class_name = :ff2"
             + " ORDER BY submit_time LIMIT :limit OFFSET :offset";
 
-    FlightFilter filter =
-        new FlightFilter()
+    FlightFilterAccess filter =
+        (FlightFilterAccess) new FlightFilter()
             .addFilterInputParameter("email", FlightFilterOp.EQUAL, "ddtest@gmail.com")
             .addFilterFlightClass(FlightFilterOp.EQUAL, TestFlight.class);
 
@@ -160,8 +132,8 @@ public class FilterTest {
             + " WHERE INPUT.matchCount = 2"
             + " ORDER BY submit_time LIMIT :limit OFFSET :offset";
 
-    FlightFilter filter =
-        new FlightFilter()
+    FlightFilterAccess filter =
+        (FlightFilterAccess) new FlightFilter()
             .addFilterInputParameter("email", FlightFilterOp.EQUAL, "ddtest@gmail.com")
             .addFilterInputParameter("name", FlightFilterOp.EQUAL, "dd");
 
@@ -184,8 +156,8 @@ public class FilterTest {
             + " AND F.class_name = :ff3"
             + " ORDER BY submit_time LIMIT :limit OFFSET :offset";
 
-    FlightFilter filter =
-        new FlightFilter()
+    FlightFilterAccess filter =
+        (FlightFilterAccess) new FlightFilter()
             .addFilterInputParameter("email", FlightFilterOp.EQUAL, "ddtest@gmail.com")
             .addFilterInputParameter("name", FlightFilterOp.EQUAL, "dd")
             .addFilterFlightClass(FlightFilterOp.EQUAL, TestFlight.class);

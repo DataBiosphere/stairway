@@ -32,6 +32,9 @@ dependencies {
     // For PubSub
     implementation group: 'com.google.cloud', name: 'google-cloud-pubsub'
 
+    // For file handling in testing
+    testImplementation group: 'commons-io', name: 'commons-io', version: '2.11.0'
+
     // For log control during unit testsing
     testImplementation group: 'ch.qos.logback', name: 'logback-classic', version: '1.2.3'
     testRuntimeOnly group: 'org.codehaus.groovy', name: 'groovy', version: '2.5.7'

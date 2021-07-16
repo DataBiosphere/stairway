@@ -5,6 +5,7 @@ import bio.terra.stairway.exception.FlightFilterException;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import java.sql.SQLException;
 import java.time.Instant;
+import java.util.List;
 import org.apache.commons.lang3.StringUtils;
 
 /**
@@ -12,6 +13,14 @@ import org.apache.commons.lang3.StringUtils;
  * the SQL queries applying the predicates.
  */
 public class FlightFilterAccess extends FlightFilter {
+
+  List<FlightFilterPredicate> getFlightPredicates() {
+    return flightPredicates;
+  }
+
+  List<FlightFilterPredicate> getInputPredicates() {
+    return inputPredicates;
+  }
 
   /**
    * Store the comparison values associated with the predicates into the SQL statement
@@ -166,12 +175,6 @@ public class FlightFilterAccess extends FlightFilter {
       inter = " OR ";
     }
   }
-
-  private String makeParameterName() {
-    parameterId++;
-    return "ff" + parameterId;
-  }
-
 
   // -- predicate methods --
 

@@ -29,7 +29,6 @@ class StairwayThreadPool extends ThreadPoolExecutor {
     return getQueue().size();
   }
 
-  // TODO: make the logging debug or remove
   protected void beforeExecute(Thread t, Runnable r) {
     super.beforeExecute(t, r);
     int active = activeTasks.incrementAndGet();

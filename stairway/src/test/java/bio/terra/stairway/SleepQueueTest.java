@@ -3,7 +3,8 @@ package bio.terra.stairway;
 import static org.hamcrest.CoreMatchers.equalTo;
 import static org.hamcrest.MatcherAssert.assertThat;
 
-import bio.terra.stairway.fixtures.TestUtil;
+import bio.terra.stairway.fixtures.FileQueue;
+import bio.terra.stairway.fixtures.TestStairwayBuilder;
 import java.util.List;
 import java.util.concurrent.TimeUnit;
 import org.junit.jupiter.api.Tag;
@@ -13,12 +14,23 @@ import org.slf4j.LoggerFactory;
 
 @Tag("connected")
 public class SleepQueueTest {
-  private Logger logger = LoggerFactory.getLogger(SleepQueueTest.class);
+  private final Logger logger = LoggerFactory.getLogger(SleepQueueTest.class);
 
   @Test
   public void clusterSuccessTest() throws Exception {
-    Stairway stairway1 = TestUtil.setupConnectedStairway("stairway1", false);
-    Stairway stairway2 = TestUtil.setupConnectedStairway("stairway2", true);
+    QueueInterface workQueue = FileQueue.makeFileQueue("clusterSuccessTest");
+
+    Stairway stairway1 = new TestStairwayBuilder()
+        .name("stairway1")
+        .workQueue(workQueue)
+        .build();
+
+    Stairway stairway2 = new TestStairwayBuilder()
+        .name("stairway2")
+        .workQueue(workQueue)
+        .continuing(true)
+        .build();
+
     SleepQueueThread sqt1 = new SleepQueueThread(stairway1, true);
     SleepQueueThread sqt2 = new SleepQueueThread(stairway2, false);
 

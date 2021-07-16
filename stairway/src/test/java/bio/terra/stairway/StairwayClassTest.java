@@ -3,6 +3,7 @@ package bio.terra.stairway;
 import bio.terra.stairway.exception.FlightNotFoundException;
 import bio.terra.stairway.exception.MakeFlightException;
 import bio.terra.stairway.exception.StairwayException;
+import bio.terra.stairway.fixtures.TestStairwayBuilder;
 import bio.terra.stairway.fixtures.TestUtil;
 import bio.terra.stairway.flights.TestFlight;
 import org.junit.jupiter.api.Assertions;
@@ -14,7 +15,7 @@ public class StairwayClassTest {
 
   @BeforeEach
   public void setup() throws Exception {
-    stairway = TestUtil.setupDefaultStairway();
+    stairway = new TestStairwayBuilder().build();
   }
 
   @Test

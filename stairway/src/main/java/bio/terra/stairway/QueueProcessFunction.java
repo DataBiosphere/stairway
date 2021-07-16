@@ -10,5 +10,5 @@ package bio.terra.stairway;
  */
 @FunctionalInterface
 public interface QueueProcessFunction {
-  boolean apply(String message, Stairway stairway) throws InterruptedException;
+  boolean apply(String message, Object dispatchContext) throws InterruptedException;
 }

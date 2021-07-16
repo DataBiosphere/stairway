@@ -2,16 +2,10 @@ package bio.terra.stairway.fixtures;
 
 import static org.hamcrest.CoreMatchers.equalTo;
 import static org.hamcrest.MatcherAssert.assertThat;
-import static org.junit.jupiter.api.Assertions.assertNull;
 
-import bio.terra.stairway.FlightState;
 import bio.terra.stairway.FlightStatus;
-import bio.terra.stairway.ShortUUID;
 import bio.terra.stairway.Stairway;
-import bio.terra.stairway.exception.DatabaseOperationException;
-import bio.terra.stairway.exception.MigrateException;
 import bio.terra.stairway.exception.StairwayException;
-import bio.terra.stairway.exception.StairwayExecutionException;
 import java.util.List;
 import java.util.concurrent.TimeUnit;
 import javax.sql.DataSource;
@@ -54,33 +48,6 @@ public final class TestUtil {
     return value;
   }
 
-  public static String randomStairwayName() {
-    return "test_" + ShortUUID.get();
-  }
-
-  public static Stairway setupDefaultStairway() throws Exception {
-    return setupStairway(randomStairwayName(), false);
-  }
-
-  public static Stairway setupStairway(String stairwayName, boolean continuing) throws Exception {
-    return makeStairway(stairwayName, !continuing, !continuing, null, 0);
-  }
-
-  public static Stairway setupStairwayWithHooks(String stairwayName, boolean continuing, int hooks)
-      throws Exception {
-    return makeStairway(stairwayName, !continuing, !continuing, null, hooks);
-  }
-
-  public static Stairway setupConnectedStairway(String stairwayName, boolean continuing)
-      throws Exception {
-    return makeStairway(stairwayName, !continuing, !continuing, getProjectId(), 0);
-  }
-
-  public static Stairway setupConnectedStairwayWithHooks(
-      String stairwayName, boolean continuing, int hooks) throws Exception {
-    return makeStairway(stairwayName, !continuing, !continuing, getProjectId(), hooks);
-  }
-
   // Optionally pauses a flight in the middle so we can fake failures
   public static void sleepPause() throws InterruptedException {
     if (TestPauseController.getControl() == 0) {
@@ -88,77 +55,6 @@ public final class TestUtil {
       TimeUnit.HOURS.sleep(1);
     }
     logger.debug("sleepStop did not stop");
-  }
-
-  private static Stairway makeStairway(
-      String stairwayName,
-      boolean forceCleanStart,
-      boolean migrateUpgrade,
-      String projectId,
-      int hooks)
-      throws Exception {
-    DataSource dataSource = makeDataSource();
-    boolean enableWorkQueue = (projectId != null);
-
-    Stairway.Builder builder =
-        Stairway.newBuilder()
-            .stairwayClusterName("stairway-cluster")
-            .stairwayName(stairwayName)
-            .workQueueProjectId(projectId)
-            .enableWorkQueue(enableWorkQueue)
-            .maxParallelFlights(2);
-
-    for (int i = 0; i < hooks; i++) {
-      int hookId = i + 1;
-      TestHook hook = new TestHook(String.valueOf(hookId));
-      builder.stairwayHook(hook);
-    }
-    TestHook.clearHookLog();
-
-    Stairway stairway = builder.build();
-
-    List<String> recordedStairways =
-        stairway.initialize(dataSource, forceCleanStart, migrateUpgrade);
-    if (forceCleanStart) {
-      assertThat("nothing to recover", recordedStairways.size(), equalTo(0));
-    }
-    stairway.recoverAndStart(recordedStairways);
-    return stairway;
-  }
-
-  // For cases where we want to validate recovery of a single stairway instance and that
-  // that a specific flight is READY and unowned.
-  public static Stairway makeStairwayValidateRecovery(
-      String stairwayName, String flightId, int hooks)
-      throws DatabaseOperationException, MigrateException,
-          StairwayExecutionException, InterruptedException, DatabaseSetupException {
-    DataSource dataSource = makeDataSource();
-
-    Stairway.Builder builder =
-        Stairway.newBuilder()
-            .stairwayClusterName("stairway-cluster")
-            .stairwayName(stairwayName)
-            .workQueueProjectId(null)
-            .maxParallelFlights(2);
-
-    for (int i = 0; i < hooks; i++) {
-      int hookId = i + 1;
-      TestHook hook = new TestHook(Integer.toString(hookId));
-      builder.stairwayHook(hook);
-    }
-
-    Stairway stairway = builder.build();
-
-    List<String> recordedStairways = stairway.initialize(dataSource, false, false);
-    assertThat("one stairway to recover", recordedStairways.size(), equalTo(1));
-    assertThat("stairway name matches", recordedStairways.get(0), equalTo(stairwayName));
-
-    FlightState state = stairway.getFlightState(flightId);
-    assertThat("State is ready", state.getFlightStatus(), equalTo(FlightStatus.READY));
-    assertNull(state.getStairwayId(), "Flight is unowned");
-
-    stairway.recoverAndStart(recordedStairways);
-    return stairway;
   }
 
   public static boolean isDone(Stairway stairway, String flightId)

@@ -1,14 +1,19 @@
-package bio.terra.stairway;
+package bio.terra.stairway.impl;
 
 import static org.hamcrest.CoreMatchers.equalTo;
 import static org.hamcrest.MatcherAssert.assertThat;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
+import bio.terra.stairway.FlightContext;
+import bio.terra.stairway.FlightFilter;
+import bio.terra.stairway.FlightFilterOp;
+import bio.terra.stairway.FlightMap;
+import bio.terra.stairway.FlightState;
+import bio.terra.stairway.FlightStatus;
 import bio.terra.stairway.fixtures.FlightsTestPojo;
-import bio.terra.stairway.fixtures.TestUtil;
+import bio.terra.stairway.fixtures.TestStairwayBuilder;
 import bio.terra.stairway.flights.TestFlight;
 import bio.terra.stairway.flights.TestFlightRetry;
-import bio.terra.stairway.impl.FlightDao;
 import java.time.Instant;
 import java.util.ArrayList;
 import java.util.Arrays;
@@ -23,12 +28,12 @@ import org.junit.jupiter.api.Test;
 @Tag("unit")
 public class EnumerateFlightsTest {
 
-  private Stairway stairway;
+  private StairwayImpl stairway;
   private FlightDao flightDao;
 
   @BeforeEach
   public void setup() throws Exception {
-    stairway = TestUtil.setupDefaultStairway();
+    stairway = (StairwayImpl) new TestStairwayBuilder().build();
     flightDao = stairway.getFlightDao();
   }
 

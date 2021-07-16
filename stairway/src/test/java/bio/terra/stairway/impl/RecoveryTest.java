@@ -1,4 +1,4 @@
-package bio.terra.stairway;
+package bio.terra.stairway.impl;
 
 import static org.hamcrest.CoreMatchers.containsString;
 import static org.hamcrest.CoreMatchers.is;
@@ -7,15 +7,18 @@ import static org.hamcrest.Matchers.equalTo;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
+import bio.terra.stairway.FlightMap;
+import bio.terra.stairway.FlightState;
+import bio.terra.stairway.FlightStatus;
+import bio.terra.stairway.Stairway;
 import bio.terra.stairway.fixtures.TestPauseController;
+import bio.terra.stairway.fixtures.TestStairwayBuilder;
 import bio.terra.stairway.fixtures.TestUtil;
 import bio.terra.stairway.flights.TestFlightRecovery;
 import bio.terra.stairway.flights.TestFlightRecoveryUndo;
 import bio.terra.stairway.flights.TestFlightRecoveryUndoSwitch;
 import bio.terra.stairway.flights.TestFlightStop;
-import java.util.List;
 import java.util.concurrent.TimeUnit;
-import javax.sql.DataSource;
 import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
 
@@ -55,7 +58,7 @@ public class RecoveryTest {
     final String stairwayName = "recoverySuccessTest";
 
     // Start with a clean and shiny database environment.
-    Stairway stairway1 = TestUtil.setupStairway(stairwayName, false);
+    Stairway stairway1 = new TestStairwayBuilder().name(stairwayName).build();
 
     FlightMap inputs = new FlightMap();
 
@@ -75,20 +78,12 @@ public class RecoveryTest {
     // sleep. We create the new stairway directly, rather than use TestUtil so we can validate the
     // process. We reuse the stairway name to make sure that replacement by the same name works.
     TestPauseController.setControl(1);
-    DataSource dataSource = TestUtil.makeDataSource();
     Stairway stairway2 =
-        Stairway.newBuilder()
-            .stairwayClusterName("stairway-cluster")
-            .stairwayName(stairwayName)
-            .workQueueProjectId(null)
-            .maxParallelFlights(2)
+        new TestStairwayBuilder()
+            .name(stairwayName)
+            .continuing(true)
+            .doRecoveryCheck(true)
             .build();
-    List<String> recordedStairways = stairway2.initialize(dataSource, false, false);
-    assertThat("One obsolete stairway to recover", recordedStairways.size(), equalTo(1));
-    String obsoleteStairway = recordedStairways.get(0);
-    assertThat("Obsolete stairway has the right name", obsoleteStairway, equalTo(stairwayName));
-
-    stairway2.recoverAndStart(recordedStairways);
 
     // Wait for recovery to complete
     stairway2.waitForFlight(flightId, null, null);
@@ -102,7 +97,8 @@ public class RecoveryTest {
   @Test
   public void undoTest() throws Exception {
     // Start with a clean and shiny database environment.
-    Stairway stairway1 = TestUtil.setupStairway("recoverySuccessTest", false);
+    final String stairwayName = "recoverySuccessTest";
+    Stairway stairway1 = new TestStairwayBuilder().name(stairwayName).build();
 
     FlightMap inputs = new FlightMap();
     Integer initialValue = 2;
@@ -120,7 +116,7 @@ public class RecoveryTest {
     // Simulate a restart with a new thread pool and stairway. Reset control so this one does not
     // sleep
     TestPauseController.setControl(1);
-    Stairway stairway2 = TestUtil.setupStairway("recoverySuccessTest", true);
+    Stairway stairway2 = new TestStairwayBuilder().name(stairwayName).continuing(true).build();
 
     // Wait for recovery to complete
     stairway2.waitForFlight(flightId, 5, 10);
@@ -141,7 +137,9 @@ public class RecoveryTest {
     // We do this by causing one flight in one Stairway to error and have
     // its undo stop.
     // Then we recover the flight and make sure it works right.
-    Stairway stairway1 = TestUtil.setupStairway("recoveryUndoSwitchTest", false);
+    // Start with a clean and shiny database environment.
+    final String stairwayName = "recoveryUndoSwitchTest";
+    Stairway stairway1 = new TestStairwayBuilder().name(stairwayName).build();
 
     FlightMap inputs = new FlightMap();
     Integer initialValue = 5;
@@ -158,7 +156,7 @@ public class RecoveryTest {
     // Simulate a restart with a new thread pool and stairway. Reset control so this one does not
     // sleep
     TestPauseController.setControl(1);
-    Stairway stairway2 = TestUtil.setupStairway("recoveryUndoSwitchTest", true);
+    Stairway stairway2 = new TestStairwayBuilder().name(stairwayName).continuing(true).build();
 
     // Wait for recovery to complete
     stairway2.waitForFlight(flightId, 5, 10);
@@ -172,7 +170,8 @@ public class RecoveryTest {
 
   @Test
   public void stopStepResultTest() throws Exception {
-    Stairway stairway = TestUtil.setupStairway("stopStepResult", false);
+    // Use the implementation class so we can call recovery
+    StairwayImpl stairway = (StairwayImpl) new TestStairwayBuilder().name("stopStepResult").build();
 
     FlightMap inputs = new FlightMap();
     Integer initialValue = 10;
