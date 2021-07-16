@@ -8,8 +8,10 @@ import java.io.File;
 import java.io.FileWriter;
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
+import java.time.Duration;
 import java.util.Arrays;
 import java.util.Comparator;
+import java.util.concurrent.TimeUnit;
 import org.apache.commons.io.FileUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -30,6 +32,12 @@ import org.slf4j.LoggerFactory;
 public class FileQueue implements QueueInterface {
   private static final Logger logger = LoggerFactory.getLogger(QueueInterface.class);
 
+  /** Time to wait between polling the directory for new message files */
+  private static final Duration DIRECTORY_POLL_WAIT = Duration.ofSeconds(2);
+
+  /** Number of times to poll before giving up */
+  private static final int DIRECTORY_POLL_COUNT = 5;
+
   private final File queueDir;
 
   public FileQueue(File queueDir) {
@@ -40,9 +48,9 @@ public class FileQueue implements QueueInterface {
   public void dispatchMessages(Object dispatchContext, int maxMessages,
       QueueProcessFunction processFunction) throws InterruptedException {
 
-    File[] files = queueDir.listFiles();
+    File[] files = waitForFiles();
     if (files == null) {
-      // empty dir, nothing to do
+      // We didn't find any files after trying for awhile
       return;
     }
     Arrays.sort(files, Comparator.comparingLong(File::lastModified));
@@ -62,6 +70,18 @@ public class FileQueue implements QueueInterface {
         logger.info("Failure handling read message file " + msgFile.getPath(), e);
       }
     }
+  }
+
+  private File[] waitForFiles() throws InterruptedException {
+    for (int i = 0; i < DIRECTORY_POLL_COUNT; i++) {
+      File[] files = queueDir.listFiles();
+      if (files == null || files.length == 0) {
+        TimeUnit.SECONDS.sleep(DIRECTORY_POLL_WAIT.toSeconds());
+      } else {
+        return files;
+      }
+    }
+    return null;
   }
 
   @Override

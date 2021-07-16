@@ -9,13 +9,13 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 public class SleepQueueThread implements Runnable {
-  private Logger logger = LoggerFactory.getLogger(SleepQueueThread.class);
+  private static final Logger logger = LoggerFactory.getLogger(SleepQueueThread.class);
+  private static final Integer SLEEP_SECONDS = 5;
+  private static final Integer FLIGHTS_TO_LAUNCH = 10;
 
-  private boolean shutdownAfter;
-  private Stairway stairway;
-  private Integer sleepSeconds = 5;
-  private Integer flightsToLaunch = 10;
-  private List<String> flightIdList;
+  private final boolean shutdownAfter;
+  private final Stairway stairway;
+  private final List<String> flightIdList;
 
   public SleepQueueThread(Stairway stairway, boolean shutdownAfter) {
     this.shutdownAfter = shutdownAfter;
@@ -26,11 +26,11 @@ public class SleepQueueThread implements Runnable {
   @Override
   public void run() {
     try {
-      for (int i = 0; i < flightsToLaunch; i++) {
+      for (int i = 0; i < FLIGHTS_TO_LAUNCH; i++) {
         makeSleepFlight(stairway, stairway.getStairwayName() + "-flight-" + i);
       }
       if (shutdownAfter) {
-        TimeUnit.SECONDS.sleep(sleepSeconds);
+        TimeUnit.SECONDS.sleep(SLEEP_SECONDS);
         logger.info("Stairway " + stairway.getStairwayName() + " quieting down");
         stairway.quietDown(5, TimeUnit.SECONDS);
       }

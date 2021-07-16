@@ -5,7 +5,6 @@ import bio.terra.stairway.ExceptionSerializer;
 import bio.terra.stairway.Flight;
 import bio.terra.stairway.FlightContext;
 import bio.terra.stairway.FlightDebugInfo;
-import bio.terra.stairway.FlightFactory;
 import bio.terra.stairway.FlightFilter;
 import bio.terra.stairway.FlightMap;
 import bio.terra.stairway.FlightState;
@@ -55,7 +54,6 @@ public class StairwayImpl implements Stairway {
   private final int maxQueuedFlights;
   private final WorkQueueManager queueManager;
   private final HookWrapper hookWrapper;
-  private final FlightFactory flightFactory;
   private final Duration retentionCheckInterval;
   private final Duration completedFlightRetention;
   private final AtomicBoolean quietingDown;
@@ -67,6 +65,8 @@ public class StairwayImpl implements Stairway {
   private FlightDao flightDao;
   private ScheduledExecutorService scheduledPool;
   private Control control;
+  private FlightFactory flightFactory;
+  private FlightSupportImpl flightSupport;
 
   /**
    * We do initialization in three steps. The constructor does the first step of constructing the
@@ -107,11 +107,6 @@ public class StairwayImpl implements Stairway {
         (builder.getStairwayName() == null)
             ? "stairway" + UUID.randomUUID().toString()
             : builder.getStairwayName();
-
-    this.flightFactory =
-        (builder.getFlightFactory() == null)
-            ? new StairwayFlightFactory()
-            : builder.getFlightFactory();
 
     this.queueManager = new WorkQueueManager(this, builder.getWorkQueue());
 
@@ -154,6 +149,8 @@ public class StairwayImpl implements Stairway {
         new FlightDao(
             dataSource, stairwayInstanceDao, exceptionSerializer, hookWrapper, stairwayId);
     control = new ControlImpl(dataSource, flightDao, stairwayInstanceDao);
+    flightSupport = new FlightSupportImpl(this);
+    flightFactory = new FlightFactory();
 
     if (forceCleanStart) {
       // Drop all tables and recreate the database
@@ -326,7 +323,8 @@ public class StairwayImpl implements Stairway {
           "Must supply non-null flightClass and inputParameters to submit");
     }
     Flight flight =
-        flightFactory.makeFlight(flightClass, inputParameters, applicationContext, debugInfo);
+        flightFactory.makeFlight(
+            flightClass, inputParameters, applicationContext, debugInfo, flightSupport);
     FlightContext context = flight.context();
     context.setFlightId(flightId);
 
@@ -435,7 +433,8 @@ public class StairwayImpl implements Stairway {
             flightContext.getFlightClassName(),
             flightContext.getInputParameters(),
             applicationContext,
-            flightContext.getDebugInfo());
+            flightContext.getDebugInfo(),
+            flightSupport);
     flightContext.setStairway(this);
     flight.setFlightContext(flightContext);
     launchFlight(flight);

@@ -8,8 +8,10 @@ import bio.terra.stairway.fixtures.TestUtil;
 import bio.terra.stairway.flights.TestFlight;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
 
+@Tag("unit")
 public class StairwayClassTest {
   private Stairway stairway;
 

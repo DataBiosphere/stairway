@@ -19,28 +19,26 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 /**
- * FlightMapAccess derives from FlightMap to give us the access to the map we need for
- * alternate construction methods, checks and whatnot.
+ * FlightMapUtils provides methods to create a flight map from data pulled from the database
+ * and format data from flight map to be stored in the database
  */
-public class FlightMapAccess extends FlightMap {
-  FlightMapAccess() {}
-
+public class FlightMapUtils {
   /**
-   * Alternate constructor, used by the DAO to re-create FlightMap from its serialized form.
-   * Not intended for client use.
+   * Create a flight map from an input list
    *
    * @param inputList input list form of the input parameters
    */
-  FlightMapAccess(List<FlightInput> inputList) {
-    super.map = new HashMap<>();
+  static FlightMap makeFlightMap(List<FlightInput> inputList) {
+    Map<String, Object> map = new HashMap<>();
     for (FlightInput input : inputList) {
       try {
         Object value = getObjectMapper().readValue(input.getValue(), Object.class);
-        super.map.put(input.getKey(), value);
+        map.put(input.getKey(), value);
       } catch (IOException ex) {
         throw new JsonConversionException("Failed to convert json string to object", ex);
       }
     }
+    return new FlightMap(map);
   }
 
   /**
@@ -49,7 +47,8 @@ public class FlightMapAccess extends FlightMap {
    *
    * @return list of FlightInput
    */
-  List<FlightInput> makeFlightInputList() {
+  static List<FlightInput> makeFlightInputList(FlightMap flightMap) {
+    Map<String, Object> map = flightMap.getMap();
     ArrayList<FlightInput> inputList = new ArrayList<>();
     for (Map.Entry<String, Object> entry : map.entrySet()) {
       try {
@@ -72,7 +71,7 @@ public class FlightMapAccess extends FlightMap {
    *     pre-existed flightworking table, or there are no working parameters.
    * @param json Map of working entries for a given Flight log in JSON. May be NULL.
    */
-  static Optional<FlightMapAccess> create(List<FlightInput> inputList, @Nullable String json) {
+  static Optional<FlightMap> create(List<FlightInput> inputList, @Nullable String json) {
 
     // Note that currently if this is NULL, it indicates that the output_parameters field of the
     // flight table was empty.  Going forward (PF-703) we will expect NULL json to be the normal
@@ -84,13 +83,12 @@ public class FlightMapAccess extends FlightMap {
     // TODO(PF-703): Once we stop writing JSON, we may still have JSON-only flight data in the
     // database, as well as flights with both. At that point we should favor inputList over json.
 
-    FlightMapAccess map = new FlightMapAccess();
-    map.fromJson(json);
+    FlightMap map = fromJson(json);
 
     // TODO(PF-703): Remove this block.
     if (!inputList.isEmpty()) {
       try {
-        map.validateAgainst(inputList);
+        validateAgainst(map, inputList);
       } catch (Exception ex) {
         Logger logger = LoggerFactory.getLogger("FlightMap");
         logger.error("Input list does not match JSON: {}", ex.getMessage());
@@ -112,8 +110,8 @@ public class FlightMapAccess extends FlightMap {
    * @param inputList
    */
   @VisibleForTesting
-  void validateAgainst(List<FlightInput> inputList) throws Exception {
-
+  static void validateAgainst(FlightMap flightMap, List<FlightInput> inputList) throws Exception {
+    Map<String, Object> map = flightMap.getMap();
     if (inputList.size() != map.size())
       throw new RuntimeException(
           String.format(
@@ -132,7 +130,8 @@ public class FlightMapAccess extends FlightMap {
   }
 
   @Deprecated
-  public String toJson() {
+  static String toJson(FlightMap flightMap) {
+    Map<String, Object> map = flightMap.getMap();
     try {
       return getObjectMapper().writeValueAsString(map);
     } catch (JsonProcessingException ex) {
@@ -140,9 +139,10 @@ public class FlightMapAccess extends FlightMap {
     }
   }
 
-  public void fromJson(String json) {
+  static FlightMap fromJson(String json) {
     try {
-      map = getObjectMapper().readValue(json, new TypeReference<Map<String, Object>>() {});
+      Map<String, Object> map = getObjectMapper().readValue(json, new TypeReference<Map<String, Object>>() {});
+      return new FlightMap(map);
     } catch (IOException ex) {
       throw new JsonConversionException("Failed to convert json string to map", ex);
     }

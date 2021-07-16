@@ -191,8 +191,7 @@ class FlightDao {
       // TODO(PF-703): Column working_parameters is being phased out in favor of table
       // flightworking.  We continue to write the working map here temporarily for backward
       // compatibility.
-      FlightMapAccess workingMap = (FlightMapAccess) flightContext.getWorkingMap();
-      statement.setString("workingMap", workingMap.toJson());
+      statement.setString("workingMap", FlightMapUtils.toJson(flightContext.getWorkingMap()));
 
       statement.setInt("stepIndex", flightContext.getStepIndex());
       statement.setBoolean("rerun", flightContext.isRerun());
@@ -446,8 +445,7 @@ class FlightDao {
 
       // TODO(PF-703): Column output_parameters is being phased out in favor of table flightworking.
       //  We continue to write the output map here temporarily for backward compatibility.
-      FlightMapAccess workingMap = (FlightMapAccess) flightContext.getWorkingMap();
-      statement.setString("outputParameters", workingMap.toJson());
+      statement.setString("outputParameters", FlightMapUtils.toJson(flightContext.getWorkingMap()));
       statement.setString("status", flightContext.getFlightStatus().name());
       statement.setString("serializedException", serializedException);
       statement.setString("flightId", flightContext.getFlightId());
@@ -689,7 +687,7 @@ class FlightDao {
   private FlightContext makeFlightContext(Connection connection, String flightId, ResultSet rs)
       throws InterruptedException, DatabaseOperationException, SQLException {
     List<FlightInput> inputList = retrieveInputParameters(connection, flightId);
-    FlightMapAccess inputParameters = new FlightMapAccess(inputList);
+    FlightMap inputParameters = FlightMapUtils.makeFlightMap(inputList);
     FlightDebugInfo debugInfo = null;
     try {
       debugInfo =
@@ -771,7 +769,7 @@ class FlightDao {
 
             // If we built a working map from the data, replace the flight context's default working
             // map with it.
-            FlightMapAccess.create(workingList, workingMapJson)
+            FlightMapUtils.create(workingList, workingMapJson)
                 .ifPresent(flightContext::setWorkingMap);
           }
         }
@@ -887,23 +885,24 @@ class FlightDao {
       throws StairwayException, DatabaseOperationException, InterruptedException {
 
     // Make an empty filter if one is not provided
-    FlightFilterAccess filter =
-        (inFilter != null) ? (FlightFilterAccess) inFilter : new FlightFilterAccess();
+    FlightFilter filter =
+        (inFilter != null) ? inFilter : new FlightFilter();
 
     return DbRetry.retry("flight.getFlights", () -> getFlightsInner(offset, limit, filter));
   }
 
-  private List<FlightState> getFlightsInner(int offset, int limit, FlightFilterAccess filter)
+  private List<FlightState> getFlightsInner(int offset, int limit, FlightFilter filter)
       throws SQLException, StairwayException {
+    var access = new FlightFilterAccess(filter);
 
-    String sql = filter.makeSql();
+    String sql = access.makeSql();
 
     try (Connection connection = dataSource.getConnection();
         NamedParameterPreparedStatement flightRangeStatement =
             new NamedParameterPreparedStatement(connection, sql)) {
       startReadOnlyTransaction(connection);
 
-      filter.storePredicateValues(flightRangeStatement);
+      access.storePredicateValues(flightRangeStatement);
 
       flightRangeStatement.setInt("limit", limit);
       flightRangeStatement.setInt("offset", offset);
@@ -934,7 +933,7 @@ class FlightDao {
       flightState.setSubmitted(rs.getTimestamp("submit_time").toInstant());
       flightState.setStairwayId(rs.getString("stairway_id"));
       List<FlightInput> flightInput = retrieveInputParameters(connection, flightId);
-      flightState.setInputParameters(new FlightMapAccess(flightInput));
+      flightState.setInputParameters(FlightMapUtils.makeFlightMap(flightInput));
 
       // If the flight is in one of the complete states, then we retrieve the completion data
       if (flightState.getFlightStatus() == FlightStatus.SUCCESS
@@ -952,7 +951,7 @@ class FlightDao {
         final List<FlightInput> workingList = retrieveLatestWorkingParameters(connection, flightId);
 
         // If we were able to build a map from the data, use it to set the result map.
-        FlightMapAccess.create(workingList, outputParamsJson).ifPresent(flightState::setResultMap);
+        FlightMapUtils.create(workingList, outputParamsJson).ifPresent(flightState::setResultMap);
       }
 
       flightStateList.add(flightState);
@@ -963,8 +962,7 @@ class FlightDao {
 
   private void storeInputParameters(
       Connection connection, String flightId, FlightMap inputParameters) throws SQLException {
-    FlightMapAccess mapAccess = (FlightMapAccess) inputParameters;
-    List<FlightInput> inputList = mapAccess.makeFlightInputList();
+    List<FlightInput> inputList = FlightMapUtils.makeFlightInputList(inputParameters);
 
     final String sqlInsertInput =
         "INSERT INTO "
@@ -986,8 +984,7 @@ class FlightDao {
 
   private void storeWorkingParameters(
       Connection connection, UUID logId, FlightMap workingParameters) throws SQLException {
-    FlightMapAccess mapAccess = (FlightMapAccess) workingParameters;
-    List<FlightInput> inputList = mapAccess.makeFlightInputList();
+    List<FlightInput> inputList = FlightMapUtils.makeFlightInputList(workingParameters);
 
     final String sqlInsertInput =
         "INSERT INTO "

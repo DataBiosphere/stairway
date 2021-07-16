@@ -1,25 +1,22 @@
 package bio.terra.stairway.impl;
 
 import bio.terra.stairway.FlightFilter;
+import bio.terra.stairway.FlightFilter.FlightFilterPredicate;
 import bio.terra.stairway.exception.FlightFilterException;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import java.sql.SQLException;
 import java.time.Instant;
-import java.util.List;
 import org.apache.commons.lang3.StringUtils;
 
 /**
  * A FlightFilterAccess is used to access FlightFilter members for generating
  * the SQL queries applying the predicates.
  */
-public class FlightFilterAccess extends FlightFilter {
+public class FlightFilterAccess {
+  private final FlightFilter filter;
 
-  List<FlightFilterPredicate> getFlightPredicates() {
-    return flightPredicates;
-  }
-
-  List<FlightFilterPredicate> getInputPredicates() {
-    return inputPredicates;
+  public FlightFilterAccess(FlightFilter filter) {
+    this.filter = filter;
   }
 
   /**
@@ -31,10 +28,10 @@ public class FlightFilterAccess extends FlightFilter {
   void storePredicateValues(NamedParameterPreparedStatement statement)
       throws FlightFilterException {
     try {
-      for (FlightFilterPredicate predicate : flightPredicates) {
+      for (FlightFilterPredicate predicate : filter.getFlightPredicates()) {
         storeFlightPredicateValue(predicate, statement);
       }
-      for (FlightFilterPredicate predicate : inputPredicates) {
+      for (FlightFilterPredicate predicate : filter.getInputPredicates()) {
         storeInputPredicateValue(predicate, statement);
       }
     } catch (SQLException | JsonProcessingException ex) {
@@ -99,7 +96,7 @@ public class FlightFilterAccess extends FlightFilter {
         .append(" FROM ");
 
     // Decide which form of the query to build.
-    switch (inputPredicates.size()) {
+    switch (filter.getInputPredicates().size()) {
       case 0:
         makeSqlForm1(sb);
         break;
@@ -127,7 +124,7 @@ public class FlightFilterAccess extends FlightFilter {
         .append(" F INNER JOIN ")
         .append(FlightDao.FLIGHT_INPUT_TABLE)
         .append(" I ON F.flightid = I.flightid WHERE ")
-        .append(makeInputPredicateSql(inputPredicates.get(0)));
+        .append(makeInputPredicateSql(filter.getInputPredicates().get(0)));
     makeFlightFilter(sb, " AND ");
   }
 
@@ -141,7 +138,7 @@ public class FlightFilterAccess extends FlightFilter {
     makeInputFilter(sb);
     sb.append(" GROUP BY I.flightid) INPUT ON F.flightid = INPUT.flightid")
         .append(" WHERE INPUT.matchCount = ")
-        .append(inputPredicates.size());
+        .append(filter.getInputPredicates().size());
     makeFlightFilter(sb, " AND ");
   }
 
@@ -150,11 +147,11 @@ public class FlightFilterAccess extends FlightFilter {
    * as a named parameter.
    */
   private void makeFlightFilter(StringBuilder sb, String prefix) {
-    if (flightPredicates.size() > 0) {
+    if (filter.getFlightPredicates().size() > 0) {
       sb.append(prefix);
       String inter = StringUtils.EMPTY;
 
-      for (FlightFilterPredicate predicate : flightPredicates) {
+      for (FlightFilterPredicate predicate : filter.getFlightPredicates()) {
         String sql = makeFlightPredicateSql(predicate);
         sb.append(inter).append(sql);
         inter = " AND ";
@@ -169,7 +166,7 @@ public class FlightFilterAccess extends FlightFilter {
   private void makeInputFilter(StringBuilder sb) {
     String inter = StringUtils.EMPTY;
 
-    for (FlightFilterPredicate predicate : inputPredicates) {
+    for (FlightFilterPredicate predicate : filter.getInputPredicates()) {
       String sql = makeInputPredicateSql(predicate);
       sb.append(inter).append(sql);
       inter = " OR ";

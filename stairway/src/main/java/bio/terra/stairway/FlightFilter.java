@@ -23,14 +23,22 @@ import java.util.List;
  * parameter.
  */
 public class FlightFilter {
-  protected final List<FlightFilterPredicate> flightPredicates;
-  protected final List<FlightFilterPredicate> inputPredicates;
-  protected int parameterId;
+  private final List<FlightFilterPredicate> flightPredicates;
+  private final List<FlightFilterPredicate> inputPredicates;
+  private int parameterId;
 
   public FlightFilter() {
     flightPredicates = new ArrayList<>();
     inputPredicates = new ArrayList<>();
     parameterId = 0;
+  }
+
+  public List<FlightFilterPredicate> getFlightPredicates() {
+    return flightPredicates;
+  }
+
+  public List<FlightFilterPredicate> getInputPredicates() {
+    return inputPredicates;
   }
 
   /**

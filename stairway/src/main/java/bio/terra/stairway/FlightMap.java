@@ -11,10 +11,29 @@ import java.util.stream.Collectors;
  * immutable.
  */
 public class FlightMap {
-  protected Map<String, Object> map;
+  private Map<String, Object> map;
 
+  /**
+   * Construct an empty flight map
+   */
   public FlightMap() {
     map = new HashMap<>();
+  }
+
+  /**
+   * This constructor is used when Stairway re-creates the flight map from the
+   * database. It is not intended for client use.
+   */
+  public FlightMap(Map<String, Object> map) {
+    this.map = map;
+  }
+
+  /**
+   * Accessor for the contained map. Used for storing the map into the database.
+   * It is not intended for client use.
+   */
+  public Map<String, Object> getMap() {
+    return map;
   }
 
   /** Convert the map to an unmodifiable form. */

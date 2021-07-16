@@ -2,30 +2,30 @@ package bio.terra.stairway.impl;
 
 import bio.terra.stairway.Flight;
 import bio.terra.stairway.FlightDebugInfo;
-import bio.terra.stairway.FlightFactory;
 import bio.terra.stairway.FlightMap;
+import bio.terra.stairway.FlightSupport;
 import bio.terra.stairway.exception.MakeFlightException;
 import java.lang.reflect.Constructor;
 import java.lang.reflect.InvocationTargetException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-// Default flight factory for Stairway
-public class StairwayFlightFactory implements FlightFactory {
-  Logger logger = LoggerFactory.getLogger(StairwayFlightFactory.class);
+public class FlightFactory {
+  private static final Logger logger = LoggerFactory.getLogger(FlightFactory.class);
 
-  @Override
   public Flight makeFlight(
       Class<? extends Flight> flightClass,
       FlightMap inputParameters,
       Object context,
-      FlightDebugInfo debugInfo) {
+      FlightDebugInfo debugInfo,
+      FlightSupport flightSupport) {
     try {
       // Find the flightClass constructor that takes the input parameter map and
       // use it to make the flight.
       Constructor constructor = flightClass.getConstructor(FlightMap.class, Object.class);
       Flight flight = (Flight) constructor.newInstance(inputParameters, context);
       flight.setDebugInfo(debugInfo);
+      flight.setFlightSupport(flightSupport);
       return flight;
     } catch (InvocationTargetException
         | NoSuchMethodException
@@ -35,14 +35,17 @@ public class StairwayFlightFactory implements FlightFactory {
     }
   }
 
-  @Override
   public Flight makeFlightFromName(
-      String className, FlightMap inputMap, Object context, FlightDebugInfo debugInfo) {
+      String className,
+      FlightMap inputMap,
+      Object context,
+      FlightDebugInfo debugInfo,
+      FlightSupport flightSupport) {
     try {
       Class<?> someClass = Class.forName(className);
       if (Flight.class.isAssignableFrom(someClass)) {
         Class<? extends Flight> flightClass = (Class<? extends Flight>) someClass;
-        return makeFlight(flightClass, inputMap, context, debugInfo);
+        return makeFlight(flightClass, inputMap, context, debugInfo, flightSupport);
       }
       // Error case
       throw new MakeFlightException(

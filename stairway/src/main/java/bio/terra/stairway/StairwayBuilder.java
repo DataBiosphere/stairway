@@ -24,7 +24,6 @@ public class StairwayBuilder {
   private Object applicationContext;
   private ExceptionSerializer exceptionSerializer;
   private String stairwayName;
-  private FlightFactory flightFactory;
   private QueueInterface workQueue;
   private Duration retentionCheckInterval;
   private Duration completedFlightRetention;
@@ -123,24 +122,6 @@ public class StairwayBuilder {
 
   public QueueInterface getWorkQueue() {
     return workQueue;
-  }
-
-  /**
-   * Flight factory Stairway Flight objects need to be created by class and by name. In all known
-   * configurations, Stairway's flight factory can be used. This is an escape hatch in case we run
-   * into a configuration that requires special handling for flight creates. Specifying the class
-   * loader is simpler and covers the known cases.
-   *
-   * @param flightFactory flight factory to use
-   * @return this
-   */
-  public StairwayBuilder flightFactory(FlightFactory flightFactory) {
-    this.flightFactory = flightFactory;
-    return this;
-  }
-
-  public FlightFactory getFlightFactory() {
-    return flightFactory;
   }
 
   /**
