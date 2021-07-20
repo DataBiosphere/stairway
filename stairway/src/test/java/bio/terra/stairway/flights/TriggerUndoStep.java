@@ -11,7 +11,8 @@ class TriggerUndoStep implements Step {
   @Override
   public StepResult doStep(FlightContext context) {
     return new StepResult(
-        StepStatus.STEP_RESULT_FAILURE_FATAL, new StairwayExecutionException("TestTriggerUndoStep"));
+        StepStatus.STEP_RESULT_FAILURE_FATAL,
+        new StairwayExecutionException("TestTriggerUndoStep"));
   }
 
   @Override

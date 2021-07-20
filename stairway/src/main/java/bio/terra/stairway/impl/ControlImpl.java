@@ -17,8 +17,8 @@ import javax.sql.DataSource;
  * This class provides an API for out-of-band debugging and recovering Stairway flights. It caters
  * to the use cases of the stairctl tool. The methods are constrained to only access the database,
  * and do not rely on any application-specific state. We current do not use the FlightDao for the
- * database accesses. We may be able to do so once FlightDao stops doing deserialization, so
- * we take a reference to the flightDao even though it is unused.
+ * database accesses. We may be able to do so once FlightDao stops doing deserialization, so we take
+ * a reference to the flightDao even though it is unused.
  */
 @SuppressFBWarnings(
     value = "RCN_REDUNDANT_NULLCHECK_WOULD_HAVE_BEEN_A_NPE",
@@ -28,10 +28,7 @@ public class ControlImpl implements Control {
   private final FlightDao flightDao;
   private final StairwayInstanceDao stairwayInstanceDao;
 
-  ControlImpl(
-      DataSource dataSource,
-      FlightDao flightDao,
-      StairwayInstanceDao stairwayInstanceDao) {
+  ControlImpl(DataSource dataSource, FlightDao flightDao, StairwayInstanceDao stairwayInstanceDao) {
     this.dataSource = dataSource;
     this.flightDao = flightDao;
     this.stairwayInstanceDao = stairwayInstanceDao;
@@ -149,8 +146,7 @@ public class ControlImpl implements Control {
   // We cannot use the regular disown code path, because it will only transition
   // from RUNNING --> READY. We want to force a transition from other states.
   // For example, restarting a dismal failure due to retry exhaustion.
-  public Flight forceReady(String flightId)
-      throws SQLException {
+  public Flight forceReady(String flightId) throws SQLException {
 
     final String sql =
         "UPDATE flight SET status = 'READY', stairway_id = NULL WHERE flightid = :flightid";
@@ -230,8 +226,8 @@ public class ControlImpl implements Control {
     }
   }
 
-  private List<Flight> flightQuery(
-      NamedParameterPreparedStatement statement, int offset, int limit) throws SQLException {
+  private List<Flight> flightQuery(NamedParameterPreparedStatement statement, int offset, int limit)
+      throws SQLException {
 
     statement.setInt("offset", offset);
     statement.setInt("limit", limit);
@@ -291,5 +287,4 @@ public class ControlImpl implements Control {
   public List<String> listStairways() throws Exception {
     return stairwayInstanceDao.getList();
   }
-
 }

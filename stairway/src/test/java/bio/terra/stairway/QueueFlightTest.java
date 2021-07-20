@@ -2,7 +2,6 @@ package bio.terra.stairway;
 
 import static org.hamcrest.CoreMatchers.equalTo;
 import static org.hamcrest.MatcherAssert.assertThat;
-import static org.junit.jupiter.api.Assertions.assertNotNull;
 
 import bio.terra.stairway.fixtures.FileQueue;
 import bio.terra.stairway.fixtures.MapKey;
@@ -21,7 +20,7 @@ import org.junit.jupiter.api.Test;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-@Tag("connected")
+@Tag("unit")
 public class QueueFlightTest {
   private static final int QUEUE_SETTLE_SECONDS = 3;
   private final Logger logger = LoggerFactory.getLogger(QueueFlightTest.class);
@@ -39,11 +38,12 @@ public class QueueFlightTest {
   @Test
   public void queueFlightTest() throws Exception {
     // Submit directly to queue and make sure we end up in the right state
-    stairway = new TestStairwayBuilder()
-        .name("queueFlightTest")
-        .testHookCount(3)
-        .useQueue(UseQueue.MAKE_QUEUE)
-        .build();
+    stairway =
+        new TestStairwayBuilder()
+            .name("queueFlightTest")
+            .testHookCount(3)
+            .useQueue(UseQueue.MAKE_QUEUE)
+            .build();
 
     FlightMap inputs = new FlightMap();
     int controlValue = 1;
@@ -105,12 +105,6 @@ public class QueueFlightTest {
 
   @Test
   public void admissionControlTest() throws Exception {
-    // We create a one thread work queue with 0 tolerance for queued flights.
-    // Put one flight in that pauses.
-    // Put another flight in. It should arrive in the QUEUED state
-    String projectId = TestUtil.getEnvVar("GOOGLE_CLOUD_PROJECT", null);
-    assertNotNull(projectId);
-
     QueueInterface workQueue = FileQueue.makeFileQueue("admissionControl");
 
     DataSource dataSource = TestUtil.makeDataSource();
@@ -193,11 +187,11 @@ public class QueueFlightTest {
 
   @Test
   public void supplyQueueTest() throws Exception {
-    String projectId = TestUtil.getEnvVar("GOOGLE_CLOUD_PROJECT", null);
     DataSource dataSource = TestUtil.makeDataSource();
     QueueInterface workQueue = FileQueue.makeFileQueue("supplyQueue");
 
-    stairway = new StairwayBuilder()
+    stairway =
+        new StairwayBuilder()
             .stairwayName("admissionControlTest")
             .workQueue(workQueue)
             .maxParallelFlights(1)

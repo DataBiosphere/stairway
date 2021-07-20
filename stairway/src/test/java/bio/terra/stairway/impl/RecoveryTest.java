@@ -71,19 +71,13 @@ public class RecoveryTest {
 
     // Allow time for the flight thread to go to sleep
     TimeUnit.SECONDS.sleep(5);
-
     assertThat(TestUtil.isDone(stairway1, flightId), is(equalTo(false)));
 
     // Simulate a restart with a new thread pool and stairway. Set control so this one does not
-    // sleep. We create the new stairway directly, rather than use TestUtil so we can validate the
-    // process. We reuse the stairway name to make sure that replacement by the same name works.
+    // sleep. We reuse the stairway name to make sure that replacement by the same name works.
     TestPauseController.setControl(1);
     Stairway stairway2 =
-        new TestStairwayBuilder()
-            .name(stairwayName)
-            .continuing(true)
-            .doRecoveryCheck(true)
-            .build();
+        new TestStairwayBuilder().name(stairwayName).continuing(true).doRecoveryCheck(true).build();
 
     // Wait for recovery to complete
     stairway2.waitForFlight(flightId, null, null);

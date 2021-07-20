@@ -35,7 +35,8 @@ abstract class QueueMessage {
     }
   }
 
-  static Boolean processMessage(String message, Object dispatchContext) throws InterruptedException {
+  static Boolean processMessage(String message, Object dispatchContext)
+      throws InterruptedException {
     QueueMessage qm = deserialize(message);
     if (qm == null) {
       return false;

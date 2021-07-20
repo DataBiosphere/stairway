@@ -65,7 +65,8 @@ public class FlightSupportImpl implements FlightSupport {
   }
 
   public void exitFlight(FlightContext flightContext)
-      throws InterruptedException, DatabaseOperationException, StairwayExecutionException, StairwayException {
+      throws InterruptedException, DatabaseOperationException, StairwayExecutionException,
+          StairwayException {
     stairwayImpl.exitFlight(flightContext);
   }
 

@@ -17,8 +17,8 @@ import org.slf4j.LoggerFactory;
 /**
  * Manage the atomic execution of a series of Steps
  *
- * This base class has the mechanisms for executing the series of steps, retrying, maintaining state
- * in a database,
+ * <p>This base class has the mechanisms for executing the series of steps, retrying, maintaining
+ * state in a database,
  *
  * <p>In order for the flight to be re-created on recovery, the construction and configuration have
  * to result in the same flight given the same input.
@@ -195,8 +195,7 @@ public class Flight implements Runnable {
    * @throws InterruptedException on thread pool shutdown
    * @throws StairwayException some stairway exception
    */
-  private StepResult runSteps()
-      throws InterruptedException, StairwayException {
+  private StepResult runSteps() throws InterruptedException, StairwayException {
     // Initialize with current result, in case we are all done already
     StepResult result = context().getResult();
 
@@ -328,7 +327,6 @@ public class Flight implements Runnable {
     return result;
   }
 
-
   private StepRetry getCurrentStep() throws StairwayExecutionException {
     int stepIndex = context().getStepIndex();
     if (stepIndex < 0 || stepIndex >= steps.size()) {
@@ -348,5 +346,4 @@ public class Flight implements Runnable {
         .append("applicationContext", applicationContext)
         .toString();
   }
-
 }

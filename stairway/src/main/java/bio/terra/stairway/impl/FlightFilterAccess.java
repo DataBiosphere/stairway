@@ -9,8 +9,8 @@ import java.time.Instant;
 import org.apache.commons.lang3.StringUtils;
 
 /**
- * A FlightFilterAccess is used to access FlightFilter members for generating
- * the SQL queries applying the predicates.
+ * A FlightFilterAccess is used to access FlightFilter members for generating the SQL queries
+ * applying the predicates.
  */
 public class FlightFilterAccess {
   private final FlightFilter filter;
@@ -181,7 +181,11 @@ public class FlightFilterAccess {
    * @return the SQL predicate
    */
   String makeFlightPredicateSql(FlightFilterPredicate predicate) {
-    return "F." + predicate.getKey() + predicate.getOp().getSql() + ":" + predicate.getParameterName();
+    return "F."
+        + predicate.getKey()
+        + predicate.getOp().getSql()
+        + ":"
+        + predicate.getParameterName();
   }
 
   /**
@@ -190,7 +194,9 @@ public class FlightFilterAccess {
    * @param statement statement being readied for execution
    * @throws SQLException on errors setting the parameter values
    */
-  void storeFlightPredicateValue(FlightFilterPredicate predicate, NamedParameterPreparedStatement statement) throws SQLException {
+  void storeFlightPredicateValue(
+      FlightFilterPredicate predicate, NamedParameterPreparedStatement statement)
+      throws SQLException {
     switch (predicate.getDatatype()) {
       case STRING:
         statement.setString(predicate.getParameterName(), (String) predicate.getValue());
@@ -208,13 +214,19 @@ public class FlightFilterAccess {
    * @return the SQL predicate
    */
   String makeInputPredicateSql(FlightFilterPredicate predicate) {
-    return "(I.key = '" + predicate.getKey() + "' AND I.value" + predicate.getOp().getSql() + ":" + predicate.getParameterName() + ")";
+    return "(I.key = '"
+        + predicate.getKey()
+        + "' AND I.value"
+        + predicate.getOp().getSql()
+        + ":"
+        + predicate.getParameterName()
+        + ")";
   }
 
-  void storeInputPredicateValue(FlightFilterPredicate predicate, NamedParameterPreparedStatement statement)
+  void storeInputPredicateValue(
+      FlightFilterPredicate predicate, NamedParameterPreparedStatement statement)
       throws SQLException, JsonProcessingException {
     String jsonValue = StairwayMapper.getObjectMapper().writeValueAsString(predicate.getValue());
     statement.setString(predicate.getParameterName(), jsonValue);
   }
-
 }

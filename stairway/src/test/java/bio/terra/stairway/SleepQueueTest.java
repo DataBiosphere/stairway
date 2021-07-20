@@ -20,16 +20,10 @@ public class SleepQueueTest {
   public void clusterSuccessTest() throws Exception {
     QueueInterface workQueue = FileQueue.makeFileQueue("clusterSuccessTest");
 
-    Stairway stairway1 = new TestStairwayBuilder()
-        .name("stairway1")
-        .workQueue(workQueue)
-        .build();
+    Stairway stairway1 = new TestStairwayBuilder().name("stairway1").workQueue(workQueue).build();
 
-    Stairway stairway2 = new TestStairwayBuilder()
-        .name("stairway2")
-        .workQueue(workQueue)
-        .continuing(true)
-        .build();
+    Stairway stairway2 =
+        new TestStairwayBuilder().name("stairway2").workQueue(workQueue).continuing(true).build();
 
     SleepQueueThread sqt1 = new SleepQueueThread(stairway1, true);
     SleepQueueThread sqt2 = new SleepQueueThread(stairway2, false);

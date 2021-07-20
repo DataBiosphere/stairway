@@ -15,15 +15,12 @@ import java.util.List;
 import java.util.Optional;
 import javax.sql.DataSource;
 
-/**
- * Builder class to create stairways for testing
- */
-
+/** Builder class to create stairways for testing */
 public class TestStairwayBuilder {
   public enum UseQueue {
-    NO_QUEUE,  // no queue for this stairway
+    NO_QUEUE, // no queue for this stairway
     MAKE_QUEUE, // create a new queue for this stairway; the queue name is random
-    USE_QUEUE   // use the provided queue for this stairway (implicit if a queue is provided)
+    USE_QUEUE // use the provided queue for this stairway (implicit if a queue is provided)
   }
 
   private String name;
@@ -41,8 +38,7 @@ public class TestStairwayBuilder {
   }
 
   /** Control how queuing is done. Defaults to NO_QUEUE. */
-  public TestStairwayBuilder useQueue(
-      UseQueue useQueue) {
+  public TestStairwayBuilder useQueue(UseQueue useQueue) {
     this.useQueue = useQueue;
     return this;
   }
@@ -66,10 +62,9 @@ public class TestStairwayBuilder {
   }
 
   /**
-   * The recovery check verifies that there is a single stairway name on the
-   * recovery list and it matches the incoming stairway name. This is to support
-   * shutdown and recovery testing.
-   * Defaults to false.
+   * The recovery check verifies that there is a single stairway name on the recovery list and it
+   * matches the incoming stairway name. This is to support shutdown and recovery testing. Defaults
+   * to false.
    */
   public TestStairwayBuilder doRecoveryCheck(boolean doRecoveryCheck) {
     this.doRecoveryCheck = doRecoveryCheck;
@@ -77,8 +72,8 @@ public class TestStairwayBuilder {
   }
 
   /**
-   * If doRecoveryCheck is true and this is specified, test that this flight
-   * is in the READY state prior to running recovery. Defaults to null;
+   * If doRecoveryCheck is true and this is specified, test that this flight is in the READY state
+   * prior to running recovery. Defaults to null;
    */
   public TestStairwayBuilder flightId(String flightId) {
     this.flightId = flightId;
@@ -108,24 +103,26 @@ public class TestStairwayBuilder {
         break;
     }
 
-    StairwayBuilder builder = new StairwayBuilder()
-        .stairwayName(buildName)
-        .maxParallelFlights(2)
-        .workQueue(buildWorkQueue);
+    StairwayBuilder builder =
+        new StairwayBuilder()
+            .stairwayName(buildName)
+            .maxParallelFlights(2)
+            .workQueue(buildWorkQueue);
 
-    // Add hooks if requested
     for (int i = 0; i < testHookCount; i++) {
       int hookId = i + 1;
       TestHook hook = new TestHook(String.valueOf(hookId));
       builder.stairwayHook(hook);
     }
-    TestHook.clearHookLog();
+    if (!continuing) {
+      // If we are continuing a test, then don't clear the hook log
+      TestHook.clearHookLog();
+    }
 
     Stairway stairway = builder.build();
 
     DataSource dataSource = makeDataSource();
-    List<String> recordedStairways =
-        stairway.initialize(dataSource, !continuing, !continuing);
+    List<String> recordedStairways = stairway.initialize(dataSource, !continuing, !continuing);
 
     // Validate the recordedStairways list
     if (!continuing) {

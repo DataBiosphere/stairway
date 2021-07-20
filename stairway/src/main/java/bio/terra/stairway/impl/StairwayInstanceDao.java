@@ -46,7 +46,8 @@ class StairwayInstanceDao {
    * @throws DatabaseOperationException on database errors
    * @throws InterruptedException on thread shutdown
    */
-  String findOrCreate(String stairwayName) throws StairwayException, DatabaseOperationException, InterruptedException {
+  String findOrCreate(String stairwayName)
+      throws StairwayException, DatabaseOperationException, InterruptedException {
     return DbRetry.retry("stairwayInstance.findOrCreate", () -> findOrCreateInner(stairwayName));
   }
 
@@ -91,7 +92,8 @@ class StairwayInstanceDao {
    * @throws DatabaseOperationException if the stairway instance was not found
    * @throws InterruptedException on thread shutdown
    */
-  String lookupId(String stairwayName) throws StairwayException, DatabaseOperationException, InterruptedException {
+  String lookupId(String stairwayName)
+      throws StairwayException, DatabaseOperationException, InterruptedException {
     return DbRetry.retry("stairwayInstance.lookupId", () -> lookupIdInner(stairwayName));
   }
 
@@ -118,7 +120,8 @@ class StairwayInstanceDao {
    * @throws DatabaseOperationException on SQL exception
    * @throws InterruptedException on thread shutdown
    */
-  List<String> getList() throws StairwayException, DatabaseOperationException, InterruptedException {
+  List<String> getList()
+      throws StairwayException, DatabaseOperationException, InterruptedException {
     return DbRetry.retry("stairwayInstance.getList", this::getListInner);
   }
 

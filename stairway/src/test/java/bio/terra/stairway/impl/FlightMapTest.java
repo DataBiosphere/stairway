@@ -149,7 +149,8 @@ public class FlightMapTest {
     Assertions.assertTrue(missingMap.isPresent());
     verifyMap(missingMap.get());
     Assertions.assertThrows(
-        RuntimeException.class, () -> FlightMapUtils.validateAgainst(missingMap.get(), missingList));
+        RuntimeException.class,
+        () -> FlightMapUtils.validateAgainst(missingMap.get(), missingList));
 
     // Bad key in list logs error, but still has good content
     List<FlightInput> badKeyList = new ArrayList<>(list);
@@ -160,7 +161,8 @@ public class FlightMapTest {
     Assertions.assertTrue(badListKeyMap.isPresent());
     verifyMap(badListKeyMap.get());
     Assertions.assertThrows(
-        RuntimeException.class, () -> FlightMapUtils.validateAgainst(badListKeyMap.get(), badKeyList));
+        RuntimeException.class,
+        () -> FlightMapUtils.validateAgainst(badListKeyMap.get(), badKeyList));
 
     // Bad value in list logs error, but still has good content
     List<FlightInput> badValueList = new ArrayList<>(list);
@@ -171,7 +173,8 @@ public class FlightMapTest {
     Assertions.assertTrue(badListValueMap.isPresent());
     verifyMap(badListValueMap.get());
     Assertions.assertThrows(
-        JsonProcessingException.class, () -> FlightMapUtils.validateAgainst(badListValueMap.get(), badValueList));
+        JsonProcessingException.class,
+        () -> FlightMapUtils.validateAgainst(badListValueMap.get(), badValueList));
   }
 
   @SuppressFBWarnings(
@@ -194,6 +197,7 @@ public class FlightMapTest {
     Assertions.assertThrows(ClassCastException.class, () -> map.get(badKey, FlightsTestPojo.class));
 
     // Deserializing map from bad JSON throws
-    Assertions.assertThrows(JsonConversionException.class, () -> FlightMapUtils.fromJson("garbage"));
+    Assertions.assertThrows(
+        JsonConversionException.class, () -> FlightMapUtils.fromJson("garbage"));
   }
 }

@@ -50,8 +50,8 @@ class DbRetry {
 
   /**
    * Retry a value-returning database function
-   * <p> SQLExceptions are caught and may cause retry or be converted into * some
-   * StairwayException.
+   *
+   * <p>SQLExceptions are caught and may cause retry or be converted into * some StairwayException.
    *
    * @param logString string used in error messages and log messages
    * @param function method to call and retry
@@ -68,8 +68,8 @@ class DbRetry {
 
   /**
    * Retry a void database function
-   * <p> SQLExceptions are caught and may cause retry or be converted into * some
-   * StairwayException.
+   *
+   * <p>SQLExceptions are caught and may cause retry or be converted into * some StairwayException.
    *
    * @param logString string used in error messages and log messages
    * @param function void method to call and retry
@@ -82,8 +82,7 @@ class DbRetry {
     dbRetry.performVoid(function);
   }
 
-  private <T> T perform(DbFunction<T> function)
-      throws StairwayException, InterruptedException {
+  private <T> T perform(DbFunction<T> function) throws StairwayException, InterruptedException {
     for (int retry = 0; retry < MAX_RETRIES; retry++) {
       try {
         return function.apply();
@@ -97,8 +96,7 @@ class DbRetry {
     throw new DatabaseOperationException("Retries exhausted. Request failed:" + logString);
   }
 
-  private void performVoid(DbVoidFunction function)
-      throws StairwayException, InterruptedException {
+  private void performVoid(DbVoidFunction function) throws StairwayException, InterruptedException {
     for (int retry = 0; retry < MAX_RETRIES; retry++) {
       try {
         function.apply();

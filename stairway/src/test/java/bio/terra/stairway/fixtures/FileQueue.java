@@ -17,17 +17,16 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 /**
- * This class implements the QueueInterface as a temp directory on the local file system.
- * It is only intended for testing.
+ * This class implements the QueueInterface as a temp directory on the local file system. It is only
+ * intended for testing.
  *
- * Enqueue is writing a file containing the message into the directory. The file is
- * named as a UUID.
+ * <p>Enqueue is writing a file containing the message into the directory. The file is named as a
+ * UUID.
  *
- * Dispatching messages is reading the directory, sorting by last modified time,
- * and picking out the oldest file. If the processing function accepts the file,
- * we delete it.
+ * <p>Dispatching messages is reading the directory, sorting by last modified time, and picking out
+ * the oldest file. If the processing function accepts the file, we delete it.
  *
- * Purging the queue is `rm -f *` more or less.
+ * <p>Purging the queue is `rm -f *` more or less.
  */
 public class FileQueue implements QueueInterface {
   private static final Logger logger = LoggerFactory.getLogger(QueueInterface.class);
@@ -45,8 +44,9 @@ public class FileQueue implements QueueInterface {
   }
 
   @Override
-  public void dispatchMessages(Object dispatchContext, int maxMessages,
-      QueueProcessFunction processFunction) throws InterruptedException {
+  public void dispatchMessages(
+      Object dispatchContext, int maxMessages, QueueProcessFunction processFunction)
+      throws InterruptedException {
 
     File[] files = waitForFiles();
     if (files == null) {
@@ -87,7 +87,7 @@ public class FileQueue implements QueueInterface {
   @Override
   public void enqueueMessage(String message) throws InterruptedException {
     File msgFile = new File(queueDir, "msg" + ShortUUID.get());
-    try (FileWriter writer = new FileWriter(msgFile)) {
+    try (FileWriter writer = new FileWriter(msgFile, StandardCharsets.UTF_8)) {
       writer.write(message);
     } catch (IOException e) {
       throw new StairwayExecutionException("enqueue error", e);

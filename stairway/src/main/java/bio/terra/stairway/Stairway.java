@@ -50,7 +50,7 @@ public interface Stairway {
    */
   List<String> initialize(DataSource dataSource, boolean forceCleanStart, boolean migrateUpgrade)
       throws StairwayShutdownException, DatabaseOperationException, MigrateException,
-      StairwayException, InterruptedException;
+          StairwayException, InterruptedException;
 
   /**
    * Third step of initialization
@@ -188,7 +188,8 @@ public interface Stairway {
    * @throws InterruptedException on shutdown while waiting for flight completion
    */
   FlightState waitForFlight(String flightId, Integer pollSeconds, Integer pollCycles)
-      throws StairwayException, DatabaseOperationException, FlightNotFoundException, FlightWaitTimedOutException, InterruptedException;
+      throws StairwayException, DatabaseOperationException, FlightNotFoundException,
+          FlightWaitTimedOutException, InterruptedException;
 
   /**
    * Try to resume a flight. If the flight is unowned and either in QUEUED, WAITING or READY state,
@@ -204,7 +205,9 @@ public interface Stairway {
    * @throws DatabaseOperationException failure during flight database operations
    * @throws InterruptedException on shutdown during resume
    */
-  boolean resume(String flightId) throws StairwayException, StairwayShutdownException, DatabaseOperationException, InterruptedException;
+  boolean resume(String flightId)
+      throws StairwayException, StairwayShutdownException, DatabaseOperationException,
+          InterruptedException;
 
   /**
    * The Stairway Control interface provides access to Staiwray internals for debugging and flight

@@ -11,9 +11,7 @@ import org.junit.jupiter.api.Test;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-/**
- * Test to make sure the FileQueue fixture works properly. Kinda meta...
- */
+/** Test to make sure the FileQueue fixture works properly. Kinda meta... */
 @Tag("unit")
 public class FileQueueTest {
   private final Logger logger = LoggerFactory.getLogger(FileQueueTest.class);
@@ -60,5 +58,4 @@ public class FileQueueTest {
     messages.replace(message, true);
     return true;
   }
-
 }

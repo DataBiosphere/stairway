@@ -19,8 +19,8 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 /**
- * FlightMapUtils provides methods to create a flight map from data pulled from the database
- * and format data from flight map to be stored in the database
+ * FlightMapUtils provides methods to create a flight map from data pulled from the database and
+ * format data from flight map to be stored in the database
  */
 public class FlightMapUtils {
   /**
@@ -141,11 +141,11 @@ public class FlightMapUtils {
 
   static FlightMap fromJson(String json) {
     try {
-      Map<String, Object> map = getObjectMapper().readValue(json, new TypeReference<Map<String, Object>>() {});
+      Map<String, Object> map =
+          getObjectMapper().readValue(json, new TypeReference<Map<String, Object>>() {});
       return new FlightMap(map);
     } catch (IOException ex) {
       throw new JsonConversionException("Failed to convert json string to map", ex);
     }
   }
-
 }

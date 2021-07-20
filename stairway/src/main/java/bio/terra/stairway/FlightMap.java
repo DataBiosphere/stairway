@@ -13,24 +13,24 @@ import java.util.stream.Collectors;
 public class FlightMap {
   private Map<String, Object> map;
 
-  /**
-   * Construct an empty flight map
-   */
+  /** Construct an empty flight map */
   public FlightMap() {
     map = new HashMap<>();
   }
 
   /**
-   * This constructor is used when Stairway re-creates the flight map from the
-   * database. It is not intended for client use.
+   * This constructor is used when Stairway re-creates the flight map from the database. It is not
+   * intended for client use.
+   * @param map deserialized input map from database
    */
   public FlightMap(Map<String, Object> map) {
     this.map = map;
   }
 
   /**
-   * Accessor for the contained map. Used for storing the map into the database.
-   * It is not intended for client use.
+   * Accessor for the contained map. Used for storing the map into the database. It is not intended
+   * for client use.
+   * @return contained map
    */
   public Map<String, Object> getMap() {
     return map;

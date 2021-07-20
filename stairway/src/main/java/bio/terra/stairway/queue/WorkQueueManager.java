@@ -1,15 +1,13 @@
 package bio.terra.stairway.queue;
 
 import bio.terra.stairway.QueueInterface;
-import bio.terra.stairway.impl.StairwayImpl;
 import bio.terra.stairway.exception.StairwayExecutionException;
+import bio.terra.stairway.impl.StairwayImpl;
 import java.util.concurrent.TimeUnit;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-/**
- * QueueManager performs all control operations on the work queue
- */
+/** QueueManager performs all control operations on the work queue */
 public class WorkQueueManager {
   private static final Logger logger = LoggerFactory.getLogger(WorkQueueManager.class);
 
@@ -27,6 +25,7 @@ public class WorkQueueManager {
 
   /**
    * The queue portion of the second phase of Stairway initialization.
+   *
    * @param forceClean if true, purge the contents of the queue; intended for test environments
    */
   public void initialize(boolean forceClean) {
@@ -36,8 +35,7 @@ public class WorkQueueManager {
   }
 
   /**
-   * The queue portion of the third phase of Stairway initialization.
-   * Start the work queue listener.
+   * The queue portion of the third phase of Stairway initialization. Start the work queue listener.
    */
   public void start() {
     if (workQueueEnabled) {
@@ -49,20 +47,20 @@ public class WorkQueueManager {
 
   /**
    * Start shutting down the queue during a graceful Stairway shutdown
+   *
    * @param waitSeconds seconds to allow for joining the work queue thread
    */
   public void shutdown(long waitSeconds) {
     tryTerminateListener(waitSeconds);
   }
 
-  /**
-   * Shutdown the queue with no wait, or at least try
-   */
+  /** Shutdown the queue with no wait, or at least try */
   public void shutdownNow() {
     tryTerminateListener(0);
   }
 
-  public void queueReadyFlight(String flightId) throws StairwayExecutionException, InterruptedException {
+  public void queueReadyFlight(String flightId)
+      throws StairwayExecutionException, InterruptedException {
     String message = QueueMessage.serialize(new QueueMessageReady(flightId));
     workQueue.enqueueMessage(message);
   }
@@ -90,5 +88,4 @@ public class WorkQueueManager {
       logger.info("Shutdown work queue listener");
     }
   }
-
 }

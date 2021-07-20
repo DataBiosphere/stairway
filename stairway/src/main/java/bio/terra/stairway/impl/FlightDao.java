@@ -885,8 +885,7 @@ class FlightDao {
       throws StairwayException, DatabaseOperationException, InterruptedException {
 
     // Make an empty filter if one is not provided
-    FlightFilter filter =
-        (inFilter != null) ? inFilter : new FlightFilter();
+    FlightFilter filter = (inFilter != null) ? inFilter : new FlightFilter();
 
     return DbRetry.retry("flight.getFlights", () -> getFlightsInner(offset, limit, filter));
   }

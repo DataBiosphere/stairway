@@ -49,7 +49,7 @@ public class StairwayImpl implements Stairway {
   // Constructor parameters
   private final Object applicationContext;
   private final ExceptionSerializer exceptionSerializer;
-  private final String stairwayName;
+  private final String stairwayName; // always identical to stairwayId
   private final int maxParallelFlights;
   private final int maxQueuedFlights;
   private final WorkQueueManager queueManager;
@@ -60,7 +60,6 @@ public class StairwayImpl implements Stairway {
 
   // Initialized state
   private StairwayThreadPool threadPool;
-  private String stairwayId;
   private StairwayInstanceDao stairwayInstanceDao;
   private FlightDao flightDao;
   private ScheduledExecutorService scheduledPool;
@@ -137,7 +136,7 @@ public class StairwayImpl implements Stairway {
   public List<String> initialize(
       DataSource dataSource, boolean forceCleanStart, boolean migrateUpgrade)
       throws StairwayShutdownException, DatabaseOperationException, MigrateException,
-      StairwayException, InterruptedException {
+          StairwayException, InterruptedException {
 
     // If we have been shut down, do not restart.
     if (isQuietingDown()) {
@@ -147,7 +146,7 @@ public class StairwayImpl implements Stairway {
     stairwayInstanceDao = new StairwayInstanceDao(dataSource);
     flightDao =
         new FlightDao(
-            dataSource, stairwayInstanceDao, exceptionSerializer, hookWrapper, stairwayId);
+            dataSource, stairwayInstanceDao, exceptionSerializer, hookWrapper, stairwayName);
     control = new ControlImpl(dataSource, flightDao, stairwayInstanceDao);
     flightSupport = new FlightSupportImpl(this);
     flightFactory = new FlightFactory();
@@ -193,7 +192,7 @@ public class StairwayImpl implements Stairway {
     }
 
     // Start this Stairway instance up!
-    stairwayId = stairwayInstanceDao.findOrCreate(stairwayName);
+    stairwayInstanceDao.findOrCreate(stairwayName);
 
     // Recover any flights in the READY state
     recoverReady();
@@ -301,7 +300,8 @@ public class StairwayImpl implements Stairway {
    *     to generate globally unique ids.
    * @param flightClass class object of the class derived from Flight; e.g., MyFlight.class
    * @param inputParameters key-value map of parameters to the flight
-   * @param shouldQueue true to put this flight on the queue; false to try to run it on this instance
+   * @param shouldQueue true to put this flight on the queue; false to try to run it on this
+   *     instance
    * @param debugInfo optional debug info structure to inject failures at points in the flight
    * @throws StairwayException failure during flight object creation, persisting to database or
    *     launching
@@ -347,7 +347,8 @@ public class StairwayImpl implements Stairway {
     } else {
       // Submit directly - not allowed if we are shutting down
       if (isQuietingDown()) {
-        throw new StairwayShutdownException("Stairway is shutting down and cannot accept a new flight");
+        throw new StairwayShutdownException(
+            "Stairway is shutting down and cannot accept a new flight");
       }
 
       // Give the flight context the public stairway object
@@ -360,8 +361,7 @@ public class StairwayImpl implements Stairway {
   /** Simple submit */
   public void submit(
       String flightId, Class<? extends Flight> flightClass, FlightMap inputParameters)
-      throws StairwayException, InterruptedException,
-          DuplicateFlightIdException {
+      throws StairwayException, InterruptedException, DuplicateFlightIdException {
     submit(flightId, flightClass, inputParameters, false, null);
   }
 
@@ -379,8 +379,8 @@ public class StairwayImpl implements Stairway {
       FlightMap inputParameters,
       boolean shouldQueue,
       FlightDebugInfo debugInfo)
-      throws StairwayException, DatabaseOperationException, StairwayExecutionException, InterruptedException,
-          DuplicateFlightIdException {
+      throws StairwayException, DatabaseOperationException, StairwayExecutionException,
+          InterruptedException, DuplicateFlightIdException {
     submit(flightId, flightClass, inputParameters, shouldQueue, debugInfo);
   }
 
@@ -418,12 +418,14 @@ public class StairwayImpl implements Stairway {
    * @throws DatabaseOperationException failure during flight database operations
    * @throws InterruptedException on shutdown during resume
    */
-  public boolean resume(String flightId) throws StairwayException, StairwayShutdownException, DatabaseOperationException, InterruptedException {
+  public boolean resume(String flightId)
+      throws StairwayException, StairwayShutdownException, DatabaseOperationException,
+          InterruptedException {
     if (isQuietingDown()) {
       throw new StairwayShutdownException("Stairway is shutting down and cannot resume a flight");
     }
 
-    FlightContext flightContext = flightDao.resume(stairwayId, flightId);
+    FlightContext flightContext = flightDao.resume(stairwayName, flightId);
     if (flightContext == null) {
       return false;
     }
@@ -484,7 +486,8 @@ public class StairwayImpl implements Stairway {
    * @throws InterruptedException on shutdown while waiting for flight completion
    */
   public FlightState waitForFlight(String flightId, Integer pollSeconds, Integer pollCycles)
-      throws StairwayException, DatabaseOperationException, FlightNotFoundException, FlightWaitTimedOutException, InterruptedException {
+      throws StairwayException, DatabaseOperationException, FlightNotFoundException,
+          FlightWaitTimedOutException, InterruptedException {
     int sleepSeconds = (pollSeconds == null) ? 10 : pollSeconds;
     int pollCount = 0;
 
@@ -582,7 +585,8 @@ public class StairwayImpl implements Stairway {
   }
 
   private void queueFlight(FlightContext flightContext)
-      throws StairwayException, DatabaseOperationException, StairwayExecutionException, InterruptedException {
+      throws StairwayException, DatabaseOperationException, StairwayExecutionException,
+          InterruptedException {
     // If the flight state is READY, then we put the flight on the queue and mark it queued in the
     // database. We cannot go directly from RUNNING to QUEUED. Suppose we put the flight in
     // the queue before it was marked QUEUED. Another Stairway instance would see it was
@@ -613,8 +617,7 @@ public class StairwayImpl implements Stairway {
    * @throws InterruptedException on shutdown during recovery
    * @throws StairwayExecutionException stairway error
    */
-  void recoverReady()
-      throws StairwayException, InterruptedException {
+  void recoverReady() throws StairwayException, InterruptedException {
     List<String> readyFlightList = flightDao.getReadyFlights();
     for (String flightId : readyFlightList) {
       if (queueManager.isWorkQueueEnabled()) {

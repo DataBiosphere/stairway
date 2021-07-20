@@ -38,7 +38,8 @@ class WorkQueueListener implements Runnable {
       while (!stairwayImpl.isQuietingDown()) {
         if (stairwayImpl.spaceAvailable()) {
           logger.debug("Asking the work queue for messages: " + MAX_MESSAGES_PER_PULL);
-          workQueue.dispatchMessages(stairwayImpl, MAX_MESSAGES_PER_PULL, QueueMessage::processMessage);
+          workQueue.dispatchMessages(
+              stairwayImpl, MAX_MESSAGES_PER_PULL, QueueMessage::processMessage);
         } else {
           // No room to queue messages. Take a rest.
           TimeUnit.SECONDS.sleep(NO_PULL_SLEEP_SECONDS);
