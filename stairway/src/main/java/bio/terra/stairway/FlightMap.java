@@ -59,12 +59,12 @@ public class FlightMap {
    *
    * <p>Flights written with:
    *
-   * <p>* Version < 0.0.50: Only json is valid, inputList is always empty.
-   *
-   * <p>* Version 0.0.50 - 0.0.60: json and inputList both valid and must be consistent with one
-   * another.
-   *
-   * <p>* Version >= 0.0.61: json always null, inputList is always valid (possibly empty).
+   * <ul>
+   *   <li>Version < 0.0.50: Only json is valid, inputList is always empty.
+   *   <li>Version 0.0.50 - 0.0.60: json and inputList both valid and must be consistent with one
+   *       another.
+   *   <li>Version >= 0.0.61: json always null, inputList is always valid (possibly empty).
+   * </ul>
    *
    * @param inputList Entries in flightworking for a given Flight log. May be empty if Flight
    *     pre-existed flightworking table, or there are no working parameters.
@@ -102,7 +102,7 @@ public class FlightMap {
    * @param key - key to lookup in the hash map
    * @param type - class requested
    * @return null if not found
-   * @throws ClassCastException if found, not deserializable to the requested type
+   * @throws JsonConversionException if found, not deserializable to the requested type
    */
   @Nullable
   public <T> T get(String key, Class<T> type) {
@@ -116,7 +116,7 @@ public class FlightMap {
       return getObjectMapper().readValue(value, type);
     } catch (JsonProcessingException ex) {
       throw new JsonConversionException(
-          "Found value '" + value + "' is not an instance of type " + type.getName());
+          "Failed to deserialize value '" + value + "' from JSON to type " + type.getName(), ex);
     }
   }
 
