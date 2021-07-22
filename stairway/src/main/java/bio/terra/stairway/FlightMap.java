@@ -57,6 +57,15 @@ public class FlightMap {
    * {@code List<FlightInput>}, both, or neither at deserialization time. This method is used to
    * generate a FlightMap based on what was contained in the database.
    *
+   * <p>Flights written with:
+   *
+   * <p>* Version < 0.0.50: Only json is valid, inputList is always empty.
+   *
+   * <p>* Version 0.0.50 - 0.0.60: json and inputList both valid and must be consistent with one
+   * another.
+   *
+   * <p>* Version >= 0.0.61: json always null, inputList is always valid (possibly empty).
+   *
    * @param inputList Entries in flightworking for a given Flight log. May be empty if Flight
    *     pre-existed flightworking table, or there are no working parameters.
    * @param json Map of working entries for a given Flight log in JSON. May be NULL.
@@ -106,7 +115,7 @@ public class FlightMap {
     try {
       return getObjectMapper().readValue(value, type);
     } catch (JsonProcessingException ex) {
-      throw new ClassCastException(
+      throw new JsonConversionException(
           "Found value '" + value + "' is not an instance of type " + type.getName());
     }
   }

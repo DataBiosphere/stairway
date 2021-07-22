@@ -712,9 +712,9 @@ class FlightDao {
             flightContext.setFlightStatus(FlightStatus.valueOf(rsflight.getString("status")));
             flightContext.setStepIndex(rsflight.getInt("step_index"));
 
-            // We may have JSON from output_parameters, a set of working parameters from
-            // flightworking table, neither, or both.  Deletgate the decision of which to use to
-            // FlightMap class.
+            // TODO(PF-917): We may have JSON from working_parameters, a set of parameters from
+            // flightworking table, neither, or both.  For now, delegate the decision of which to
+            // use to FlightMap class.  PF-917 will remove column working_parameters.
 
             final String workingMapJson = rsflight.getString("working_parameters");
 
@@ -889,8 +889,9 @@ class FlightDao {
         flightState.setException(
             exceptionSerializer.deserialize(rs.getString("serialized_exception")));
 
-        // We may have JSON from output_parameters, a set of working parameters from flightworking
-        // table, neither, or both.  Deletgate the decision of which to use to FlightMap class.
+        // TODO(PF-917): We may have JSON from output_parameters, a set of parameters from
+        // flightworking table, neither, or both.  For now, delegate the decision of which to use to
+        // FlightMap class.  PF-917 will remove column output_parameters.
 
         String outputParamsJson = rs.getString("output_parameters");
         final List<FlightInput> workingList = retrieveLatestWorkingParameters(connection, flightId);

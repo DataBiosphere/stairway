@@ -146,7 +146,8 @@ public class FlightMapTest {
     Assertions.assertNull(map.get(badKey, NonStaticClass.class));
 
     // Deserializing the wrong type results in ClassCastException.
-    Assertions.assertThrows(ClassCastException.class, () -> map.get(intKey, FlightsTestPojo.class));
+    Assertions.assertThrows(
+        JsonConversionException.class, () -> map.get(intKey, FlightsTestPojo.class));
 
     // Deserializing map from bad JSON throws
     Assertions.assertThrows(
