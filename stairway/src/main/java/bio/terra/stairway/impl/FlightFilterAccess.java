@@ -2,6 +2,7 @@ package bio.terra.stairway.impl;
 
 import bio.terra.stairway.FlightFilter;
 import bio.terra.stairway.FlightFilter.FlightFilterPredicate;
+import bio.terra.stairway.StairwayMapper;
 import bio.terra.stairway.exception.FlightFilterException;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import java.sql.SQLException;

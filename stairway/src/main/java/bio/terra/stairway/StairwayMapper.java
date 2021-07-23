@@ -1,4 +1,4 @@
-package bio.terra.stairway.impl;
+package bio.terra.stairway;
 
 import com.fasterxml.jackson.databind.DeserializationFeature;
 import com.fasterxml.jackson.databind.ObjectMapper;

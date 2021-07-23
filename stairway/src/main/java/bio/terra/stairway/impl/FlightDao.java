@@ -173,9 +173,9 @@ class FlightDao {
     final String sqlInsertFlightLog =
         "INSERT INTO "
             + FLIGHT_LOG_TABLE
-            + "(id, flightid, log_time, working_parameters, step_index, rerun, direction,"
+            + "(id, flightid, log_time, step_index, rerun, direction,"
             + " succeeded, serialized_exception, status)"
-            + " VALUES (:logId, :flightId, CURRENT_TIMESTAMP, :workingMap, :stepIndex, :rerun, :direction,"
+            + " VALUES (:logId, :flightId, CURRENT_TIMESTAMP, :stepIndex, :rerun, :direction,"
             + " :succeeded, :serializedException, :status)";
 
     String serializedException =
@@ -187,12 +187,6 @@ class FlightDao {
       startTransaction(connection);
       statement.setUuid("logId", logId);
       statement.setString("flightId", flightContext.getFlightId());
-
-      // TODO(PF-703): Column working_parameters is being phased out in favor of table
-      // flightworking.  We continue to write the working map here temporarily for backward
-      // compatibility.
-      statement.setString("workingMap", FlightMapUtils.toJson(flightContext.getWorkingMap()));
-
       statement.setInt("stepIndex", flightContext.getStepIndex());
       statement.setBoolean("rerun", flightContext.isRerun());
       statement.setString("direction", flightContext.getDirection().name());
@@ -428,7 +422,6 @@ class FlightDao {
         "UPDATE "
             + FLIGHT_TABLE
             + " SET completed_time = CURRENT_TIMESTAMP,"
-            + " output_parameters = :outputParameters,"
             + " status = :status,"
             + " serialized_exception = :serializedException,"
             + " stairway_id = NULL"
@@ -443,9 +436,6 @@ class FlightDao {
 
       startTransaction(connection);
 
-      // TODO(PF-703): Column output_parameters is being phased out in favor of table flightworking.
-      //  We continue to write the output map here temporarily for backward compatibility.
-      statement.setString("outputParameters", FlightMapUtils.toJson(flightContext.getWorkingMap()));
       statement.setString("status", flightContext.getFlightStatus().name());
       statement.setString("serializedException", serializedException);
       statement.setString("flightId", flightContext.getFlightId());
@@ -758,19 +748,16 @@ class FlightDao {
             flightContext.setFlightStatus(FlightStatus.valueOf(rsflight.getString("status")));
             flightContext.setStepIndex(rsflight.getInt("step_index"));
 
-            // TODO(PF-703): In the current transition away from working_parameters column towards
-            // flightworking table we can either have only JSON or both.  Until we've transitioned,
-            // delegate the decision of which to use to the FlightMap class.
+            // TODO(PF-917): We may have JSON from working_parameters, a set of parameters from
+            // flightworking table, neither, or both.  For now, delegate the decision of which to
+            // use to FlightMap class.  PF-917 will remove column working_parameters.
 
             final String workingMapJson = rsflight.getString("working_parameters");
 
             final List<FlightInput> workingList =
                 retrieveWorkingParameters(connection, rsflight.getObject("id", UUID.class));
 
-            // If we built a working map from the data, replace the flight context's default working
-            // map with it.
-            FlightMapUtils.create(workingList, workingMapJson)
-                .ifPresent(flightContext::setWorkingMap);
+            flightContext.setWorkingMap(FlightMapUtils.create(workingList, workingMapJson));
           }
         }
       }
@@ -942,15 +929,13 @@ class FlightDao {
         flightState.setException(
             exceptionSerializer.deserialize(rs.getString("serialized_exception")));
 
-        // TODO(PF-703): In the current transition away from output_parameters column towards
-        // flightworking table we can either have only JSON or both.  Until we've transitioned,
-        // delegate the decision of which to use to the FlightMap class.
+        // TODO(PF-917): We may have JSON from output_parameters, a set of parameters from
+        // flightworking table, neither, or both.  For now, delegate the decision of which to use to
+        // FlightMap class.  PF-917 will remove column output_parameters.
 
         String outputParamsJson = rs.getString("output_parameters");
         final List<FlightInput> workingList = retrieveLatestWorkingParameters(connection, flightId);
-
-        // If we were able to build a map from the data, use it to set the result map.
-        FlightMapUtils.create(workingList, outputParamsJson).ifPresent(flightState::setResultMap);
+        flightState.setResultMap(FlightMapUtils.create(workingList, outputParamsJson));
       }
 
       flightStateList.add(flightState);
