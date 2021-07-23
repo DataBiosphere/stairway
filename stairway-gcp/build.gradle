@@ -9,7 +9,7 @@ dependencies {
     }
     implementation platform('com.google.cloud:libraries-bom:20.2.0')
 
-    api(':stairway')
+    api project(':stairway')
 
     implementation group: 'org.apache.commons', name: 'commons-lang3', version: '3.11'
     implementation group: 'org.apache.commons', name: 'commons-collections4', version: '4.4'

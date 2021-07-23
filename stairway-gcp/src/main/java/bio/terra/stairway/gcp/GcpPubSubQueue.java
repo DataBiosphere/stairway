@@ -1,5 +1,8 @@
 package bio.terra.stairway.gcp;
 
+import bio.terra.stairway.QueueInterface;
+import bio.terra.stairway.QueueProcessFunction;
+import bio.terra.stairway.exception.StairwayExecutionException;
 import com.google.api.core.ApiFuture;
 import com.google.api.gax.rpc.DeadlineExceededException;
 import com.google.cloud.pubsub.v1.Publisher;
@@ -16,12 +19,9 @@ import com.google.pubsub.v1.PullResponse;
 import com.google.pubsub.v1.ReceivedMessage;
 import edu.umd.cs.findbugs.annotations.SuppressFBWarnings;
 import java.io.IOException;
-import java.time.Duration;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.concurrent.ExecutionException;
-import java.util.concurrent.TimeUnit;
-import org.apache.commons.lang3.ObjectUtils;
 import org.apache.commons.lang3.Validate;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -126,7 +126,7 @@ class GcpPubSubQueue implements QueueInterface {
         String smess = message.getMessage().getData().toStringUtf8();
         logger.info("Received message: " + smess);
 
-        Boolean processSucceeded = processFunction.apply(smess, dispatchContext);
+        boolean processSucceeded = processFunction.apply(smess, dispatchContext);
         if (processSucceeded) {
           ackIds.add(message.getAckId());
         }
@@ -151,7 +151,7 @@ class GcpPubSubQueue implements QueueInterface {
   }
 
   @Override
-  public void enqueueMessage(String message) throws InterruptedException, StairwayExecutionException {
+  public void enqueueMessage(String message) throws InterruptedException {
     ByteString data = ByteString.copyFromUtf8(message);
     PubsubMessage pubsubMessage = PubsubMessage.newBuilder().setData(data).build();
 
@@ -223,7 +223,7 @@ class GcpPubSubQueue implements QueueInterface {
       return this;
     }
 
-    public GcpPubSubQueue build() {
+    public GcpPubSubQueue build() throws IOException {
       Validate.notEmpty(projectId, "A projectId is required");
       Validate.notEmpty(topicId, "A topicId is required");
       Validate.notEmpty(subscriptionId, "A subscriptionId is required");
