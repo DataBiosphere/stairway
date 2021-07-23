@@ -27,16 +27,18 @@ public class PubSubQueueTest {
     projectId = getProjectId();
     GcpQueueUtils.makeTopic(projectId, topicId);
     GcpQueueUtils.makeSubscription(projectId, topicId, subscriptionId);
-    workQueue = GcpPubSubQueue.newBuilder()
-        .projectId(projectId)
-        .topicId(topicId)
-        .subscriptionId(subscriptionId)
-        .build();
+    workQueue =
+        GcpPubSubQueue.newBuilder()
+            .projectId(projectId)
+            .topicId(topicId)
+            .subscriptionId(subscriptionId)
+            .build();
     workQueue.purgeQueue();
   }
 
   @AfterEach
   public void teardown() throws Exception {
+    workQueue.shutdown();
     GcpQueueUtils.deleteQueue(projectId, topicId, subscriptionId);
   }
 
@@ -90,5 +92,4 @@ public class PubSubQueueTest {
     }
     return projectId;
   }
-
 }

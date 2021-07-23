@@ -63,21 +63,11 @@ class GcpPubSubQueue implements QueueInterface {
     subscriberStub = GrpcSubscriberStub.create(subscriberStubSettings);
   }
 
-  @Override
-  protected void finalize() throws Throwable {
-    super.finalize();
-    shutdownSubscriber();
-  }
-
-  public void shutdownSubscriber() {
+  public void shutdown() {
     if (subscriberStub != null) {
       subscriberStub.close();
       subscriberStub = null;
     }
-  }
-
-  public void shutdown() {
-    shutdownSubscriber();
     if (publisher != null) {
       publisher.shutdown();
     }
@@ -112,9 +102,8 @@ class GcpPubSubQueue implements QueueInterface {
 
   @Override
   public void dispatchMessages(
-      Object dispatchContext,
-      int numOfMessages,
-      QueueProcessFunction processFunction) throws InterruptedException {
+      Object dispatchContext, int numOfMessages, QueueProcessFunction processFunction)
+      throws InterruptedException {
     try {
       PullResponse pullResponse = pullFromQueue(numOfMessages, false);
       if (pullResponse == null) {
@@ -229,6 +218,5 @@ class GcpPubSubQueue implements QueueInterface {
       Validate.notEmpty(subscriptionId, "A subscriptionId is required");
       return new GcpPubSubQueue(this);
     }
-
   }
 }

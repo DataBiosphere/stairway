@@ -17,13 +17,12 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 /**
- * Utility methods for creating PubSub topics and subscriptions.
- * The default credentials must have {@code roles/pubsub.editor} or
- * {@code roles/editor} on the project in order to use these methods.
+ * Utility methods for creating PubSub topics and subscriptions. The default credentials must have
+ * {@code roles/pubsub.editor} or {@code roles/editor} on the project in order to use these methods.
  *
- * It is not necessary to use these to use GcpPubSubQueue. In fact,
- * it is best to create these object in Terraform or similar and not at run time,
- * so that the running instance does not need to hold the enhanced permissions.
+ * <p>It is not necessary to use these to use GcpPubSubQueue. In fact, it is best to create these
+ * object in Terraform or similar and not at run time, so that the running instance does not need to
+ * hold the enhanced permissions.
  */
 @SuppressFBWarnings(
     value = "RCN_REDUNDANT_NULLCHECK_WOULD_HAVE_BEEN_A_NPE",
@@ -66,8 +65,9 @@ public class GcpQueueUtils {
    * @throws IOException error thrown when the create doesn't work
    */
   public static void makeSubscription(String projectId, String topicId, String subscriptionId)
-        throws IOException {
-    makeSubscription(projectId, topicId, subscriptionId, MESSAGE_RETENTION_SECONDS, ACK_DEADLINE_SECONDS);
+      throws IOException {
+    makeSubscription(
+        projectId, topicId, subscriptionId, MESSAGE_RETENTION_SECONDS, ACK_DEADLINE_SECONDS);
   }
 
   /**
@@ -85,10 +85,12 @@ public class GcpQueueUtils {
       String topicId,
       String subscriptionId,
       long messageRetentionSeconds,
-      int ackDeadlineSeconds) throws IOException {
+      int ackDeadlineSeconds)
+      throws IOException {
 
     TopicName topicName = TopicName.ofProjectTopicName(projectId, topicId);
-    ProjectSubscriptionName subscriptionName = ProjectSubscriptionName.of(projectId, subscriptionId);
+    ProjectSubscriptionName subscriptionName =
+        ProjectSubscriptionName.of(projectId, subscriptionId);
 
     GoogleCredentialsProvider credentialsProvider =
         GoogleCredentialsProvider.newBuilder()
@@ -105,7 +107,8 @@ public class GcpQueueUtils {
               .setName(subscriptionName.toString())
               .setTopic(topicName.toString())
               .setAckDeadlineSeconds(ackDeadlineSeconds)
-              .setMessageRetentionDuration(Duration.newBuilder().setSeconds(messageRetentionSeconds))
+              .setMessageRetentionDuration(
+                  Duration.newBuilder().setSeconds(messageRetentionSeconds))
               .build();
 
       subscriptionAdminClient.createSubscription(request);
