@@ -7,7 +7,6 @@ import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.core.type.TypeReference;
 import java.io.IOException;
 import java.util.ArrayList;
-import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -92,6 +91,26 @@ public class FlightMap {
   /** Check map for emptiness */
   boolean isEmpty() {
     return map.isEmpty();
+  }
+
+  @Nullable
+  public <T> T get(String key, TypeReference<T> typeReference) {
+    String value = map.get(key);
+
+    if (value == null) {
+      return null;
+    }
+
+    try {
+      return getObjectMapper().readValue(value, typeReference);
+    } catch (JsonProcessingException ex) {
+      throw new JsonConversionException(
+          "Failed to deserialize value '"
+              + value
+              + "' from JSON to type "
+              + typeReference.getType().getTypeName(),
+          ex);
+    }
   }
 
   /**

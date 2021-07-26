@@ -2,9 +2,13 @@ package bio.terra.stairway;
 
 import bio.terra.stairway.exception.JsonConversionException;
 import bio.terra.stairway.fixtures.FlightsTestPojo;
+import com.fasterxml.jackson.core.type.TypeReference;
 import edu.umd.cs.findbugs.annotations.SuppressFBWarnings;
 import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.UUID;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Tag;
@@ -53,16 +57,31 @@ public class FlightMapTest {
     FlightsTestPojo pojoOut = inMap.get(pojoKey, FlightsTestPojo.class);
     Assertions.assertEquals(pojoIn, pojoOut);
 
+    pojoOut = inMap.get(pojoKey, new TypeReference<>() {});
+    Assertions.assertEquals(pojoIn, pojoOut);
+
     Integer intOut = inMap.get(intKey, Integer.class);
+    Assertions.assertEquals(intIn, intOut);
+
+    intOut = inMap.get(intKey, new TypeReference<>() {});
     Assertions.assertEquals(intIn, intOut);
 
     String stringOut = inMap.get(stringKey, String.class);
     Assertions.assertEquals(stringIn, stringOut);
 
+    stringOut = inMap.get(stringKey, new TypeReference<>() {});
+    Assertions.assertEquals(stringIn, stringOut);
+
     UUID uuidOut = inMap.get(uuidKey, UUID.class);
     Assertions.assertEquals(uuidIn, uuidOut);
 
+    uuidOut = inMap.get(uuidKey, new TypeReference<>() {});
+    Assertions.assertEquals(uuidIn, uuidOut);
+
     MyEnum enumOut = inMap.get(enumKey, MyEnum.class);
+    Assertions.assertEquals(enumOut, enumIn);
+
+    enumOut = inMap.get(enumKey, new TypeReference<>() {});
     Assertions.assertEquals(enumOut, enumIn);
   }
 
@@ -152,5 +171,29 @@ public class FlightMapTest {
     // Deserializing map from bad JSON throws
     Assertions.assertThrows(
         JsonConversionException.class, () -> FlightMap.create(new ArrayList<>(), "garbage"));
+  }
+
+  @Test
+  public void typeReferences() {
+    FlightMap flightMap = new FlightMap();
+
+    Map<String, List<UUID>> inputMap = new HashMap<>();
+
+    inputMap.put(
+        "mapKey",
+        new ArrayList<>(
+            Arrays.asList(
+                UUID.randomUUID(), UUID.randomUUID(), UUID.randomUUID(), UUID.randomUUID())));
+
+    final String key = "myList";
+    flightMap.put(key, inputMap);
+    System.out.println(flightMap.getRaw(key));
+
+    Map<String, List<UUID>> outputMap = flightMap.get(key, Map.class);
+    Assertions.assertEquals(inputMap, outputMap);
+
+    HashMap<String, ArrayList<UUID>> explicitOutputMap =
+        flightMap.get(key, new TypeReference<>() {});
+    Assertions.assertEquals(inputMap, explicitOutputMap);
   }
 }
