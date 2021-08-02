@@ -2,6 +2,7 @@ package bio.terra.stairway;
 
 import bio.terra.stairway.exception.JsonConversionException;
 import bio.terra.stairway.fixtures.FlightsTestPojo;
+import com.google.common.collect.ImmutableList;
 import edu.umd.cs.findbugs.annotations.SuppressFBWarnings;
 import java.util.ArrayList;
 import java.util.List;
@@ -152,5 +153,17 @@ public class FlightMapTest {
     // Deserializing map from bad JSON throws
     Assertions.assertThrows(
         JsonConversionException.class, () -> FlightMap.create(new ArrayList<>(), "garbage"));
+  }
+
+  @Test
+  public void guavaTypes() {
+    FlightMap flightMap = new FlightMap();
+
+    final String key = "immutableList";
+    ImmutableList<Integer> immutableListIn = ImmutableList.of(1, 2, 3, 4);
+    flightMap.put(key, immutableListIn);
+
+    ImmutableList<Integer> immutableListOut = flightMap.get(key, ImmutableList.class);
+    Assertions.assertEquals(immutableListIn, immutableListOut);
   }
 }
