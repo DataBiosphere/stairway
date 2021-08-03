@@ -95,13 +95,26 @@ public class FlightMap {
   }
 
   /**
-   * Return the object from the hash map deserialized to the right type. Throw an exception if the
-   * Object cannot be deserialized to that type.
+   * Returns true if this map contains a mapping of the passed key.
+   *
+   * @param key to look up in the map
+   * @return true if present
+   */
+  boolean containsKey(String key) {
+    return map.containsKey(key);
+  }
+
+  /**
+   * Return the object from the hash map deserialized to the right non-parameterized type. Throw an
+   * exception if the Object cannot be deserialized to that type. For parameterized types, the
+   * {@code TypeReference<T>} overload of this method offers more type safety and should be
+   * preferred.
    *
    * @param <T> - type of class to expect in the hash map
    * @param key - key to lookup in the hash map
    * @param type - class requested
-   * @return null if not found
+   * @return null if not found or if a null value is stored at that key (use method {@code
+   *     containsKey()} to differentiate)
    * @throws JsonConversionException if found, not deserializable to the requested type
    */
   @Nullable
@@ -117,6 +130,38 @@ public class FlightMap {
     } catch (JsonProcessingException ex) {
       throw new JsonConversionException(
           "Failed to deserialize value '" + value + "' from JSON to type " + type.getName(), ex);
+    }
+  }
+
+  /**
+   * Return the object from the hash map deserialized to the right type. Throw an exception if the
+   * Object cannot be deserialized to that type. This overload is preferred when deserializing
+   * parameterized types as it provides stronger type checking at deserialization time.
+   *
+   * @param <T> - type of class to expect in the hash map
+   * @param key - key to lookup in the hash map
+   * @param typeReference - class requested
+   * @return null if not found or if a null value is stored at that key (use method {@code
+   *     containsKey()} to differentiate)
+   * @throws JsonConversionException if found, not deserializable to the requested type
+   */
+  @Nullable
+  public <T> T get(String key, TypeReference<T> typeReference) {
+    String value = map.get(key);
+
+    if (value == null) {
+      return null;
+    }
+
+    try {
+      return getObjectMapper().readValue(value, typeReference);
+    } catch (JsonProcessingException ex) {
+      throw new JsonConversionException(
+          "Failed to deserialize value '"
+              + value
+              + "' from JSON to type "
+              + typeReference.getType().getTypeName(),
+          ex);
     }
   }
 
