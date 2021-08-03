@@ -21,6 +21,7 @@ dependencies {
 
     // JSON processing
     implementation('com.fasterxml.jackson.core:jackson-databind:2.12.3')
+    implementation('com.fasterxml.jackson.datatype:jackson-datatype-guava:2.12.3')
     implementation('com.fasterxml.jackson.datatype:jackson-datatype-jsr310:2.12.3')
     implementation('com.fasterxml.jackson.datatype:jackson-datatype-jdk8:2.12.3')
     implementation('com.fasterxml.jackson.module:jackson-module-parameter-names:2.12.3')

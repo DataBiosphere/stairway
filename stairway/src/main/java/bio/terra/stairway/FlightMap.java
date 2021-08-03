@@ -90,19 +90,32 @@ public class FlightMap {
   }
 
   /** Check map for emptiness */
-  boolean isEmpty() {
+  public boolean isEmpty() {
     return map.isEmpty();
   }
 
   /**
-   * Return the object from the hash map deserialized to the right type. Throw an exception if the
-   * Object cannot be deserialized to that type.
+   * Returns true if this map contains a mapping of the passed key.
    *
-   * @param <T> - type of class to expect in the hash map
-   * @param key - key to lookup in the hash map
+   * @param key to look up in the map
+   * @return true if present
+   */
+  public boolean containsKey(String key) {
+    return map.containsKey(key);
+  }
+
+  /**
+   * Return the object from the flight map deserialized to the right non-parameterized type. Throw
+   * an exception if the Object cannot be deserialized to that type. For parameterized types, the
+   * {@code TypeReference<T>} overload of this method offers more type safety and should be
+   * preferred.
+   *
+   * @param <T> - type of class to expect in the flight map
+   * @param key - key to lookup in the flight map
    * @param type - class requested
-   * @return null if not found
-   * @throws JsonConversionException if found, not deserializable to the requested type
+   * @return null if not found or if a null value is stored at that key (use method {@code
+   *     containsKey()} to differentiate)
+   * @throws JsonConversionException if not deserializable to the requested type
    */
   @Nullable
   public <T> T get(String key, Class<T> type) {
@@ -121,9 +134,41 @@ public class FlightMap {
   }
 
   /**
-   * Returns the raw String stored for a given key in the hash map.
+   * Return the object from the flight map deserialized to the right type. Throw an exception if the
+   * Object cannot be deserialized to that type. This overload is preferred when deserializing
+   * parameterized types as it provides stronger type checking at deserialization time.
    *
-   * @param key to lookup in the hash map
+   * @param <T> - type of class to expect in the flight map
+   * @param key - key to lookup in the flight map
+   * @param typeReference - class requested
+   * @return null if not found or if a null value is stored at that key (use method {@code
+   *     containsKey()} to differentiate)
+   * @throws JsonConversionException if not deserializable to the requested type
+   */
+  @Nullable
+  public <T> T get(String key, TypeReference<T> typeReference) {
+    String value = map.get(key);
+
+    if (value == null) {
+      return null;
+    }
+
+    try {
+      return getObjectMapper().readValue(value, typeReference);
+    } catch (JsonProcessingException ex) {
+      throw new JsonConversionException(
+          "Failed to deserialize value '"
+              + value
+              + "' from JSON to type "
+              + typeReference.getType().getTypeName(),
+          ex);
+    }
+  }
+
+  /**
+   * Returns the raw String stored for a given key in the flight map.
+   *
+   * @param key to lookup in the flight map
    * @return null if not found
    */
   @Nullable
@@ -132,7 +177,7 @@ public class FlightMap {
   }
 
   /**
-   * Serialize the passed Object to a JSON String and store in the hash map
+   * Serialize the passed Object to a JSON String and store in the flight map
    *
    * @param key to store the data under
    * @param value to serialize and store
@@ -147,7 +192,7 @@ public class FlightMap {
   }
 
   /**
-   * Store a raw String representing a serialized object in the hash map
+   * Store a raw String representing a serialized object in the flight map
    *
    * @param key to store the String under
    * @param rawValue to store
