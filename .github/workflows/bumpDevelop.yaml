@@ -47,8 +47,8 @@ jobs:
       - name: "Publish to Artifactory"
         uses: broadinstitute/gradle-command-action@v1
         with:
-          arguments: ":library:artifactoryPublish"
+          arguments: "artifactoryPublish"
         env:
-          ARTIFACTORY_USER: ${{ secrets.ARTIFACTORY_USER }}
+          ARTIFACTORY_USERNAME: ${{ secrets.ARTIFACTORY_USER }}
           ARTIFACTORY_PASSWORD: ${{ secrets.ARTIFACTORY_PASSWORD }}
           ARTIFACTORY_REPO_KEY: "libs-snapshot-local"

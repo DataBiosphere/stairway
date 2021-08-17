@@ -221,7 +221,6 @@ public class FlightMapTest {
             System.out.println("Nothing should get printed: " + foo);
           });
     }
-
     // This version will throw an exception if deserialization of the requested type is not
     // possible.
     Assertions.assertThrows(
