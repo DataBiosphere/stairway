@@ -37,13 +37,13 @@ public class FileQueueTest {
     workQueue.enqueueMessage("msg2");
     workQueue.enqueueMessage("msg3");
 
-    workQueue.dispatchMessages(null, 2, this::simpleMessageProcessor);
+    workQueue.dispatchMessages(2, this::simpleMessageProcessor);
 
     workQueue.enqueueMessage("msg4");
     workQueue.enqueueMessage("msg5");
 
-    workQueue.dispatchMessages(null, 2, this::simpleMessageProcessor);
-    workQueue.dispatchMessages(null, 2, this::simpleMessageProcessor);
+    workQueue.dispatchMessages(2, this::simpleMessageProcessor);
+    workQueue.dispatchMessages(2, this::simpleMessageProcessor);
 
     for (Map.Entry<String, Boolean> entry : messages.entrySet()) {
       Boolean seen = entry.getValue();
@@ -53,7 +53,7 @@ public class FileQueueTest {
     }
   }
 
-  public Boolean simpleMessageProcessor(String message, Object dispatchContext) {
+  public Boolean simpleMessageProcessor(String message) {
     logger.info("Dispatched " + message);
     messages.replace(message, true);
     return true;

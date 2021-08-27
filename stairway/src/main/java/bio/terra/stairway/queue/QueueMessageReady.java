@@ -20,17 +20,20 @@ class QueueMessageReady extends QueueMessage {
   }
 
   @Override
-  public void process(Object dispatchContext) throws InterruptedException {
-    StairwayImpl stairwayImpl = (StairwayImpl) dispatchContext;
+  public boolean process(StairwayImpl stairwayImpl) throws InterruptedException {
     try {
+      // Resumed is false if the flight is not found. We still call that a complete processing
+      // of the message and return true.
       boolean resumed = stairwayImpl.resume(flightId);
       logger.info(
           "Stairway "
               + stairwayImpl.getStairwayName()
               + (resumed ? " resumed flight: " : " did not resume flight: ")
               + flightId);
+      return true;
     } catch (DatabaseOperationException ex) {
       logger.error("Unexpected stairway error", ex);
+      return false; // leave the message on the queue
     }
   }
 

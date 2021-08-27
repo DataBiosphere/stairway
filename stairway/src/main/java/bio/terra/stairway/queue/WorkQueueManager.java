@@ -14,11 +14,13 @@ public class WorkQueueManager {
   private final StairwayImpl stairwayImpl;
   private final QueueInterface workQueue;
   private final boolean workQueueEnabled;
+  private final WorkQueueProcessor queueProcessor;
 
   private Thread workQueueListenerThread;
 
   public WorkQueueManager(StairwayImpl stairwayImpl, QueueInterface workQueue) {
     this.stairwayImpl = stairwayImpl;
+    this.queueProcessor = new WorkQueueProcessor(stairwayImpl);
     this.workQueue = workQueue;
     workQueueEnabled = (workQueue != null);
   }
@@ -39,7 +41,8 @@ public class WorkQueueManager {
    */
   public void start() {
     if (workQueueEnabled) {
-      WorkQueueListener workQueueListener = new WorkQueueListener(stairwayImpl, workQueue);
+      WorkQueueListener workQueueListener =
+          new WorkQueueListener(stairwayImpl, queueProcessor, workQueue);
       workQueueListenerThread = new Thread(workQueueListener);
       workQueueListenerThread.start();
     }
@@ -61,7 +64,7 @@ public class WorkQueueManager {
 
   public void queueReadyFlight(String flightId)
       throws StairwayExecutionException, InterruptedException {
-    String message = QueueMessage.serialize(new QueueMessageReady(flightId));
+    String message = queueProcessor.serialize(new QueueMessageReady(flightId));
     workQueue.enqueueMessage(message);
   }
 

@@ -12,9 +12,10 @@ public class QueueMessageTest {
 
   @Test
   public void messageTest() throws Exception {
+    WorkQueueProcessor queueProcessor = new WorkQueueProcessor(null);
     QueueMessageReady messageReady = new QueueMessageReady("abcde");
-    String serialized = QueueMessage.serialize(messageReady);
-    QueueMessage deserialized = QueueMessage.deserialize(serialized);
+    String serialized = queueProcessor.serialize(messageReady);
+    QueueMessage deserialized = queueProcessor.deserialize(serialized);
     if (deserialized instanceof QueueMessageReady) {
       QueueMessageReady messageReadyCopy = (QueueMessageReady) deserialized;
       assertThat(messageReadyCopy.getFlightId(), equalTo(messageReady.getFlightId()));

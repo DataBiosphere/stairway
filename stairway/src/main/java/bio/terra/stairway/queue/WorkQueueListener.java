@@ -12,10 +12,13 @@ class WorkQueueListener implements Runnable {
   private static final int NO_PULL_SLEEP_SECONDS = 5;
 
   private final StairwayImpl stairwayImpl;
+  private final WorkQueueProcessor queueProcessor;
   private final QueueInterface workQueue;
 
-  public WorkQueueListener(StairwayImpl stairwayImpl, QueueInterface workQueue) {
+  public WorkQueueListener(
+      StairwayImpl stairwayImpl, WorkQueueProcessor queueProcessor, QueueInterface workQueue) {
     this.stairwayImpl = stairwayImpl;
+    this.queueProcessor = queueProcessor;
     this.workQueue = workQueue;
   }
 
@@ -38,8 +41,7 @@ class WorkQueueListener implements Runnable {
       while (!stairwayImpl.isQuietingDown()) {
         if (stairwayImpl.spaceAvailable()) {
           logger.debug("Asking the work queue for messages: " + MAX_MESSAGES_PER_PULL);
-          workQueue.dispatchMessages(
-              stairwayImpl, MAX_MESSAGES_PER_PULL, QueueMessage::processMessage);
+          workQueue.dispatchMessages(MAX_MESSAGES_PER_PULL, queueProcessor::processMessage);
         } else {
           // No room to queue messages. Take a rest.
           TimeUnit.SECONDS.sleep(NO_PULL_SLEEP_SECONDS);

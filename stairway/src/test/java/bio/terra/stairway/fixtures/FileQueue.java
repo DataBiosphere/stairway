@@ -44,8 +44,7 @@ public class FileQueue implements QueueInterface {
   }
 
   @Override
-  public void dispatchMessages(
-      Object dispatchContext, int maxMessages, QueueProcessFunction processFunction)
+  public void dispatchMessages(int maxMessages, QueueProcessFunction processFunction)
       throws InterruptedException {
 
     File[] files = waitForFiles();
@@ -59,7 +58,7 @@ public class FileQueue implements QueueInterface {
       File msgFile = files[i];
       try {
         String message = FileUtils.readFileToString(msgFile, StandardCharsets.UTF_8);
-        boolean handled = processFunction.apply(message, dispatchContext);
+        boolean handled = processFunction.apply(message);
         if (handled) {
           boolean deleted = msgFile.delete();
           if (!deleted) {

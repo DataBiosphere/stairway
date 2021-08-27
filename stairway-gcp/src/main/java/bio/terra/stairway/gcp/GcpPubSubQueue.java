@@ -101,8 +101,7 @@ class GcpPubSubQueue implements QueueInterface {
   }
 
   @Override
-  public void dispatchMessages(
-      Object dispatchContext, int numOfMessages, QueueProcessFunction processFunction)
+  public void dispatchMessages(int numOfMessages, QueueProcessFunction processFunction)
       throws InterruptedException {
     try {
       PullResponse pullResponse = pullFromQueue(numOfMessages, false);
@@ -115,7 +114,7 @@ class GcpPubSubQueue implements QueueInterface {
         String smess = message.getMessage().getData().toStringUtf8();
         logger.info("Received message: " + smess);
 
-        boolean processSucceeded = processFunction.apply(smess, dispatchContext);
+        boolean processSucceeded = processFunction.apply(smess);
         if (processSucceeded) {
           ackIds.add(message.getAckId());
         }

@@ -1,5 +1,6 @@
 package bio.terra.stairway.queue;
 
+import bio.terra.stairway.impl.StairwayImpl;
 import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 
 // We use this class to read the type information, to guide deserializing the right type
@@ -16,5 +17,7 @@ class QueueMessageNoFields extends QueueMessage {
   }
 
   @Override
-  public void process(Object dispatchContext) {}
+  public boolean process(StairwayImpl stairwayImpl) {
+    return true;
+  }
 }

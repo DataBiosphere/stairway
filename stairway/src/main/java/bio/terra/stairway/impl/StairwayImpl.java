@@ -219,8 +219,6 @@ public class StairwayImpl implements Stairway {
     }
   }
 
-  private void startWorkQueueListener() {}
-
   /**
    * Graceful shutdown: instruct stairway to stop executing flights. When running flights hit a step
    * boundary they will yield. No new flights are able to start. Then this thread waits for
