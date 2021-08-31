@@ -14,7 +14,6 @@ import bio.terra.stairway.StepStatus;
 import bio.terra.stairway.exception.RetryException;
 import bio.terra.stairway.exception.StairwayException;
 import bio.terra.stairway.exception.StairwayExecutionException;
-import bio.terra.stairway.impl.FlightContextImpl.StepRetry;
 import java.util.HashSet;
 import java.util.Set;
 import org.slf4j.Logger;
@@ -235,9 +234,9 @@ public class FlightRunner implements Runnable {
   private StepResult stepWithRetry() throws InterruptedException, StairwayExecutionException {
     logger.debug("Executing " + flightContext.prettyStepState());
 
-    StepRetry currentStepRetry = flightContext.getCurrentStepRetry();
-    Step step = currentStepRetry.getStep();
-    RetryRule retryRule = currentStepRetry.getRetryRule();
+    Step step = flightContext.getCurrentStep();
+    RetryRule retryRule = flightContext.getCurrentRetryRule();
+    retryRule.initialize();
 
     StepResult result;
 

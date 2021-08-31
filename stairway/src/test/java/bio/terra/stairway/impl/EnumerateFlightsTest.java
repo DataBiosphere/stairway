@@ -12,8 +12,8 @@ import bio.terra.stairway.FlightState;
 import bio.terra.stairway.FlightStatus;
 import bio.terra.stairway.fixtures.FlightsTestPojo;
 import bio.terra.stairway.fixtures.TestStairwayBuilder;
-import bio.terra.stairway.flights.TestFlight;
-import bio.terra.stairway.flights.TestFlightRetry;
+import bio.terra.stairway.flights.TestFlightEnum1;
+import bio.terra.stairway.flights.TestFlightEnum2;
 import java.time.Instant;
 import java.util.ArrayList;
 import java.util.Arrays;
@@ -45,8 +45,8 @@ public class EnumerateFlightsTest {
     int int2 = 6;
     String string1 = "5";
     String string2 = "6";
-    String class1 = TestFlight.class.getName();
-    String class2 = TestFlightRetry.class.getName();
+    String class1 = TestFlightEnum1.class.getName();
+    String class2 = TestFlightEnum2.class.getName();
 
     // Build 6 flights with various parameters to allow testing of all ops on all datatypes
     // The input parameters get named "in1", "in2", "in3"
@@ -88,7 +88,7 @@ public class EnumerateFlightsTest {
     filter =
         new FlightFilter()
             .addFilterFlightStatus(FlightFilterOp.EQUAL, FlightStatus.RUNNING)
-            .addFilterFlightClass(FlightFilterOp.EQUAL, TestFlightRetry.class);
+            .addFilterFlightClass(FlightFilterOp.EQUAL, TestFlightEnum2.class);
     flightList = flightDao.getFlights(0, 100, filter);
     checkResults("case 4", flightList, Arrays.asList("3", "4"));
 
@@ -100,7 +100,7 @@ public class EnumerateFlightsTest {
     // Case 6: class and one in param - form2
     filter =
         new FlightFilter()
-            .addFilterFlightClass(FlightFilterOp.EQUAL, TestFlightRetry.class)
+            .addFilterFlightClass(FlightFilterOp.EQUAL, TestFlightEnum2.class)
             .addFilterInputParameter("in1", FlightFilterOp.EQUAL, "5");
     flightList = flightDao.getFlights(0, 100, filter);
     checkResults("case 6", flightList, Arrays.asList("1", "4"));

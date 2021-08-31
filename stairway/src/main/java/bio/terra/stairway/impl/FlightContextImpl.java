@@ -14,6 +14,7 @@ import bio.terra.stairway.Step;
 import bio.terra.stairway.StepResult;
 import bio.terra.stairway.exception.StairwayExecutionException;
 import java.util.Collections;
+import java.util.LinkedList;
 import java.util.List;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.commons.lang3.builder.ToStringBuilder;
@@ -28,24 +29,6 @@ import org.apache.commons.lang3.builder.ToStringBuilder;
  * A subset of the flight context is made visible via the FlightContext interface
  */
 public class FlightContextImpl implements FlightContext {
-  static class StepRetry {
-    private final Step step;
-    private final RetryRule retryRule;
-
-    StepRetry(Step step, RetryRule retryRule) {
-      this.step = step;
-      this.retryRule = retryRule;
-    }
-
-    public Step getStep() {
-      return step;
-    }
-
-    public RetryRule getRetryRule() {
-      return retryRule;
-    }
-  }
-
   // -- dynamic state --
   // May be different for each instantiation of the flight
 
@@ -72,7 +55,10 @@ public class FlightContextImpl implements FlightContext {
   // instantiation of the flight.
 
   /** Steps that comprise this flight */
-  private List<StepRetry> steps;
+  private List<Step> steps;
+
+  /** RetryRules in parallel with the Steps list */
+  private List<RetryRule> retryRules;
 
   /** Class names of the steps, for logging */
   private List<String> stepClassNames;
@@ -157,7 +143,6 @@ public class FlightContextImpl implements FlightContext {
     this.logState = logState;
   }
 
-
   public void setDynamicContext(StairwayImpl stairway, Flight flight) {
     // dynamic state
     this.stairway = stairway;
@@ -165,15 +150,17 @@ public class FlightContextImpl implements FlightContext {
     this.stepHooks = null;
     this.flightHooks = null;
 
+    steps = flight.getSteps();
+    retryRules = flight.getRetryRules();
+    stepClassNames = new LinkedList<>();
+
     // regenerated state
-    List<Step> inSteps = flight.getSteps();
-    List<RetryRule> inRules = flight.getRetryRules();
-    for (int i = 0; i < steps.size(); i++) {
-      steps.add(new StepRetry(inSteps.get(i), inRules.get(i)));
-      stepClassNames.add(inSteps.get(i).getClass().getName());
+    for (Step step : steps) {
+      stepClassNames.add(step.getClass().getName());
     }
     // Make these lists immutable
     steps = Collections.unmodifiableList(steps);
+    retryRules = Collections.unmodifiableList(retryRules);
     stepClassNames = Collections.unmodifiableList(stepClassNames);
   }
 
@@ -268,13 +255,22 @@ public class FlightContextImpl implements FlightContext {
     return stairway;
   }
 
-  StepRetry getCurrentStepRetry() {
+  Step getCurrentStep() {
     int stepIndex = getStepIndex();
     if (stepIndex < 0 || stepIndex >= steps.size()) {
       throw new StairwayExecutionException("Invalid step index: " + stepIndex);
     }
 
     return steps.get(stepIndex);
+  }
+
+  RetryRule getCurrentRetryRule() {
+    int stepIndex = getStepIndex();
+    if (stepIndex < 0 || stepIndex >= steps.size()) {
+      throw new StairwayExecutionException("Invalid step index: " + stepIndex);
+    }
+
+    return retryRules.get(stepIndex);
   }
 
   FlightDebugInfo getDebugInfo() {
