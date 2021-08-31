@@ -1,73 +1,33 @@
 package bio.terra.stairway;
 
-import static bio.terra.stairway.FlightStatus.READY;
-import static bio.terra.stairway.FlightStatus.READY_TO_RESTART;
-import static bio.terra.stairway.FlightStatus.WAITING;
-
-import bio.terra.stairway.exception.RetryException;
-import bio.terra.stairway.exception.StairwayException;
-import bio.terra.stairway.exception.StairwayExecutionException;
 import java.util.LinkedList;
 import java.util.List;
-import org.apache.commons.lang3.builder.ToStringBuilder;
-import org.apache.commons.lang3.builder.ToStringStyle;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 
 /**
- * Manage the atomic execution of a series of Steps
- *
- * <p>This base class has the mechanisms for executing the series of steps, retrying, maintaining
- * state in a database,
+ * The Flight object is the vehicle Stairway uses for (re)building the steps of a flight
+ * in preparation for running the flight. The object is not used in the actual execution of
+ * the flight.
  *
  * <p>In order for the flight to be re-created on recovery, the construction and configuration have
- * to result in the same flight given the same input.
+ * to result in the same set of steps given the same input.
  */
-public class Flight implements Runnable {
-  static class StepRetry {
-    private final Step step;
-    private final RetryRule retryRule;
-
-    StepRetry(Step step, RetryRule retryRule) {
-      this.step = step;
-      this.retryRule = retryRule;
-    }
-  }
-
-  private static final Logger logger = LoggerFactory.getLogger(Flight.class);
-
-  private final List<StepRetry> steps;
-  private final List<String> stepClassNames;
-  private FlightSupport flightSupport;
-  private FlightContext flightContext;
+public class Flight {
+  private final FlightMap inputParameters;
   private final Object applicationContext;
+  private final List<Step> steps;
+  private final List<RetryRule> retryRules;
 
+  /**
+   * All subclasses must provide a constructor with this signature.
+   *
+   * @param inputParameters FlightMap of the inputs for the flight
+   * @param applicationContext Anonymous context meaningful to the application using Stairway
+   */
   public Flight(FlightMap inputParameters, Object applicationContext) {
+    this.inputParameters = inputParameters;
     this.applicationContext = applicationContext;
-    steps = new LinkedList<>();
-    stepClassNames = new LinkedList<>();
-    flightContext = new FlightContext(inputParameters, this.getClass().getName(), stepClassNames);
-  }
-
-  public void setDebugInfo(FlightDebugInfo debugInfo) {
-    this.context().setDebugInfo(debugInfo);
-  }
-
-  public void setFlightSupport(FlightSupport flightSupport) {
-    this.flightSupport = flightSupport;
-  }
-
-  public FlightContext context() {
-    return flightContext;
-  }
-
-  public Object getApplicationContext() {
-    return applicationContext;
-  }
-
-  public void setFlightContext(FlightContext flightContext) {
-    flightContext.setStepClassNames(stepClassNames);
-    this.flightContext = flightContext;
+    this.steps = new LinkedList<>();
+    this.retryRules = new LinkedList<>();
   }
 
   // Used by subclasses to build the step list with default no-retry rule
@@ -75,275 +35,31 @@ public class Flight implements Runnable {
     addStep(step, RetryRuleNone.getRetryRuleNone());
   }
 
-  // Used by subclasses to build the step list with a retry rule
+  /**
+   * Add a step and a retry rule to the respective arrays.
+   * @param step subclass of Step
+   * @param retryRule subclass of RetryRule
+   */
   protected void addStep(Step step, RetryRule retryRule) {
-    steps.add(new StepRetry(step, retryRule));
-    stepClassNames.add(step.getClass().getName());
+    steps.add(step);
+    retryRules.add(retryRule);
   }
 
-  /**
-   * Execute the flight starting wherever the flight context says we are. We may be headed either
-   * direction.
-   */
-  public void run() {
-    try {
-      flightSupport.startFlightHook(flightContext);
+  // -- accessors --
 
-      if (flightSupport.isQuietingDown()) {
-        logger.info("Disowning flight starting during quietDown: " + context().getFlightId());
-        flightExit(READY);
-        return;
-      }
-
-      logger.debug("Executing: " + context().toString());
-      FlightStatus flightStatus = fly();
-      flightExit(flightStatus);
-    } catch (InterruptedException ex) {
-      // Shutdown - try disowning the flight
-      logger.warn("Flight interrupted: " + context().getFlightId());
-      flightExit(READY);
-    } catch (Exception ex) {
-      logger.error("Flight failed with exception", ex);
-    }
-    try {
-      flightSupport.endFlightHook(flightContext);
-    } catch (Exception ex) {
-      logger.warn("End flight hook failed with exception", ex);
-    }
+  public Object getApplicationContext() {
+    return applicationContext;
   }
 
-  private void flightExit(FlightStatus flightStatus) {
-    try {
-      context().setFlightStatus(flightStatus);
-      flightSupport.exitFlight(context());
-    } catch (Exception ex) {
-      logger.error("Failed to exit flight cleanly", ex);
-    }
+  public FlightMap getInputParameters() {
+    return inputParameters;
   }
 
-  /**
-   * Perform the flight, until we do all steps, undo to the beginning, or declare a dismal failure.
-   */
-  private FlightStatus fly() throws InterruptedException {
-    try {
-      context().nextStepIndex(); // position the flight to execute the next thing
-
-      // Part 1 - running forward (doing). We either succeed or we record the failure and
-      // fall through to running backward (undoing)
-      if (context().isDoing()) {
-        StepResult doResult = runSteps();
-        if (doResult.isSuccess()) {
-          if (doResult.getStepStatus() == StepStatus.STEP_RESULT_STOP) {
-            return READY;
-          }
-          if (doResult.getStepStatus() == StepStatus.STEP_RESULT_WAIT) {
-            return WAITING;
-          }
-          if (doResult.getStepStatus() == StepStatus.STEP_RESULT_RESTART_FLIGHT) {
-            return READY_TO_RESTART;
-          }
-          return FlightStatus.SUCCESS;
-        }
-
-        // Remember the failure from the do; that is what we want to return
-        // after undo completes
-        context().setResult(doResult);
-        context().setDirection(Direction.SWITCH);
-
-        // Record the step failure and direction change in the database
-        flightSupport.recordStep(context());
-      }
-
-      // Part 2 - running backwards. We either succeed and return the original failure
-      // status or we have a 'dismal failure'
-      StepResult undoResult = runSteps();
-      if (undoResult.isSuccess()) {
-        // Return the error from the doResult - that is why we failed
-        return FlightStatus.ERROR;
-      }
-
-      // Part 3 - dismal failure - undo failed!
-      // Record the undo failure
-      flightSupport.recordStep(context());
-      context().setResult(undoResult);
-      logger.error(
-          "DISMAL FAILURE: non-retry-able error during undo. Flight: {}({}) Step: {}({})",
-          context().getFlightId(),
-          context().getFlightClassName(),
-          context().getStepIndex(),
-          context().getStepClassName());
-
-    } catch (InterruptedException ex) {
-      // Interrupted exception - we assume this means that the thread pool is shutting down and
-      // forcibly stopping all threads. We propagate the exception.
-      throw ex;
-    } catch (Exception ex) {
-      logger.error("Unhandled flight exception", ex);
-      context().setResult(new StepResult(StepStatus.STEP_RESULT_FAILURE_FATAL, ex));
-    }
-
-    return FlightStatus.FATAL;
+  public List<Step> getSteps() {
+    return steps;
   }
 
-  /**
-   * run the steps in sequence, either forward or backward, until either we complete successfully or
-   * we encounter an error. Note that this only records the step in the database if there is
-   * success. Otherwise, it returns out and lets the outer logic setup the failure state before
-   * recording it into the database.
-   *
-   * @return StepResult recording the success or failure of the most recent step
-   * @throws InterruptedException on thread pool shutdown
-   * @throws StairwayException some stairway exception
-   */
-  private StepResult runSteps() throws InterruptedException, StairwayException {
-    // Initialize with current result, in case we are all done already
-    StepResult result = context().getResult();
-
-    while (context().haveStepToDo(steps.size())) {
-      result = stepWithRetry();
-
-      // Exit if we hit a failure (result shows failed)
-      if (!result.isSuccess()) {
-        return result;
-      }
-
-      // If we SWITCHed from do to undo, make the direction UNDO
-      if (context().getDirection() == Direction.SWITCH) {
-        context().setDirection(Direction.UNDO);
-      }
-
-      if (flightSupport.getDebugRestartEachStep(flightContext)) {
-        StepResult newResult =
-            new StepResult(
-                StepStatus.STEP_RESULT_RESTART_FLIGHT, result.getException().orElse(null));
-        flightSupport.recordStep(context());
-        return newResult;
-      }
-      switch (result.getStepStatus()) {
-        case STEP_RESULT_SUCCESS:
-          // Finished a step; run the next one
-          context().setRerun(false);
-          flightSupport.recordStep(context());
-          context().nextStepIndex();
-          break;
-
-        case STEP_RESULT_RERUN:
-          // Rerun the same step
-          context().setRerun(true);
-          flightSupport.recordStep(context());
-          break;
-
-        case STEP_RESULT_WAIT:
-          // Finished a step; yield execution
-          context().setRerun(false);
-          flightSupport.recordStep(context());
-          return result;
-
-        case STEP_RESULT_STOP:
-          // Stop executing - leave rerun setting as is; we'll need to pick up where we left off
-          flightSupport.recordStep(context());
-          return result;
-
-        case STEP_RESULT_FAILURE_RETRY:
-        case STEP_RESULT_FAILURE_FATAL:
-        default:
-          throw new StairwayExecutionException("Unexpected step status: " + result.getStepStatus());
-      }
-    }
-    return result;
-  }
-
-  private StepResult stepWithRetry() throws InterruptedException, StairwayExecutionException {
-    logger.debug("Executing " + context().prettyStepState());
-
-    StepRetry currentStep = getCurrentStep();
-    currentStep.retryRule.initialize();
-
-    StepResult result;
-
-    // Retry loop
-    do {
-      try {
-        // Do or undo based on direction we are headed
-        flightSupport.startStepHook(flightContext);
-
-        if (context().isDoing()) {
-          result = currentStep.step.doStep(context());
-          result = flightSupport.debugStatusReplacement(flightContext, steps.size(), result);
-        } else {
-          result = currentStep.step.undoStep(context());
-          result = flightSupport.debugStatusReplacement(flightContext, steps.size(), result);
-        }
-      } catch (InterruptedException ex) {
-        // Interrupted exception - we assume this means that the thread pool is shutting down and
-        // forcibly stopping all threads. We propagate the exception.
-        throw ex;
-      } catch (Exception ex) {
-        // The purpose of this catch is to relieve steps of implementing their own repetitive
-        // try-catch simply to turn exceptions into StepResults.
-        logger.info("Caught exception: (" + ex.toString() + ") " + context().prettyStepState(), ex);
-
-        StepStatus stepStatus =
-            (ex instanceof RetryException)
-                ? StepStatus.STEP_RESULT_FAILURE_RETRY
-                : StepStatus.STEP_RESULT_FAILURE_FATAL;
-        result = new StepResult(stepStatus, ex);
-      } finally {
-        flightSupport.endStepHook(flightContext);
-      }
-
-      switch (result.getStepStatus()) {
-        case STEP_RESULT_SUCCESS:
-        case STEP_RESULT_RERUN:
-          if (flightSupport.isQuietingDown()) {
-            // If we are quieting down, we force a stop
-            result = new StepResult(StepStatus.STEP_RESULT_STOP, null);
-          }
-          return result;
-
-        case STEP_RESULT_FAILURE_FATAL:
-        case STEP_RESULT_STOP:
-        case STEP_RESULT_WAIT:
-        case STEP_RESULT_RESTART_FLIGHT:
-          return result;
-
-        case STEP_RESULT_FAILURE_RETRY:
-          if (flightSupport.isQuietingDown()) {
-            logger.info("Quieting down - not retrying: " + context().prettyStepState());
-            return result;
-          }
-          logger.info("Invoking retry rule: " + context().prettyStepState());
-          break;
-
-        default:
-          // Invalid step status returned from a step!
-          throw new StairwayExecutionException(
-              "Invalid step status returned: "
-                  + result.getStepStatus()
-                  + context().prettyStepState());
-      }
-    } while (currentStep.retryRule
-        .retrySleep()); // retry rule decides if we should try again or not
-    return result;
-  }
-
-  private StepRetry getCurrentStep() throws StairwayExecutionException {
-    int stepIndex = context().getStepIndex();
-    if (stepIndex < 0 || stepIndex >= steps.size()) {
-      throw new StairwayExecutionException("Invalid step index: " + stepIndex);
-    }
-
-    return steps.get(stepIndex);
-  }
-
-  @Override
-  public String toString() {
-    return new ToStringBuilder(this, ToStringStyle.JSON_STYLE)
-        .append("steps", steps)
-        .append("stepClassNames", stepClassNames)
-        .append("flightSupport", flightSupport)
-        .append("flightContext", flightContext)
-        .append("applicationContext", applicationContext)
-        .toString();
+  public List<RetryRule> getRetryRules() {
+    return retryRules;
   }
 }

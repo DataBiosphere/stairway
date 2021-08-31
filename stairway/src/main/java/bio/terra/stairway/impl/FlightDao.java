@@ -28,10 +28,10 @@ import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.time.Instant;
 import java.util.ArrayList;
-import java.util.Collections;
 import java.util.List;
 import java.util.UUID;
 import javax.sql.DataSource;
+import org.apache.commons.lang3.StringUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -92,7 +92,7 @@ class FlightDao {
   }
 
   /**
-   * Record a new flight
+   * Create the record of a new flight
    *
    * @param flightContext description of the flight
    * @throws StairwayException other stairway exception
@@ -100,13 +100,13 @@ class FlightDao {
    * @throws DuplicateFlightIdException attempt to submit a flight with a duplicate id
    * @throws InterruptedException thread shutdown
    */
-  void submit(FlightContext flightContext)
+  void create(FlightContextImpl flightContext)
       throws StairwayException, DatabaseOperationException, DuplicateFlightIdException,
           InterruptedException {
-    DbRetry.retryVoid("flight.submit", () -> submitInner(flightContext));
+    DbRetry.retryVoid("flight.submit", () -> createInner(flightContext));
   }
 
-  private void submitInner(FlightContext flightContext)
+  private void createInner(FlightContextImpl flightContext)
       throws SQLException, DuplicateFlightIdException {
     final String sqlInsertFlight =
         "INSERT INTO "
@@ -213,7 +213,7 @@ class FlightDao {
    * @throws DatabaseOperationException database error
    * @throws InterruptedException thread shutdown
    */
-  void exit(FlightContext flightContext)
+  void exit(FlightContextImpl flightContext)
       throws StairwayException, StairwayExecutionException, DatabaseOperationException,
           InterruptedException {
     switch (flightContext.getFlightStatus()) {
@@ -250,7 +250,7 @@ class FlightDao {
    * @throws DatabaseOperationException database error
    * @throws InterruptedException thread shutdown
    */
-  void queued(FlightContext flightContext)
+  void queued(FlightContextImpl flightContext)
       throws StairwayException, DatabaseOperationException, InterruptedException {
     final String sqlUpdateFlight =
         "UPDATE "
@@ -269,7 +269,7 @@ class FlightDao {
    * @throws DatabaseOperationException database error
    * @throws InterruptedException thread shutdown
    */
-  private void disown(FlightContext flightContext)
+  private void disown(FlightContextImpl flightContext)
       throws StairwayException, DatabaseOperationException, InterruptedException {
     final String sqlUpdateFlight =
         "UPDATE "
@@ -280,7 +280,7 @@ class FlightDao {
     DbRetry.retryVoid("flight.disown", () -> updateFlightState(sqlUpdateFlight, flightContext));
   }
 
-  private void updateFlightState(String sql, FlightContext flightContext) throws SQLException {
+  private void updateFlightState(String sql, FlightContextImpl flightContext) throws SQLException {
     try (Connection connection = dataSource.getConnection();
         NamedParameterPreparedStatement statement =
             new NamedParameterPreparedStatement(connection, sql)) {
@@ -330,10 +330,14 @@ class FlightDao {
 
       startTransaction(connection);
       getStatement.setString("stairwayId", stairwayId);
-      List<FlightContext> flightList = new ArrayList<>();
+
+      // We build a list of flight contexts. This is not necessary for disowning, but we need
+      // to supply the flight context to the state transition hook, so we go to the trouble
+      // of making the whole context.
+      List<FlightContextImpl> flightList = new ArrayList<>();
       try (ResultSet rs = getStatement.getPreparedStatement().executeQuery()) {
         while (rs.next()) {
-          FlightContext flightContext = makeFlightContext(connection, rs.getString("flightid"), rs);
+          FlightContextImpl flightContext = makeFlightContext(connection, rs.getString("flightid"), rs);
           flightContext.setFlightStatus(FlightStatus.READY);
           flightList.add(flightContext);
         }
@@ -350,7 +354,7 @@ class FlightDao {
       commitTransaction(connection);
 
       // Call the state hook for each of the flights we found
-      for (FlightContext flightContext : flightList) {
+      for (FlightContextImpl flightContext : flightList) {
         hookWrapper.stateTransition(flightContext);
       }
     }
@@ -411,12 +415,12 @@ class FlightDao {
    * @throws DatabaseOperationException database error
    * @throws InterruptedException thread shutdown
    */
-  private void complete(FlightContext flightContext)
+  private void complete(FlightContextImpl flightContext)
       throws StairwayException, DatabaseOperationException, InterruptedException {
     DbRetry.retryVoid("flight.complete", () -> completeInner(flightContext));
   }
 
-  private void completeInner(FlightContext flightContext) throws SQLException {
+  private void completeInner(FlightContextImpl flightContext) throws SQLException {
     // Make the update idempotent; that is, only do it if the status is RUNNING
     final String sqlUpdateFlight =
         "UPDATE "
@@ -577,12 +581,12 @@ class FlightDao {
    * @throws DatabaseOperationException database error
    * @throws InterruptedException thread shutdown
    */
-  FlightContext resume(String stairwayId, String flightId)
+  FlightContextImpl resume(String stairwayId, String flightId)
       throws StairwayException, DatabaseOperationException, InterruptedException {
     return DbRetry.retry("flight.resume", () -> resumeInner(stairwayId, flightId));
   }
 
-  private FlightContext resumeInner(String stairwayId, String flightId)
+  private FlightContextImpl resumeInner(String stairwayId, String flightId)
       throws SQLException, DatabaseOperationException, InterruptedException {
     final String sqlUnownedFlight =
         "SELECT class_name, debug_info, status "
@@ -607,10 +611,12 @@ class FlightDao {
       startTransaction(connection);
 
       unownedFlightStatement.setString("flightId", flightId);
-      FlightContext flightContext = null;
+      FlightContextImpl flightContext = null;
       try (ResultSet rs = unownedFlightStatement.getPreparedStatement().executeQuery()) {
         if (rs.next()) {
           flightContext = makeFlightContext(connection, flightId, rs);
+          // Set the flight status to RUNNING. That anticipates the execution of the
+          // takeOwnership statement that will set the flight status in the database.
           flightContext.setFlightStatus(FlightStatus.RUNNING);
         }
       }
@@ -640,13 +646,13 @@ class FlightDao {
    * @throws DatabaseOperationException database error
    * @throws InterruptedException thread shutdown
    */
-  FlightContext makeFlightContextById(String flightId)
+  FlightContextImpl makeFlightContextById(String flightId)
       throws StairwayException, DatabaseOperationException, InterruptedException {
     return DbRetry.retry(
         "flight.makeFlightcontextById", () -> makeFlightContextByIdInner(flightId));
   }
 
-  private FlightContext makeFlightContextByIdInner(String flightId)
+  private FlightContextImpl makeFlightContextByIdInner(String flightId)
       throws SQLException, DatabaseOperationException, InterruptedException {
     final String sqlGetFlight =
         "SELECT class_name, debug_info, status "
@@ -661,7 +667,7 @@ class FlightDao {
       startTransaction(connection);
 
       getFlightStatement.setString("flightId", flightId);
-      FlightContext flightContext = null;
+      FlightContextImpl flightContext = null;
       try (ResultSet rs = getFlightStatement.getPreparedStatement().executeQuery()) {
         if (rs.next()) {
           flightContext = makeFlightContext(connection, flightId, rs);
@@ -674,40 +680,51 @@ class FlightDao {
 
   // The results set must be positioned at a row from the flight table,
   // and the select list must include debug_info, class_name, and status.
-  private FlightContext makeFlightContext(Connection connection, String flightId, ResultSet rs)
-      throws InterruptedException, DatabaseOperationException, SQLException {
+  private FlightContextImpl makeFlightContext(Connection connection, String flightId, ResultSet rs)
+      throws DatabaseOperationException, SQLException {
+
+    // Make the input parameters
     List<FlightInput> inputList = retrieveInputParameters(connection, flightId);
     FlightMap inputParameters = FlightMapUtils.makeFlightMap(inputList);
-    FlightDebugInfo debugInfo = null;
-    try {
-      debugInfo =
-          rs.getString("debug_info") == null
-              ? null
-              : FlightDebugInfo.getObjectMapper()
-                  .readValue(rs.getString("debug_info"), FlightDebugInfo.class);
-    } catch (JsonProcessingException e) {
-      throw new DatabaseOperationException(e);
-    }
-    FlightContext flightContext =
-        new FlightContext(inputParameters, rs.getString("class_name"), Collections.emptyList());
-    flightContext.setDebugInfo(debugInfo);
-    flightContext.setFlightId(flightId);
 
-    fillFlightContexts(connection, Collections.singletonList(flightContext));
-    flightContext.setFlightStatus(FlightStatus.valueOf(rs.getString("status")));
-    return flightContext;
+    // Make debug info, if any
+    FlightDebugInfo debugInfo = null;
+    String debugInfoJson = rs.getString("debug_info");
+    if (StringUtils.isNotEmpty(debugInfoJson)) {
+      try {
+        debugInfo = FlightDebugInfo.getObjectMapper().readValue(debugInfoJson, FlightDebugInfo.class);
+      } catch (JsonProcessingException e) {
+        throw new DatabaseOperationException(e);
+      }
+    }
+
+    // Make the log state
+    FlightContextLogState logState = makeLogState(connection, flightId);
+
+    return new FlightContextImpl(
+        flightId,
+        rs.getString("class_name"),
+        inputParameters,
+        debugInfo,
+        FlightStatus.valueOf(rs.getString("status")),
+        logState);
   }
 
   /**
-   * Loop through the flight context list making a query for each flight to fill in the
-   * FlightContext. This may not be the most efficient algorithm. My reasoning is that the code is
-   * more obvious to understand and this is not a performance-critical part of the processing.
+   * Build the log state of the flight context. The log state comprises the most recent
+   * log record stored in FLIGHT_LOG_TABLE and the most recent working map stored in the
+   * FLIGHT_WORKING_TABLE.
+   *
+   * For a newly created flight, there is no log record or data in the working table. In that
+   * case, we return a log state with the initial values set. That will typically happen when
+   * the caller has queued the flight on submit.
    *
    * @param connection database connection to use
-   * @param flightContextList list of flight context objects to fill in
+   * @return FlightContextLogState either the log state from the database or the initial log
+   *         state if there is nothing logged yet in the database.
    * @throws SQLException on database errors
    */
-  private void fillFlightContexts(Connection connection, List<FlightContext> flightContextList)
+  private FlightContextLogState makeLogState(Connection connection, String flightId)
       throws SQLException {
 
     final String sqlLastFlightLog =
@@ -723,43 +740,38 @@ class FlightDao {
     try (NamedParameterPreparedStatement lastFlightLogStatement =
         new NamedParameterPreparedStatement(connection, sqlLastFlightLog)) {
 
-      for (FlightContext flightContext : flightContextList) {
-        lastFlightLogStatement.setString("flightId", flightContext.getFlightId());
-        lastFlightLogStatement.setString("flightId2", flightContext.getFlightId());
+      lastFlightLogStatement.setString("flightId", flightId);
+      lastFlightLogStatement.setString("flightId2", flightId);
 
-        try (ResultSet rsflight = lastFlightLogStatement.getPreparedStatement().executeQuery()) {
-          // There may not be any log entries for a given flight. That happens if we fail after
-          // submit and before the first step. The defaults for flight context are correct for that
-          // case, so there is nothing left to do here.
-          if (rsflight.next()) {
-            StepResult stepResult;
-            if (rsflight.getBoolean("succeeded")) {
-              stepResult = StepResult.getStepResultSuccess();
-            } else {
-              stepResult =
-                  new StepResult(
-                      StepStatus.STEP_RESULT_FAILURE_FATAL,
-                      exceptionSerializer.deserialize(rsflight.getString("serialized_exception")));
-            }
-
-            flightContext.setRerun(rsflight.getBoolean("rerun"));
-            flightContext.setDirection(Direction.valueOf(rsflight.getString("direction")));
-            flightContext.setResult(stepResult);
-            flightContext.setFlightStatus(FlightStatus.valueOf(rsflight.getString("status")));
-            flightContext.setStepIndex(rsflight.getInt("step_index"));
-
-            // TODO(PF-917): We may have JSON from working_parameters, a set of parameters from
-            // flightworking table, neither, or both.  For now, delegate the decision of which to
-            // use to FlightMap class.  PF-917 will remove column working_parameters.
-
-            final String workingMapJson = rsflight.getString("working_parameters");
-
-            final List<FlightInput> workingList =
-                retrieveWorkingParameters(connection, rsflight.getObject("id", UUID.class));
-
-            flightContext.setWorkingMap(FlightMapUtils.create(workingList, workingMapJson));
-          }
+      try (ResultSet rsflight = lastFlightLogStatement.getPreparedStatement().executeQuery()) {
+        if (!rsflight.next()) {
+          // There is no row. Return the initial log state.
+          return new FlightContextLogState(true); // true = set initial state
         }
+
+        StepResult stepResult;
+        if (rsflight.getBoolean("succeeded")) {
+          stepResult = StepResult.getStepResultSuccess();
+        } else {
+          stepResult =
+              new StepResult(
+                  StepStatus.STEP_RESULT_FAILURE_FATAL,
+                  exceptionSerializer.deserialize(rsflight.getString("serialized_exception")));
+        }
+
+        // TODO(PF-917): We may have JSON from working_parameters, a set of parameters from
+        // flightworking table, neither, or both.  For now, delegate the decision of which to
+        // use to FlightMap class.  PF-917 will remove column working_parameters.
+        final String workingMapJson = rsflight.getString("working_parameters");
+        final List<FlightInput> workingList =
+            retrieveWorkingParameters(connection, rsflight.getObject("id", UUID.class));
+
+        return new FlightContextLogState(false)
+            .workingMap(FlightMapUtils.create(workingList, workingMapJson))
+            .stepIndex(rsflight.getInt("step_index"))
+            .rerun(rsflight.getBoolean("rerun"))
+            .direction(Direction.valueOf(rsflight.getString("direction")))
+            .result(stepResult);
       }
     }
   }

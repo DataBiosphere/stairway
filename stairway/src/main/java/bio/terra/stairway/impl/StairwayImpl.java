@@ -3,7 +3,6 @@ package bio.terra.stairway.impl;
 import bio.terra.stairway.Control;
 import bio.terra.stairway.ExceptionSerializer;
 import bio.terra.stairway.Flight;
-import bio.terra.stairway.FlightContext;
 import bio.terra.stairway.FlightDebugInfo;
 import bio.terra.stairway.FlightFilter;
 import bio.terra.stairway.FlightMap;
@@ -65,7 +64,6 @@ public class StairwayImpl implements Stairway {
   private ScheduledExecutorService scheduledPool;
   private Control control;
   private FlightFactory flightFactory;
-  private FlightSupportImpl flightSupport;
 
   /**
    * We do initialization in three steps. The constructor does the first step of constructing the
@@ -148,7 +146,6 @@ public class StairwayImpl implements Stairway {
         new FlightDao(
             dataSource, stairwayInstanceDao, exceptionSerializer, hookWrapper, stairwayName);
     control = new ControlImpl(dataSource, flightDao, stairwayInstanceDao);
-    flightSupport = new FlightSupportImpl(this);
     flightFactory = new FlightFactory();
 
     if (forceCleanStart) {
@@ -265,14 +262,16 @@ public class StairwayImpl implements Stairway {
     queueManager.shutdownNow();
     List<Runnable> neverStartedFlights = threadPool.shutdownNow();
     for (Runnable flightRunnable : neverStartedFlights) {
-      Flight flight = (Flight) flightRunnable;
+      FlightRunner flightRunner = (FlightRunner) flightRunnable;
+      FlightContextImpl flightContext = flightRunner.getFlightContext();
+      String flightDesc = flightContext.flightDesc();
       try {
-        logger.info("Requeue never-started flight: " + flight.context().flightDesc());
-        flight.context().setFlightStatus(FlightStatus.READY);
-        flightDao.exit(flight.context());
+        logger.info("Requeue never-started flight: " + flightDesc);
+        flightContext.setFlightStatus(FlightStatus.READY);
+        flightDao.exit(flightContext);
       } catch (DatabaseOperationException | StairwayExecutionException ex) {
         // Not much to do on termination
-        logger.warn("Unable to requeue never-started flight: " + flight.context().flightDesc(), ex);
+        logger.warn("Unable to requeue never-started flight: " + flightDesc, ex);
       }
     }
     return threadPool.awaitTermination(waitTimeout, unit);
@@ -321,10 +320,8 @@ public class StairwayImpl implements Stairway {
           "Must supply non-null flightClass and inputParameters to submit");
     }
     Flight flight =
-        flightFactory.makeFlight(
-            flightClass, inputParameters, applicationContext, debugInfo, flightSupport);
-    FlightContext context = flight.context();
-    context.setFlightId(flightId);
+        flightFactory.makeFlight(flightClass, inputParameters, applicationContext);
+    FlightContextImpl context = new FlightContextImpl(this, flight, flightId, debugInfo);
 
     if (isQuietingDown()) {
       shouldQueue = true;
@@ -340,7 +337,7 @@ public class StairwayImpl implements Stairway {
     if (queueManager.isWorkQueueEnabled() && shouldQueue) {
       // Submit to the queue
       context.setFlightStatus(FlightStatus.READY);
-      flightDao.submit(context);
+      flightDao.create(context);
       queueFlight(context);
     } else {
       // Submit directly - not allowed if we are shutting down
@@ -350,9 +347,8 @@ public class StairwayImpl implements Stairway {
       }
 
       // Give the flight context the public stairway object
-      context.setStairway(this);
-      flightDao.submit(context);
-      launchFlight(flight);
+      flightDao.create(context);
+      launchFlight(context);
     }
   }
 
@@ -423,7 +419,8 @@ public class StairwayImpl implements Stairway {
       throw new StairwayShutdownException("Stairway is shutting down and cannot resume a flight");
     }
 
-    FlightContext flightContext = flightDao.resume(stairwayName, flightId);
+    // The DAO fills in the persistent fields in the flightContext
+    FlightContextImpl flightContext = flightDao.resume(stairwayName, flightId);
     if (flightContext == null) {
       return false;
     }
@@ -432,12 +429,11 @@ public class StairwayImpl implements Stairway {
         flightFactory.makeFlightFromName(
             flightContext.getFlightClassName(),
             flightContext.getInputParameters(),
-            applicationContext,
-            flightContext.getDebugInfo(),
-            flightSupport);
-    flightContext.setStairway(this);
-    flight.setFlightContext(flightContext);
-    launchFlight(flight);
+            applicationContext);
+
+    // With the flight, we can complete building the flight context
+    flightContext.setDynamicContext(this, flight);
+    launchFlight(flightContext);
 
     return true;
   }
@@ -564,9 +560,9 @@ public class StairwayImpl implements Stairway {
     return threadPool;
   }
 
-  void exitFlight(FlightContext context)
+  void exitFlight(FlightContextImpl context)
       throws StairwayException, DatabaseOperationException, StairwayExecutionException,
-          InterruptedException {
+      InterruptedException {
     // save the flight state in the database
     flightDao.exit(context);
 
@@ -582,7 +578,7 @@ public class StairwayImpl implements Stairway {
     }
   }
 
-  private void queueFlight(FlightContext flightContext)
+  private void queueFlight(FlightContextImpl flightContext)
       throws StairwayException, DatabaseOperationException, StairwayExecutionException,
           InterruptedException {
     // If the flight state is READY, then we put the flight on the queue and mark it queued in the
@@ -619,7 +615,7 @@ public class StairwayImpl implements Stairway {
     List<String> readyFlightList = flightDao.getReadyFlights();
     for (String flightId : readyFlightList) {
       if (queueManager.isWorkQueueEnabled()) {
-        FlightContext flightContext = flightDao.makeFlightContextById(flightId);
+        FlightContextImpl flightContext = flightDao.makeFlightContextById(flightId);
         queueFlight(flightContext);
       } else {
         resume(flightId);
@@ -628,11 +624,12 @@ public class StairwayImpl implements Stairway {
   }
 
   /*
-   * Build the task context to keep track of the running flight.
-   * Once it is launched, hook it into the {@link #taskContextMap} so other
-   * calls can resolve it.
+   * Build the FlightRunner object that will execute the flight
+   * and hand it to the threadPool to run.
    */
-  private void launchFlight(Flight flight) {
+  private void launchFlight(FlightContextImpl flightContext) {
+    FlightRunner runner = new FlightRunner(flightContext);
+
     if (logger.isDebugEnabled()) {
       logger.debug(
           "Stairway thread pool: "
@@ -640,8 +637,8 @@ public class StairwayImpl implements Stairway {
               + " active from pool of "
               + threadPool.getPoolSize());
     }
-    logger.info("Launching flight " + flight.context().flightDesc());
-    threadPool.submit(flight);
+    logger.info("Launching flight " + flightContext.flightDesc());
+    threadPool.submit(runner);
   }
 
   HookWrapper getHookWrapper() {

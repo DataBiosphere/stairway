@@ -4,7 +4,7 @@ import static org.hamcrest.CoreMatchers.equalTo;
 import static org.hamcrest.MatcherAssert.assertThat;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
-import bio.terra.stairway.FlightContext;
+import bio.terra.stairway.Flight;
 import bio.terra.stairway.FlightFilter;
 import bio.terra.stairway.FlightFilterOp;
 import bio.terra.stairway.FlightMap;
@@ -149,11 +149,17 @@ public class EnumerateFlightsTest {
       }
     }
 
-    FlightContext flightContext = new FlightContext(inputParams, className, Collections.EMPTY_LIST);
-    flightContext.setFlightId(flightId);
-    flightContext.setStairway(stairway);
+    FlightFactory flightFactory = new FlightFactory();
+    Flight flight = flightFactory.makeFlightFromName(className, inputParams, null);
 
-    flightDao.submit(flightContext);
+    FlightContextImpl flightContext =
+        new FlightContextImpl(
+            stairway,
+            flight,
+            flightId,
+            null);
+
+    flightDao.create(flightContext);
 
     // If status isn't "RUNNING" then we set the status and mark the flight complete
     if (status != FlightStatus.RUNNING) {
