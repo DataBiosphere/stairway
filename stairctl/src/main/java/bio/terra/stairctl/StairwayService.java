@@ -3,6 +3,7 @@ package bio.terra.stairctl;
 import bio.terra.stairctl.configuration.StairwayConfiguration;
 import bio.terra.stairway.Control;
 import bio.terra.stairway.Stairway;
+import bio.terra.stairway.StairwayBuilder;
 import java.util.Properties;
 import javax.sql.DataSource;
 import org.apache.commons.dbcp2.ConnectionFactory;
@@ -38,10 +39,8 @@ public class StairwayService {
 
     try {
       this.stairway =
-          Stairway.newBuilder()
+          new StairwayBuilder()
               .stairwayName("stairctl") // No queue, no flights, so name is irrelevant...
-              .stairwayClusterName("stairctlcluster") // ...as is clustername
-              .enableWorkQueue(false) // we will not be running any flights anywhere!
               .build();
 
       stairway.initialize(dataSource, false, false);
