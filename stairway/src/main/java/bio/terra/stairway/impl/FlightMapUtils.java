@@ -8,7 +8,6 @@ import bio.terra.stairway.exception.JsonConversionException;
 import com.fasterxml.jackson.core.type.TypeReference;
 import java.io.IOException;
 import java.util.ArrayList;
-import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import javax.annotation.Nullable;
@@ -24,11 +23,11 @@ public class FlightMapUtils {
    * @param inputList input list form of the input parameters
    */
   static FlightMap makeFlightMap(List<FlightInput> inputList) {
-    Map<String, String> map = new HashMap<>();
+    FlightMap flightMap = new FlightMap();
     for (FlightInput input : inputList) {
-      map.put(input.getKey(), input.getValue());
+      flightMap.putRaw(input.getKey(), input.getValue());
     }
-    return new FlightMap(map);
+    return flightMap;
   }
 
   /**
@@ -76,15 +75,14 @@ public class FlightMapUtils {
   }
 
   static FlightMap fromJson(String json) {
-    Map<String, String> map = new HashMap<>();
     try {
       Map<String, Object> legacyMap =
           getObjectMapper().readValue(json, new TypeReference<Map<String, Object>>() {});
+      FlightMap flightMap = new FlightMap();
       for (Map.Entry<String, Object> entry : legacyMap.entrySet()) {
-        map.put(entry.getKey(), getObjectMapper().writeValueAsString(entry.getValue()));
+        flightMap.putRaw(entry.getKey(), getObjectMapper().writeValueAsString(entry.getValue()));
       }
-
-      return new FlightMap(map);
+      return flightMap;
     } catch (IOException ex) {
       throw new JsonConversionException("Failed to convert json string to map", ex);
     }

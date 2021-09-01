@@ -94,7 +94,7 @@ public class FileQueue implements QueueInterface {
   }
 
   @Override
-  public void purgeQueue() {
+  public void purgeQueueForTesting() {
     File[] files = queueDir.listFiles();
     if (files == null) {
       return;
@@ -117,7 +117,7 @@ public class FileQueue implements QueueInterface {
       logger.info("Queue directory exists: " + queueDir.getPath());
     }
     FileQueue aQueue = new FileQueue(queueDir);
-    aQueue.purgeQueue();
+    aQueue.purgeQueueForTesting();
     return aQueue;
   }
 }

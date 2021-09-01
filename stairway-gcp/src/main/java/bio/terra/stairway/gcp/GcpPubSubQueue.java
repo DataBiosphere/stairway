@@ -154,7 +154,7 @@ class GcpPubSubQueue implements QueueInterface {
   }
 
   @Override
-  public void purgeQueue() {
+  public void purgeQueueForTesting() {
     // Sometimes we get an empty response even when there are messages, so receive empty twice
     // before calling it purged.
     int emptyCount = 0;

@@ -6,9 +6,9 @@ import bio.terra.stairway.StepResult;
 import org.apache.commons.lang3.builder.ToStringBuilder;
 
 /**
- * This POJO represents the part of the flight context that changes each time a step is
- * completed and its log record is written. It is factored out as a separate POJO to
- * simplify handling in the DAO and initializing the flight context object.
+ * This POJO represents the part of the flight context that changes each time a step is completed
+ * and its log record is written. It is factored out as a separate POJO to simplify handling in the
+ * DAO and initializing the flight context object.
  */
 public class FlightContextLogState {
   /**
@@ -30,6 +30,7 @@ public class FlightContextLogState {
 
   /**
    * Constructor that can optionally set defaults for the log state
+   *
    * @param setDefaults true to set default; false otherwise
    */
   public FlightContextLogState(boolean setDefaults) {
@@ -39,7 +40,7 @@ public class FlightContextLogState {
       this.rerun = false;
       this.direction = Direction.START;
       this.result = StepResult.getStepResultSuccess();
-      }
+    }
   }
 
   public FlightMap getWorkingMap() {
@@ -59,7 +60,6 @@ public class FlightContextLogState {
     this.stepIndex = stepIndex;
     return this;
   }
-
 
   public boolean isRerun() {
     return rerun;

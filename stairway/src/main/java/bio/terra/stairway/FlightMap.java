@@ -25,23 +25,13 @@ public class FlightMap {
   }
 
   /**
-   * This constructor is used when Stairway re-creates the flight map from the database. It is not
-   * intended for client use.
-   *
-   * @param map deserialized input map from database
-   */
-  public FlightMap(Map<String, String> map) {
-    this.map = map;
-  }
-
-  /**
    * Accessor for the contained map. Used for storing the map into the database. It is not intended
    * for client use.
    *
    * @return contained map
    */
   public Map<String, String> getMap() {
-    return map;
+    return Collections.unmodifiableMap(map);
   }
 
   /** Convert the map to an unmodifiable form. */

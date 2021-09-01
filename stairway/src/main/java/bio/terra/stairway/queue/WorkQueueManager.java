@@ -32,7 +32,7 @@ public class WorkQueueManager {
    */
   public void initialize(boolean forceClean) {
     if (workQueueEnabled && forceClean) {
-      workQueue.purgeQueue();
+      workQueue.purgeQueueForTesting();
     }
   }
 

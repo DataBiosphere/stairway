@@ -63,7 +63,6 @@ public class StairwayImpl implements Stairway {
   private FlightDao flightDao;
   private ScheduledExecutorService scheduledPool;
   private Control control;
-  private FlightFactory flightFactory;
 
   /**
    * We do initialization in three steps. The constructor does the first step of constructing the
@@ -146,7 +145,6 @@ public class StairwayImpl implements Stairway {
         new FlightDao(
             dataSource, stairwayInstanceDao, exceptionSerializer, hookWrapper, stairwayName);
     control = new ControlImpl(dataSource, flightDao, stairwayInstanceDao);
-    flightFactory = new FlightFactory();
 
     if (forceCleanStart) {
       // Drop all tables and recreate the database
@@ -319,8 +317,7 @@ public class StairwayImpl implements Stairway {
       throw new MakeFlightException(
           "Must supply non-null flightClass and inputParameters to submit");
     }
-    Flight flight =
-        flightFactory.makeFlight(flightClass, inputParameters, applicationContext);
+    Flight flight = FlightFactory.makeFlight(flightClass, inputParameters, applicationContext);
     FlightContextImpl context = new FlightContextImpl(this, flight, flightId, debugInfo);
 
     if (isQuietingDown()) {
@@ -426,7 +423,7 @@ public class StairwayImpl implements Stairway {
     }
 
     Flight flight =
-        flightFactory.makeFlightFromName(
+        FlightFactory.makeFlightFromName(
             flightContext.getFlightClassName(),
             flightContext.getInputParameters(),
             applicationContext);
@@ -562,7 +559,7 @@ public class StairwayImpl implements Stairway {
 
   void exitFlight(FlightContextImpl context)
       throws StairwayException, DatabaseOperationException, StairwayExecutionException,
-      InterruptedException {
+          InterruptedException {
     // save the flight state in the database
     flightDao.exit(context);
 

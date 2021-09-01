@@ -19,9 +19,7 @@ import java.util.Set;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-/**
- * FlightRunner executes the flight. It manages the atomic execution of a series of steps.
- */
+/** FlightRunner executes the flight. It manages the atomic execution of a series of steps. */
 public class FlightRunner implements Runnable {
   private static final Logger logger = LoggerFactory.getLogger(FlightRunner.class);
 
@@ -85,8 +83,8 @@ public class FlightRunner implements Runnable {
   }
 
   /**
-   * Common exit method that sets the flight state in the context and
-   * tells stairway to perform state-related exit processing.
+   * Common exit method that sets the flight state in the context and tells stairway to perform
+   * state-related exit processing.
    *
    * @param flightStatus status of the flight
    */
@@ -260,7 +258,8 @@ public class FlightRunner implements Runnable {
       } catch (Exception ex) {
         // The purpose of this catch is to relieve steps of implementing their own repetitive
         // try-catch simply to turn exceptions into StepResults.
-        logger.info("Caught exception: (" + ex.toString() + ") " + flightContext.prettyStepState(), ex);
+        logger.info(
+            "Caught exception: (" + ex.toString() + ") " + flightContext.prettyStepState(), ex);
 
         // If the exception is the special Stairway RetryException, then we perform a retry.
         // Otherwise, it is an error.

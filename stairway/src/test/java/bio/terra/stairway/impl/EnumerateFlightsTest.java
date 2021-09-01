@@ -149,15 +149,9 @@ public class EnumerateFlightsTest {
       }
     }
 
-    FlightFactory flightFactory = new FlightFactory();
-    Flight flight = flightFactory.makeFlightFromName(className, inputParams, null);
+    Flight flight = FlightFactory.makeFlightFromName(className, inputParams, null);
 
-    FlightContextImpl flightContext =
-        new FlightContextImpl(
-            stairway,
-            flight,
-            flightId,
-            null);
+    FlightContextImpl flightContext = new FlightContextImpl(stairway, flight, flightId, null);
 
     flightDao.create(flightContext);
 

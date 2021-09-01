@@ -13,8 +13,8 @@ import org.slf4j.LoggerFactory;
 
 /** Test to make sure the GcpPubSubQueue is basically working */
 @Tag("connected")
-public class PubSubQueueTest {
-  private final Logger logger = LoggerFactory.getLogger(PubSubQueueTest.class);
+public class GcpPubSubQueueTest {
+  private final Logger logger = LoggerFactory.getLogger(GcpPubSubQueueTest.class);
 
   private static final String subscriptionId = "queueTest-sub";
   private static final String topicId = "queueTest-queue";
@@ -33,7 +33,7 @@ public class PubSubQueueTest {
             .topicId(topicId)
             .subscriptionId(subscriptionId)
             .build();
-    workQueue.purgeQueue();
+    workQueue.purgeQueueForTesting();
   }
 
   @AfterEach

@@ -337,7 +337,8 @@ class FlightDao {
       List<FlightContextImpl> flightList = new ArrayList<>();
       try (ResultSet rs = getStatement.getPreparedStatement().executeQuery()) {
         while (rs.next()) {
-          FlightContextImpl flightContext = makeFlightContext(connection, rs.getString("flightid"), rs);
+          FlightContextImpl flightContext =
+              makeFlightContext(connection, rs.getString("flightid"), rs);
           flightContext.setFlightStatus(FlightStatus.READY);
           flightList.add(flightContext);
         }
@@ -692,7 +693,8 @@ class FlightDao {
     String debugInfoJson = rs.getString("debug_info");
     if (StringUtils.isNotEmpty(debugInfoJson)) {
       try {
-        debugInfo = FlightDebugInfo.getObjectMapper().readValue(debugInfoJson, FlightDebugInfo.class);
+        debugInfo =
+            FlightDebugInfo.getObjectMapper().readValue(debugInfoJson, FlightDebugInfo.class);
       } catch (JsonProcessingException e) {
         throw new DatabaseOperationException(e);
       }
@@ -711,17 +713,16 @@ class FlightDao {
   }
 
   /**
-   * Build the log state of the flight context. The log state comprises the most recent
-   * log record stored in FLIGHT_LOG_TABLE and the most recent working map stored in the
-   * FLIGHT_WORKING_TABLE.
+   * Build the log state of the flight context. The log state comprises the most recent log record
+   * stored in FLIGHT_LOG_TABLE and the most recent working map stored in the FLIGHT_WORKING_TABLE.
    *
-   * For a newly created flight, there is no log record or data in the working table. In that
-   * case, we return a log state with the initial values set. That will typically happen when
-   * the caller has queued the flight on submit.
+   * <p>For a newly created flight, there is no log record or data in the working table. In that
+   * case, we return a log state with the initial values set. That will typically happen when the
+   * caller has queued the flight on submit.
    *
    * @param connection database connection to use
-   * @return FlightContextLogState either the log state from the database or the initial log
-   *         state if there is nothing logged yet in the database.
+   * @return FlightContextLogState either the log state from the database or the initial log state
+   *     if there is nothing logged yet in the database.
    * @throws SQLException on database errors
    */
   private FlightContextLogState makeLogState(Connection connection, String flightId)

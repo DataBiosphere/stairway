@@ -20,13 +20,12 @@ import org.apache.commons.lang3.StringUtils;
 import org.apache.commons.lang3.builder.ToStringBuilder;
 
 /**
- * Context for a flight. This object contains all of the data associated with running
- * the flight. Some of the data is persisted and restored through the flight's
- * lifecycle. Some is regenerated (idempotently) by the Flight constructor. Some
- * is dynamic based on the current instantiation of the flight within a
- * service instance.
+ * Context for a flight. This object contains all of the data associated with running the flight.
+ * Some of the data is persisted and restored through the flight's lifecycle. Some is regenerated
+ * (idempotently) by the Flight constructor. Some is dynamic based on the current instantiation of
+ * the flight within a service instance.
  *
- * A subset of the flight context is made visible via the FlightContext interface
+ * <p>A subset of the flight context is made visible via the FlightContext interface
  */
 public class FlightContextImpl implements FlightContext {
   // -- dynamic state --
@@ -91,8 +90,8 @@ public class FlightContextImpl implements FlightContext {
   private final FlightContextLogState logState;
 
   /**
-   * Context constructor used for new submitted flights.
-   * Initialize the context to start at the first step (index 0).
+   * Context constructor used for new submitted flights. Initialize the context to start at the
+   * first step (index 0).
    *
    * @param stairway the calling stairway object
    * @param flight the flight object with steps filled in
@@ -100,10 +99,7 @@ public class FlightContextImpl implements FlightContext {
    * @param debugInfo debugInfo for this flight
    */
   public FlightContextImpl(
-      StairwayImpl stairway,
-      Flight flight,
-      String flightId,
-      FlightDebugInfo debugInfo) {
+      StairwayImpl stairway, Flight flight, String flightId, FlightDebugInfo debugInfo) {
 
     // Set the dynamic and regenerated state
     setDynamicContext(stairway, flight);
@@ -120,6 +116,7 @@ public class FlightContextImpl implements FlightContext {
 
   /**
    * Context constructor used for persisted flights. Used in the DAO
+   *
    * @param flightId unique id for this flight
    * @param flightClassName name of the flight class
    * @param inputParameters input parameters for the flight
@@ -280,8 +277,7 @@ public class FlightContextImpl implements FlightContext {
   // Check if we are 'doing' the last step in the flight.
   // Used to implement the DebugInfo last step failure in FlightRunner
   boolean isDoingLastStep() {
-    return (isDoing() &&
-        getStepIndex() == steps.size() - 1);
+    return (isDoing() && getStepIndex() == steps.size() - 1);
   }
 
   void nextStepIndex() {

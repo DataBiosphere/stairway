@@ -242,7 +242,7 @@ public class ScenarioTest {
     String stairwayName = stairway.getStairwayName();
 
     stairway.terminate(5, TimeUnit.SECONDS);
-    // out with the old; in with the new
+    // Create a new stairway instance to test flight continuity over terminate-recover
     stairway =
         new TestStairwayBuilder()
             .name(stairwayName)
@@ -353,7 +353,7 @@ public class ScenarioTest {
 
     String stairwayName = stairway.getStairwayName();
     stairway.terminate(5, TimeUnit.SECONDS);
-    // out with the old; in with the new
+    // Create a new stairway and check flight recovery
     stairway =
         new TestStairwayBuilder()
             .name(stairwayName)

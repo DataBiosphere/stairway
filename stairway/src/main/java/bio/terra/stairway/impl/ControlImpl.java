@@ -13,13 +13,7 @@ import java.util.List;
 import java.util.UUID;
 import javax.sql.DataSource;
 
-/**
- * This class provides an API for out-of-band debugging and recovering Stairway flights. It caters
- * to the use cases of the stairctl tool. The methods are constrained to only access the database,
- * and do not rely on any application-specific state. We current do not use the FlightDao for the
- * database accesses. We may be able to do so once FlightDao stops doing deserialization, so we take
- * a reference to the flightDao even though it is unused.
- */
+/** This class provides the implementation of {@link Control}. */
 @SuppressFBWarnings(
     value = "RCN_REDUNDANT_NULLCHECK_WOULD_HAVE_BEEN_A_NPE",
     justification = "Spotbugs doesn't understand resource try construct")

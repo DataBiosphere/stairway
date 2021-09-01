@@ -4,9 +4,8 @@ import java.util.LinkedList;
 import java.util.List;
 
 /**
- * The Flight object is the vehicle Stairway uses for (re)building the steps of a flight
- * in preparation for running the flight. The object is not used in the actual execution of
- * the flight.
+ * The Flight object is the vehicle Stairway uses for (re)building the steps of a flight in
+ * preparation for running the flight. The object is not used in the actual execution of the flight.
  *
  * <p>In order for the flight to be re-created on recovery, the construction and configuration have
  * to result in the same set of steps given the same input.
@@ -37,6 +36,7 @@ public class Flight {
 
   /**
    * Add a step and a retry rule to the respective arrays.
+   *
    * @param step subclass of Step
    * @param retryRule subclass of RetryRule
    */

@@ -8,13 +8,11 @@ import java.lang.reflect.InvocationTargetException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-public class FlightFactory {
+class FlightFactory {
   private static final Logger logger = LoggerFactory.getLogger(FlightFactory.class);
 
-  public Flight makeFlight(
-      Class<? extends Flight> flightClass,
-      FlightMap inputParameters,
-      Object context) {
+  static Flight makeFlight(
+      Class<? extends Flight> flightClass, FlightMap inputParameters, Object context) {
     try {
       // Find the flightClass constructor that takes the input parameter map and
       // use it to make the flight.
@@ -29,10 +27,7 @@ public class FlightFactory {
     }
   }
 
-  public Flight makeFlightFromName(
-      String className,
-      FlightMap inputMap,
-      Object context) {
+  static Flight makeFlightFromName(String className, FlightMap inputMap, Object context) {
     try {
       Class<?> someClass = Class.forName(className);
       if (Flight.class.isAssignableFrom(someClass)) {

@@ -5,6 +5,7 @@ import bio.terra.stairway.FlightFilter.FlightFilterPredicate;
 import bio.terra.stairway.StairwayMapper;
 import bio.terra.stairway.exception.FlightFilterException;
 import com.fasterxml.jackson.core.JsonProcessingException;
+import com.google.common.annotations.VisibleForTesting;
 import java.sql.SQLException;
 import java.time.Instant;
 import org.apache.commons.lang3.StringUtils;
@@ -13,7 +14,7 @@ import org.apache.commons.lang3.StringUtils;
  * A FlightFilterAccess is used to access FlightFilter members for generating the SQL queries
  * applying the predicates.
  */
-public class FlightFilterAccess {
+class FlightFilterAccess {
   private final FlightFilter filter;
 
   public FlightFilterAccess(FlightFilter filter) {
@@ -181,6 +182,7 @@ public class FlightFilterAccess {
    *
    * @return the SQL predicate
    */
+  @VisibleForTesting
   String makeFlightPredicateSql(FlightFilterPredicate predicate) {
     return "F."
         + predicate.getKey()
@@ -195,7 +197,7 @@ public class FlightFilterAccess {
    * @param statement statement being readied for execution
    * @throws SQLException on errors setting the parameter values
    */
-  void storeFlightPredicateValue(
+  private void storeFlightPredicateValue(
       FlightFilterPredicate predicate, NamedParameterPreparedStatement statement)
       throws SQLException {
     switch (predicate.getDatatype()) {
@@ -214,6 +216,7 @@ public class FlightFilterAccess {
    *
    * @return the SQL predicate
    */
+  @VisibleForTesting
   String makeInputPredicateSql(FlightFilterPredicate predicate) {
     return "(I.key = '"
         + predicate.getKey()
@@ -224,7 +227,7 @@ public class FlightFilterAccess {
         + ")";
   }
 
-  void storeInputPredicateValue(
+  private void storeInputPredicateValue(
       FlightFilterPredicate predicate, NamedParameterPreparedStatement statement)
       throws SQLException, JsonProcessingException {
     String jsonValue = StairwayMapper.getObjectMapper().writeValueAsString(predicate.getValue());
