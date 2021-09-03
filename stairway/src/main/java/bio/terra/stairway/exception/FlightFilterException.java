@@ -1,6 +1,8 @@
 package bio.terra.stairway.exception;
 
-public class FlightFilterException extends StairwayException {
+/** Invalid flight filter provided to flight enumeration */
+public class FlightFilterException extends StairwayBadRequestException {
+
   public FlightFilterException(String message) {
     super(message);
   }

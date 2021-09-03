@@ -8,9 +8,18 @@ import java.lang.reflect.InvocationTargetException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+/** Methods to construct Flight objects given a Flight class or the name of a Flight class. */
 class FlightFactory {
   private static final Logger logger = LoggerFactory.getLogger(FlightFactory.class);
 
+  /**
+   * Construct a Flight object given the class
+   *
+   * @param flightClass subclass Flight
+   * @param inputParameters input FlightMap
+   * @param context caller-provided context for the flight
+   * @return Constructed flight object with steps array
+   */
   static Flight makeFlight(
       Class<? extends Flight> flightClass, FlightMap inputParameters, Object context) {
     try {
@@ -27,12 +36,20 @@ class FlightFactory {
     }
   }
 
-  static Flight makeFlightFromName(String className, FlightMap inputMap, Object context) {
+  /**
+   * Construct a Flight object given the name of the class
+   *
+   * @param className Name of a flight class
+   * @param inputParameters input FlightMap
+   * @param context caller-provided context for the flight
+   * @return Constructed flight object with steps array
+   */
+  static Flight makeFlightFromName(String className, FlightMap inputParameters, Object context) {
     try {
       Class<?> someClass = Class.forName(className);
       if (Flight.class.isAssignableFrom(someClass)) {
         Class<? extends Flight> flightClass = (Class<? extends Flight>) someClass;
-        return makeFlight(flightClass, inputMap, context);
+        return makeFlight(flightClass, inputParameters, context);
       }
       // Error case
       throw new MakeFlightException(

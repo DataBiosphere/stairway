@@ -1,19 +1,22 @@
 package bio.terra.stairway;
 
+/**
+ * In a cluster configuration (e.g., Kubernetes), multiple service instances containing Stairway
+ * instances cooperate to provide the service. In that configuration, Stairway uses a queue to share
+ * work across its instances and to move work during shutdown. Stairway requires a transactional
+ * queue with at-least-once delivery semantics.
+ *
+ * <p>The queue interface is the abstraction Stairway uses to put messages onto the queue and read
+ * them from the queue for processing. At the time of this writing, the only message passed is the
+ * request for another Stairway instance to run a flight.
+ *
+ * <p>We need the queue abstraction to support multiple cloud platforms. On GCP, we use PubSub
+ * queues. On Azure, there are several messaging options.
+ */
 public interface QueueInterface {
 
   /**
-   * In a cluster configuration (e.g., Kubernetes), multiple service instances containing Stairway
-   * instances, cooperate the provide the service. In that configuration, Stairway uses a queue to
-   * share work across instances and to move work during shutdown. Stairway requires a transactional
-   * queue with at-least-once delivery semantics.
-   *
-   * <p>The queue interface is the abstraction Stairway uses to put messages onto the queue and read
-   * them from the queue for processing. At the time of this writing, the only message passed is the
-   * request for another Stairway instance to run a flight.
-   *
-   * <p>We need the queue abstraction to support multiple cloud platforms. On GCP, we use PubSub
-   * queues. On Azure, there are several messaging options.
+   * Dispatch messages from the work queue
    *
    * <p>Dispatching from the queue cannot be a simple dequeue operation. The queue implementations
    * on GCP and Azure are transactional. Getting an item from the cloud queue does not dequeue it.

@@ -1,5 +1,6 @@
 package bio.terra.stairway.exception;
 
+/** Thrown when {@link bio.terra.stairway.Stairway#waitForFlight} times out. */
 public class FlightWaitTimedOutException extends StairwayBadRequestException {
   public FlightWaitTimedOutException(String message) {
     super(message);

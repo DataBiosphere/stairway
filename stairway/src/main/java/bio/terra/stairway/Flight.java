@@ -5,7 +5,9 @@ import java.util.List;
 
 /**
  * The Flight object is the vehicle Stairway uses for (re)building the steps of a flight in
- * preparation for running the flight. The object is not used in the actual execution of the flight.
+ * preparation for running the flight. Previously, this class contained the logic for running the
+ * flight. That logic is now in the implementation class {@link
+ * bio.terra.stairway.impl.FlightRunner}
  *
  * <p>In order for the flight to be re-created on recovery, the construction and configuration have
  * to result in the same set of steps given the same input.
