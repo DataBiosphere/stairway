@@ -13,6 +13,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 import bio.terra.stairway.exception.FlightNotFoundException;
 import bio.terra.stairway.fixtures.MapKey;
 import bio.terra.stairway.fixtures.TestPauseController;
+import bio.terra.stairway.fixtures.TestStairwayBuilder;
 import bio.terra.stairway.fixtures.TestUtil;
 import bio.terra.stairway.flights.TestFlight;
 import bio.terra.stairway.flights.TestFlightQuietDown;
@@ -36,13 +37,12 @@ import org.slf4j.LoggerFactory;
 
 @Tag("unit")
 public class ScenarioTest {
-  private Stairway stairway;
   private final Logger logger = LoggerFactory.getLogger(ScenarioTest.class);
+  private Stairway stairway;
 
   @BeforeEach
   public void setup() throws Exception {
-    String stairwayName = TestUtil.randomStairwayName();
-    stairway = TestUtil.setupStairwayWithHooks(stairwayName, false, 1);
+    stairway = new TestStairwayBuilder().testHookCount(1).build();
   }
 
   @Test
@@ -69,11 +69,11 @@ public class ScenarioTest {
     assertThat(result.getFlightStatus(), equalTo(FlightStatus.SUCCESS));
     assertFalse(result.getException().isPresent());
 
+    String badFlightId = UUID.randomUUID().toString();
     try {
-      stairway.deleteFlight(flightId, false);
-      stairway.waitForFlight(flightId, null, null);
+      stairway.waitForFlight(badFlightId, null, null);
     } catch (FlightNotFoundException ex) {
-      assertThat(ex.getMessage(), containsString(flightId));
+      assertThat(ex.getMessage(), containsString(badFlightId));
     }
 
     // Validate the hook log
@@ -242,9 +242,15 @@ public class ScenarioTest {
     String stairwayName = stairway.getStairwayName();
 
     stairway.terminate(5, TimeUnit.SECONDS);
-    stairway = null;
-
-    stairway = TestUtil.makeStairwayValidateRecovery(stairwayName, flightId, 1);
+    // Create a new stairway instance to test flight continuity over terminate-recover
+    stairway =
+        new TestStairwayBuilder()
+            .name(stairwayName)
+            .continuing(true)
+            .doRecoveryCheck(true)
+            .flightId(flightId)
+            .testHookCount(1)
+            .build();
 
     stairway.waitForFlight(flightId, null, null);
     state = stairway.getFlightState(flightId);
@@ -347,9 +353,15 @@ public class ScenarioTest {
 
     String stairwayName = stairway.getStairwayName();
     stairway.terminate(5, TimeUnit.SECONDS);
-    stairway = null;
-
-    stairway = TestUtil.makeStairwayValidateRecovery(stairwayName, flightId, 1);
+    // Create a new stairway and check flight recovery
+    stairway =
+        new TestStairwayBuilder()
+            .name(stairwayName)
+            .continuing(true)
+            .doRecoveryCheck(true)
+            .flightId(flightId)
+            .testHookCount(1)
+            .build();
 
     TestPauseController.setControl(1); // wake it up
     stairway.waitForFlight(flightId, null, null);
@@ -462,9 +474,15 @@ public class ScenarioTest {
 
     String stairwayName = stairway.getStairwayName();
     stairway.terminate(5, TimeUnit.SECONDS);
-    stairway = null;
 
-    stairway = TestUtil.makeStairwayValidateRecovery(stairwayName, flightId, 1);
+    stairway =
+        new TestStairwayBuilder()
+            .name(stairwayName)
+            .continuing(true)
+            .doRecoveryCheck(true)
+            .flightId(flightId)
+            .testHookCount(1)
+            .build();
 
     TestPauseController.setControl(1); // prevent the flight from re-sleeping
     stairway.waitForFlight(flightId, null, null);
@@ -719,15 +737,52 @@ public class ScenarioTest {
     return "/tmp/test." + UUID.randomUUID().toString() + ".txt";
   }
 
+  @Test
+  public void threadedTest() throws Exception {
+
+    // Like simpleTest(), but with threads.  Spawn a set of threads using ThreadedTestRunnable,
+    // which will launch flights, wait for completion, and cache results (and any exceptions
+    // thrown).  We will join these threads and then assert expected results.
+
+    List<ThreadedTestRunnable> runnableList = new ArrayList<>();
+    List<Thread> threadList = new ArrayList<>();
+
+    final int threadCount = Runtime.getRuntime().availableProcessors();
+
+    // Phaser is used as a simple barrier to try to sync flight submissions.
+    Phaser phaser = new Phaser(threadCount);
+
+    for (int i = 0; i < threadCount; ++i) {
+      ThreadedTestRunnable runnable = new ThreadedTestRunnable(phaser, i);
+      runnableList.add(runnable);
+
+      Thread thread = new Thread(runnable);
+      thread.start();
+      threadList.add(thread);
+    }
+
+    // Wait for all threads.
+    for (Thread thread : threadList) {
+      thread.join();
+    }
+
+    // Assert all results (throwing any exceptions caught in threads along the way).
+    for (ThreadedTestRunnable runnable : runnableList) {
+      runnable.throwExceptionIfPresent();
+      assertThat(runnable.getResult().getFlightStatus(), equalTo(FlightStatus.SUCCESS));
+      assertFalse(runnable.getResult().getException().isPresent());
+    }
+  }
+
   /**
    * Class to enable creating Flights and waiting for their completion in background threads,
    * caching results and any thrown exceptions for inspection in the main test thread.
    */
   private class ThreadedTestRunnable implements Runnable {
 
-    Phaser phaser;
     private final int index;
     private final String filename;
+    Phaser phaser;
     Exception exception;
     FlightState result;
 
@@ -784,43 +839,6 @@ public class ScenarioTest {
 
     public FlightState getResult() {
       return result;
-    }
-  }
-
-  @Test
-  public void threadedTest() throws Exception {
-
-    // Like simpleTest(), but with threads.  Spawn a set of threads using ThreadedTestRunnable,
-    // which will launch flights, wait for completion, and cache results (and any exceptions
-    // thrown).  We will join these threads and then assert expected results.
-
-    List<ThreadedTestRunnable> runnableList = new ArrayList<>();
-    List<Thread> threadList = new ArrayList<>();
-
-    final int threadCount = Runtime.getRuntime().availableProcessors();
-
-    // Phaser is used as a simple barrier to try to sync flight submissions.
-    Phaser phaser = new Phaser(threadCount);
-
-    for (int i = 0; i < threadCount; ++i) {
-      ThreadedTestRunnable runnable = new ThreadedTestRunnable(phaser, i);
-      runnableList.add(runnable);
-
-      Thread thread = new Thread(runnable);
-      thread.start();
-      threadList.add(thread);
-    }
-
-    // Wait for all threads.
-    for (Thread thread : threadList) {
-      thread.join();
-    }
-
-    // Assert all results (throwing any exceptions caught in threads along the way).
-    for (ThreadedTestRunnable runnable : runnableList) {
-      runnable.throwExceptionIfPresent();
-      assertThat(runnable.getResult().getFlightStatus(), equalTo(FlightStatus.SUCCESS));
-      assertFalse(runnable.getResult().getException().isPresent());
     }
   }
 }

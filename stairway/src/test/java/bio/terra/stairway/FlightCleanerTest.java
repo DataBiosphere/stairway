@@ -32,11 +32,10 @@ public class FlightCleanerTest {
 
     // Start with a clean and shiny database environment.
     Stairway stairway =
-        Stairway.newBuilder()
+        new StairwayBuilder()
             .stairwayName(stairwayName)
             .completedFlightRetention(Duration.ofSeconds(RETENTION))
             .retentionCheckInterval(Duration.ofSeconds(CHECK_INTERVAL))
-            .enableWorkQueue(false)
             .build();
 
     List<String> recordedStairways = stairway.initialize(TestUtil.makeDataSource(), true, true);

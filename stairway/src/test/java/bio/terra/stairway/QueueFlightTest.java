@@ -2,10 +2,12 @@ package bio.terra.stairway;
 
 import static org.hamcrest.CoreMatchers.equalTo;
 import static org.hamcrest.MatcherAssert.assertThat;
-import static org.junit.jupiter.api.Assertions.assertNotNull;
 
+import bio.terra.stairway.fixtures.FileQueue;
 import bio.terra.stairway.fixtures.MapKey;
 import bio.terra.stairway.fixtures.TestPauseController;
+import bio.terra.stairway.fixtures.TestStairwayBuilder;
+import bio.terra.stairway.fixtures.TestStairwayBuilder.UseQueue;
 import bio.terra.stairway.fixtures.TestUtil;
 import bio.terra.stairway.flights.TestFlightControlledSleep;
 import java.util.Arrays;
@@ -18,7 +20,7 @@ import org.junit.jupiter.api.Test;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-@Tag("connected")
+@Tag("unit")
 public class QueueFlightTest {
   private static final int QUEUE_SETTLE_SECONDS = 3;
   private final Logger logger = LoggerFactory.getLogger(QueueFlightTest.class);
@@ -36,7 +38,12 @@ public class QueueFlightTest {
   @Test
   public void queueFlightTest() throws Exception {
     // Submit directly to queue and make sure we end up in the right state
-    stairway = TestUtil.setupConnectedStairwayWithHooks("queueFlightTest", false, 3);
+    stairway =
+        new TestStairwayBuilder()
+            .name("queueFlightTest")
+            .testHookCount(3)
+            .useQueue(UseQueue.MAKE_QUEUE)
+            .build();
 
     FlightMap inputs = new FlightMap();
     int controlValue = 1;
@@ -98,19 +105,13 @@ public class QueueFlightTest {
 
   @Test
   public void admissionControlTest() throws Exception {
-    // We create a one thread work queue with 0 tolerance for queued flights.
-    // Put one flight in that pauses.
-    // Put another flight in. It should arrive in the QUEUED state
-    String projectId = TestUtil.getEnvVar("GOOGLE_CLOUD_PROJECT", null);
-    assertNotNull(projectId);
+    QueueInterface workQueue = FileQueue.makeFileQueue("admissionControl");
 
     DataSource dataSource = TestUtil.makeDataSource();
     stairway =
-        Stairway.newBuilder()
-            .stairwayClusterName("stairway-cluster")
+        new StairwayBuilder()
             .stairwayName("admissionControlTest")
-            .enableWorkQueue(true)
-            .workQueueProjectId(projectId)
+            .workQueue(workQueue)
             .maxParallelFlights(1)
             .maxQueuedFlights(1)
             .build();
@@ -186,21 +187,13 @@ public class QueueFlightTest {
 
   @Test
   public void supplyQueueTest() throws Exception {
-    String projectId = TestUtil.getEnvVar("GOOGLE_CLOUD_PROJECT", null);
     DataSource dataSource = TestUtil.makeDataSource();
-    String topicId = "supplyQueue-topic";
-    String subscriptionId = "supplyQueue-sub";
-    QueueCreate.makeTopic(projectId, topicId);
-    QueueCreate.makeSubscription(projectId, topicId, subscriptionId);
+    QueueInterface workQueue = FileQueue.makeFileQueue("supplyQueue");
 
     stairway =
-        Stairway.newBuilder()
-            .stairwayClusterName("stairway-cluster")
+        new StairwayBuilder()
             .stairwayName("admissionControlTest")
-            .enableWorkQueue(true)
-            .workQueueProjectId(projectId)
-            .workQueueTopicId(topicId)
-            .workQueueSubscriptionId(subscriptionId)
+            .workQueue(workQueue)
             .maxParallelFlights(1)
             .maxQueuedFlights(1)
             .build();

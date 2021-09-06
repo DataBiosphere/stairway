@@ -131,7 +131,7 @@ public class FlightDebugInfo {
     this.undoStepFailures = undoStepFailures;
   }
 
-  static ObjectMapper getObjectMapper() {
+  public static ObjectMapper getObjectMapper() {
     return objectMapper;
   }
 

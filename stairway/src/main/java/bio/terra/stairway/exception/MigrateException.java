@@ -4,7 +4,7 @@ package bio.terra.stairway.exception;
  * StairwayExecutionException indicates that something is wrong in the Stairway execution code; an
  * invalid state or similar.
  */
-public class MigrateException extends StairwayException {
+public class MigrateException extends StairwayInternalException {
   public MigrateException(String message) {
     super(message);
   }

@@ -1,6 +1,7 @@
 package bio.terra.stairway.exception;
 
-public class MakeFlightException extends StairwayRuntimeException {
+/** Stairway was unable to construct the client Flight subclass object. */
+public class MakeFlightException extends StairwayBadRequestException {
   public MakeFlightException(String message) {
     super(message);
   }

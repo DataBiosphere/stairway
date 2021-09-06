@@ -1,6 +1,7 @@
 package bio.terra.stairway.exception;
 
-public abstract class StairwayException extends Exception {
+/** Base class for all stairway exceptions */
+public abstract class StairwayException extends RuntimeException {
   public StairwayException(String message) {
     super(message);
   }
