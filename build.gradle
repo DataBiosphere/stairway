@@ -24,7 +24,9 @@ artifactory {
             password = "${artifactory_password}"
         }
         defaults {
-            publications('stairway')
+            publications(
+                    'stairway',
+                    'stairway-gcp')
         }
     }
 }
