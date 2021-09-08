@@ -29,7 +29,7 @@ import org.slf4j.LoggerFactory;
 @SuppressFBWarnings(
     value = "RCN_REDUNDANT_NULLCHECK_WOULD_HAVE_BEEN_A_NPE",
     justification = "Spotbugs doesn't understand resource try construct")
-class GcpPubSubQueue implements QueueInterface {
+public class GcpPubSubQueue implements QueueInterface {
   private static final Logger logger = LoggerFactory.getLogger(GcpPubSubQueue.class);
 
   // Stairway expects that the only traffic in this queue is its own messages.
