@@ -11,6 +11,7 @@ import bio.terra.stairway.QueueInterface;
 import bio.terra.stairway.ShortUUID;
 import bio.terra.stairway.Stairway;
 import bio.terra.stairway.StairwayBuilder;
+import java.util.Collections;
 import java.util.List;
 import java.util.Optional;
 import javax.sql.DataSource;
@@ -29,6 +30,7 @@ public class TestStairwayBuilder {
   private boolean continuing;
   private int testHookCount;
   private boolean doRecoveryCheck;
+  private boolean existingStairwaysAreAlive;
   private String flightId;
 
   /** Set stairway name. If not present, a random name is generated */
@@ -77,6 +79,11 @@ public class TestStairwayBuilder {
    */
   public TestStairwayBuilder flightId(String flightId) {
     this.flightId = flightId;
+    return this;
+  }
+
+  public TestStairwayBuilder existingStairwaysAreAlive(boolean existingStairwaysAreAlive) {
+    this.existingStairwaysAreAlive = existingStairwaysAreAlive;
     return this;
   }
 
@@ -138,6 +145,11 @@ public class TestStairwayBuilder {
       }
     }
 
+    // If we are treating existing stairways as running, then don't pass the recorded stairways
+    // into recoverAndStart for recovery.
+    if (existingStairwaysAreAlive) {
+      recordedStairways = Collections.emptyList();
+    }
     stairway.recoverAndStart(recordedStairways);
     return stairway;
   }
