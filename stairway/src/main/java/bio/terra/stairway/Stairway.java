@@ -77,8 +77,9 @@ public interface Stairway {
    * notices a pod failure.
    *
    * @param stairwayName name of a stairway instance to recover
+   * @throws InterruptedException interruption during recovery
    */
-  void recoverStairway(String stairwayName);
+  void recoverStairway(String stairwayName) throws InterruptedException;
 
   /**
    * Graceful shutdown: instruct stairway to stop executing flights. When running flights hit a step

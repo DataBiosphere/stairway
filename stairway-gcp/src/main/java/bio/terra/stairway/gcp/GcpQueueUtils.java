@@ -1,6 +1,7 @@
 package bio.terra.stairway.gcp;
 
 import com.google.api.gax.core.GoogleCredentialsProvider;
+import com.google.api.gax.rpc.AlreadyExistsException;
 import com.google.cloud.pubsub.v1.SubscriptionAdminClient;
 import com.google.cloud.pubsub.v1.SubscriptionAdminSettings;
 import com.google.cloud.pubsub.v1.TopicAdminClient;
@@ -53,6 +54,9 @@ public class GcpQueueUtils {
 
     try (TopicAdminClient topicAdminClient = TopicAdminClient.create(topicAdminSettings)) {
       topicAdminClient.createTopic(topicName);
+      logger.debug("Created topic: " + topicId);
+    } catch (AlreadyExistsException ex) {
+      logger.debug("Topic already exists: " + topicId);
     }
   }
 
@@ -112,6 +116,9 @@ public class GcpQueueUtils {
               .build();
 
       subscriptionAdminClient.createSubscription(request);
+      logger.debug("Created subscription: " + subscriptionId);
+    } catch (AlreadyExistsException ex) {
+      logger.debug("Subscription already exists: " + subscriptionId);
     }
   }
 

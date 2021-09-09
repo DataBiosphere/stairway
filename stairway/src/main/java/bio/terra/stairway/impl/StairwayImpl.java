@@ -201,12 +201,9 @@ public class StairwayImpl implements Stairway {
    * notices a pod failure.
    *
    * @param stairwayName name of a stairway instance to recover
-   * @throws DatabaseOperationException database access error
    * @throws InterruptedException interruption during recovery
-   * @throws StairwayExecutionException stairway error
    */
-  public void recoverStairway(String stairwayName)
-      throws DatabaseOperationException, InterruptedException, StairwayExecutionException {
+  public void recoverStairway(String stairwayName) throws InterruptedException {
     String stairwayId = stairwayInstanceDao.lookupId(stairwayName);
     flightDao.disownRecovery(stairwayId);
     recoverReady();

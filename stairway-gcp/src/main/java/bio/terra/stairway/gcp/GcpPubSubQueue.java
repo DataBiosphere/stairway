@@ -36,7 +36,7 @@ public class GcpPubSubQueue implements QueueInterface {
   // This byte limit is super-generous for what we currently use.
   private static final int MAX_INBOUND_MESSAGE_BYTES = 10000;
 
-  private final Publisher publisher;
+  private Publisher publisher;
   private final String subscriptionName;
   private SubscriberStub subscriberStub;
 
@@ -45,6 +45,13 @@ public class GcpPubSubQueue implements QueueInterface {
     return new GcpPubSubQueue.Builder();
   }
 
+  /**
+   * Construct the queue by creating a creating a publisher object for writing to the queue and a
+   * subscriber for reading from the queue.
+   *
+   * @param builder the builder used to pass parameters
+   * @throws IOException thrown if the publisher or subscriber cannot be created
+   */
   public GcpPubSubQueue(GcpPubSubQueue.Builder builder) throws IOException {
     subscriptionName = ProjectSubscriptionName.format(builder.projectId, builder.subscriptionId);
 
@@ -63,6 +70,10 @@ public class GcpPubSubQueue implements QueueInterface {
     subscriberStub = GrpcSubscriberStub.create(subscriberStubSettings);
   }
 
+  /**
+   * Shutdown the queue The GCP interface is asymmetric. The subscriber is closable. The publisher
+   * is shutdown.
+   */
   public void shutdown() {
     if (subscriberStub != null) {
       subscriberStub.close();
@@ -70,6 +81,7 @@ public class GcpPubSubQueue implements QueueInterface {
     }
     if (publisher != null) {
       publisher.shutdown();
+      publisher = null;
     }
   }
 
@@ -100,6 +112,14 @@ public class GcpPubSubQueue implements QueueInterface {
     return pullResponse;
   }
 
+  /**
+   * Read and process queue messages
+   *
+   * @param numOfMessages number of messages to try to process in one go
+   * @param processFunction Function to call for each message. The function returns true if the
+   *     message is successfully handled; false if it was not and should remain on the queue.
+   * @throws InterruptedException wait for messages is interrupted during Stairway shutdown
+   */
   @Override
   public void dispatchMessages(int numOfMessages, QueueProcessFunction processFunction)
       throws InterruptedException {
@@ -138,6 +158,12 @@ public class GcpPubSubQueue implements QueueInterface {
     }
   }
 
+  /**
+   * Put a message into the queue
+   *
+   * @param message the message to enqueue
+   * @throws InterruptedException is possible from waiting on the pubsub enqueue
+   */
   @Override
   public void enqueueMessage(String message) throws InterruptedException {
     ByteString data = ByteString.copyFromUtf8(message);
@@ -153,6 +179,10 @@ public class GcpPubSubQueue implements QueueInterface {
     }
   }
 
+  /**
+   * In tests, we often reuse the same pubsub queue. We want to clean the queue between tests. This
+   * method is used to remove all messages from the queue.
+   */
   @Override
   public void purgeQueueForTesting() {
     // Sometimes we get an empty response even when there are messages, so receive empty twice
@@ -179,6 +209,7 @@ public class GcpPubSubQueue implements QueueInterface {
     }
   }
 
+  /** Use this builder class to create the GcpPubSubQueue. */
   public static class Builder {
     private String projectId;
     private String topicId;
