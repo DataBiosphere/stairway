@@ -71,6 +71,17 @@ public interface Stairway {
           StairwayExecutionException;
 
   /**
+   * Recover any orphaned flights from a particular Stairway instance.
+   * This method can be called when a server using Stairway discovers that
+   * another Stairway instance has failed. For example, when a Kubernetes listener
+   * notices a pod failure.
+   *
+   * @param stairwayName name of a stairway instance to recover
+   * @throws InterruptedException interruption during recovery
+   */
+  void recoverStairway(String stairwayName) throws InterruptedException;
+
+  /**
    * Graceful shutdown: instruct stairway to stop executing flights. When running flights hit a step
    * boundary they will yield. No new flights are able to start. Then this thread waits for
    * termination of the thread pool; basically, just exposing the awaitTermination parameters.

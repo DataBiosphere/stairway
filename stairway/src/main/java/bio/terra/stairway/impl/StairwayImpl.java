@@ -194,6 +194,21 @@ public class StairwayImpl implements Stairway {
     queueManager.start();
   }
 
+  /**
+   * Recover any orphaned flights from a particular Stairway instance.
+   * This method can be called when a server using Stairway discovers that
+   * another Stairway instance has failed. For example, when a Kubernetes listener
+   * notices a pod failure.
+   *
+   * @param stairwayName name of a stairway instance to recover
+   * @throws InterruptedException interruption during recovery
+   */
+  public void recoverStairway(String stairwayName) throws InterruptedException {
+    String stairwayId = stairwayInstanceDao.lookupId(stairwayName);
+    flightDao.disownRecovery(stairwayId);
+    recoverReady();
+  }
+
   private void configureThreadPools() {
     threadPool =
         new StairwayThreadPool(

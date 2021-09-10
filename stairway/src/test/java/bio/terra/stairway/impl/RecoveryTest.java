@@ -189,4 +189,51 @@ public class RecoveryTest {
     Integer value = result.getResultMap().get().get("value", Integer.class);
     assertThat(value, is(equalTo(12)));
   }
+
+  @Test
+  public void recoverOneTest() throws Exception {
+    final String stairway1Name = "recoverOneTestOne";
+    final String stairway2Name = "recoverOneTestTwo";
+
+    // The idea here is to start two stairways, run a flight on one that pauses.
+    // Then from the second, use the recoverStairway() method to recover the flight
+    // and continue it. This test is similar to the startup recover test, but
+    // exercises the case where the failure of one stairway instance is detected
+    // and recovered by another stairway.
+
+    Stairway stairway1 = new TestStairwayBuilder().name(stairway1Name).build();
+    Stairway stairway2 =
+        new TestStairwayBuilder()
+            .name(stairway2Name)
+            .continuing(true)
+            .existingStairwaysAreAlive(true)
+            .build();
+
+    FlightMap inputs = new FlightMap();
+
+    Integer initialValue = 0;
+    inputs.put("initialValue", initialValue);
+
+    TestPauseController.setControl(0);
+    String flightId = "recoverOneTest";
+    stairway1.submit(flightId, TestFlightRecovery.class, inputs);
+
+    // Allow time for the flight thread to go to sleep
+    TimeUnit.SECONDS.sleep(5);
+    assertThat(TestUtil.isDone(stairway1, flightId), is(equalTo(false)));
+
+    // Pretend we notice that stairway1 is down. We recover stairway1.
+    // That should rerun the "pause" step of TestFlightRecovery class, this
+    // time with control set to 1 it will complete.
+    TestPauseController.setControl(1);
+    stairway2.recoverStairway(stairway1Name);
+
+    // Wait for recovery to complete
+    stairway2.waitForFlight(flightId, null, null);
+    FlightState result = stairway2.getFlightState(flightId);
+    assertThat(result.getFlightStatus(), is(equalTo(FlightStatus.SUCCESS)));
+    assertTrue(result.getResultMap().isPresent());
+    Integer value = result.getResultMap().get().get("value", Integer.class);
+    assertThat(value, is(equalTo(2)));
+  }
 }
