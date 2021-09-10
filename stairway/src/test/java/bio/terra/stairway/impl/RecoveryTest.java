@@ -198,7 +198,8 @@ public class RecoveryTest {
     // The idea here is to start two stairways, run a flight on one that pauses.
     // Then from the second, use the recoverStairway() method to recover the flight
     // and continue it. This test is similar to the startup recover test, but
-    // exercises the case where the
+    // exercises the case where the failure of one stairway instance is detected
+    // and recovered by another stairway.
 
     Stairway stairway1 = new TestStairwayBuilder().name(stairway1Name).build();
     Stairway stairway2 =
