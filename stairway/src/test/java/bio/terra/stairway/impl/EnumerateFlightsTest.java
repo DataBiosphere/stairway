@@ -5,6 +5,7 @@ import static org.hamcrest.MatcherAssert.assertThat;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import bio.terra.stairway.Flight;
+import bio.terra.stairway.FlightEnumeration;
 import bio.terra.stairway.FlightFilter;
 import bio.terra.stairway.FlightFilterOp;
 import bio.terra.stairway.FlightMap;
@@ -59,6 +60,7 @@ public class EnumerateFlightsTest {
     flights.add(makeFlight("5", FlightStatus.RUNNING, class1, null));
 
     Instant minSubmit = flights.get(0).getSubmitted();
+    Instant midSubmit = flights.get(2).getSubmitted();
     Instant maxSubmit = flights.get(5).getSubmitted();
 
     // -- Test Cases --
@@ -79,10 +81,15 @@ public class EnumerateFlightsTest {
     flightList = flightDao.getFlights(0, 100, filter);
     checkResults("case 2", flightList, Arrays.asList("0", "1", "2", "3", "4", "5"));
 
-    // Case 3: date with null values - form1
+    // Case 3.1: date with values - form1
     filter = new FlightFilter().addFilterCompletedTime(FlightFilterOp.GREATER_THAN, minSubmit);
     flightList = flightDao.getFlights(0, 100, filter);
-    checkResults("case 3", flightList, Arrays.asList("0", "1", "2"));
+    checkResults("case 3.1", flightList, Arrays.asList("0", "1", "2"));
+
+    // Case 3.2: date with null values - form1
+    filter = new FlightFilter().addFilterCompletedTime(FlightFilterOp.EQUAL, null);
+    flightList = flightDao.getFlights(0, 100, filter);
+    checkResults("case 3.2", flightList, Arrays.asList("3", "4", "5"));
 
     // Case 4: status and flight class - form1
     filter =
@@ -127,6 +134,18 @@ public class EnumerateFlightsTest {
             .addFilterInputParameter("in2", FlightFilterOp.EQUAL, pojo2);
     flightList = flightDao.getFlights(0, 100, filter);
     checkResults("case 9", flightList, Collections.singletonList("3"));
+
+    // Case 10: page token
+    String pageTokenString = new PageToken(midSubmit).makeToken();
+    filter = new FlightFilter();
+    FlightEnumeration flightEnum = flightDao.getFlights(null, 3, filter);
+    checkResults("case 10", flightEnum.getFlightStateList(), Arrays.asList("0", "1", "2"));
+    assertThat(flightEnum.getTotalFlights(), equalTo(6));
+    assertThat(flightEnum.getNextPageToken(), equalTo(pageTokenString));
+
+    flightEnum = flightDao.getFlights(pageTokenString, 3, filter);
+    checkResults("case 10", flightEnum.getFlightStateList(), Arrays.asList("3", "4", "5"));
+    assertThat(flightEnum.getTotalFlights(), equalTo(6));
   }
 
   private void checkResults(String name, List<FlightState> resultlList, List<String> expectedIds) {

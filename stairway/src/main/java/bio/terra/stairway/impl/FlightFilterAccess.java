@@ -2,23 +2,37 @@ package bio.terra.stairway.impl;
 
 import bio.terra.stairway.FlightFilter;
 import bio.terra.stairway.FlightFilter.FlightFilterPredicate;
+import bio.terra.stairway.FlightFilter.FlightFilterPredicate.Datatype;
 import bio.terra.stairway.StairwayMapper;
 import bio.terra.stairway.exception.FlightFilterException;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.google.common.annotations.VisibleForTesting;
 import java.sql.SQLException;
 import java.time.Instant;
+import java.util.Optional;
 import org.apache.commons.lang3.StringUtils;
 
 /**
  * A FlightFilterAccess is used to access FlightFilter members for generating the SQL queries
  * applying the predicates.
+ *
+ * <p>We use this class in two ways. First, to count all of the rows in the filtered set, we pass
+ * null values for all of the paging controls (offset, limit, pageToken). Then call {@link
+ * #makeCountSql()} to get the COUNT(*) select. Second, we pass the provided values for the paging
+ * controls and then call {@link #makeSql} to get the full select list and the paging code gen.
  */
 class FlightFilterAccess {
   private final FlightFilter filter;
+  private final Integer offset;
+  private final Integer limit;
+  private final PageToken pageToken;
 
-  public FlightFilterAccess(FlightFilter filter) {
+  public FlightFilterAccess(
+      FlightFilter filter, Integer offset, Integer limit, String pageTokenString) {
     this.filter = filter;
+    this.offset = offset;
+    this.limit = limit;
+    this.pageToken = Optional.ofNullable(pageTokenString).map(PageToken::new).orElse(null);
   }
 
   /**
@@ -35,6 +49,16 @@ class FlightFilterAccess {
       }
       for (FlightFilterPredicate predicate : filter.getInputPredicates()) {
         storeInputPredicateValue(predicate, statement);
+      }
+      // Add any values for paging controls we have
+      if (pageToken != null) {
+        statement.setInstant("pagetoken", pageToken.getTimestamp());
+      }
+      if (limit != null) {
+        statement.setInt("limit", limit);
+      }
+      if (offset != null) {
+        statement.setInt("offset", offset);
       }
     } catch (SQLException | JsonProcessingException ex) {
       throw new FlightFilterException("Failure storing predicate values", ex);
@@ -86,20 +110,52 @@ class FlightFilterAccess {
    *   AND INPUT.matchCount = 3
    * }</pre>
    *
-   * In all cases, the result is sorted and paged like this: (@code ORDER BY submit_time LIMIT
-   * :limit OFFSET :offset}
+   * <p>In all cases, the result is sorted like this: {@code ORDER BY submit_time}. If limit is
+   * present, then the {@code LIMIT :limit} is included. If offset is present, then the {@code
+   * OFFSET :offset} is included.
    */
   String makeSql() {
     StringBuilder sb = new StringBuilder();
 
-    // All forms start with the same select list
+    // Start with the select list
     sb.append("SELECT F.flightid, F.stairway_id, F.submit_time, F.completed_time,")
         .append(" F.output_parameters, F.status, F.serialized_exception")
         .append(" FROM ");
 
+    makeSqlQueryCommon(sb);
+
+    // All forms end with the same order by
+    sb.append(" ORDER BY submit_time");
+
+    // Add the paging controls if present
+    if (limit != null) {
+      sb.append(" LIMIT :limit");
+    }
+    if (offset != null) {
+      sb.append(" OFFSET :offset");
+    }
+    return sb.toString();
+  }
+
+  /**
+   * The query structure for the count query is the same as the main query. However, this query does
+   * not apply the limit and offset, since we want to count the total rows that make it through the
+   * query. Also leaves out order by, since that is meaningless for the aggregate.
+   *
+   * @return SQL string returning the count
+   */
+  String makeCountSql() {
+    StringBuilder sb = new StringBuilder();
+    sb.append("SELECT CURRENT_TIMESTAMP AS currenttime, COUNT(*) AS totalflights FROM ");
+    makeSqlQueryCommon(sb);
+    return sb.toString();
+  }
+
+  // Make the common form of the query string
+  private void makeSqlQueryCommon(StringBuilder sb) {
     // Decide which form of the query to build.
     switch (filter.getInputPredicates().size()) {
-      case 0:
+      case 0: // Form 1
         makeSqlForm1(sb);
         break;
       case 1: // Form 2
@@ -108,10 +164,6 @@ class FlightFilterAccess {
       default: // Form 3
         makeSqlForm3(sb);
     }
-
-    // All forms end with the same order by, limit, and offset
-    sb.append(" ORDER BY submit_time LIMIT :limit OFFSET :offset");
-    return sb.toString();
   }
 
   // Form1: only flight table filtering
@@ -149,7 +201,8 @@ class FlightFilterAccess {
    * as a named parameter.
    */
   private void makeFlightFilter(StringBuilder sb, String prefix) {
-    if (filter.getFlightPredicates().size() > 0) {
+    // If we have a predicate to make...
+    if (filter.getFlightPredicates().size() > 0 || pageToken != null) {
       sb.append(prefix);
       String inter = StringUtils.EMPTY;
 
@@ -157,6 +210,11 @@ class FlightFilterAccess {
         String sql = makeFlightPredicateSql(predicate);
         sb.append(inter).append(sql);
         inter = " AND ";
+      }
+
+      // Add the page token paging control if present
+      if (pageToken != null) {
+        sb.append(inter).append("F.submit_time > :pagetoken");
       }
     }
   }
@@ -184,6 +242,9 @@ class FlightFilterAccess {
    */
   @VisibleForTesting
   String makeFlightPredicateSql(FlightFilterPredicate predicate) {
+    if (predicate.getDatatype() == Datatype.NULL) {
+      return "F." + predicate.getKey() + " IS NULL";
+    }
     return "F."
         + predicate.getKey()
         + predicate.getOp().getSql()
@@ -206,6 +267,9 @@ class FlightFilterAccess {
         break;
       case TIMESTAMP:
         statement.setInstant(predicate.getParameterName(), (Instant) predicate.getValue());
+        break;
+      case NULL:
+        // Ignore the parameter in the null case
         break;
     }
   }

@@ -8,6 +8,7 @@ import bio.terra.stairway.Direction;
 import bio.terra.stairway.ExceptionSerializer;
 import bio.terra.stairway.FlightContext;
 import bio.terra.stairway.FlightDebugInfo;
+import bio.terra.stairway.FlightEnumeration;
 import bio.terra.stairway.FlightFilter;
 import bio.terra.stairway.FlightInput;
 import bio.terra.stairway.FlightMap;
@@ -30,6 +31,7 @@ import java.time.Instant;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.UUID;
+import javax.annotation.Nullable;
 import javax.sql.DataSource;
 import org.apache.commons.lang3.StringUtils;
 import org.slf4j.Logger;
@@ -883,36 +885,74 @@ class FlightDao {
    */
   List<FlightState> getFlights(int offset, int limit, FlightFilter inFilter)
       throws StairwayException, DatabaseOperationException, InterruptedException {
+    FlightEnumeration enumeration =
+        DbRetry.retry("flight.getFlights", () -> getFlightsInner(offset, limit, inFilter, null));
+    return enumeration.getFlightStateList();
+  }
 
+  FlightEnumeration getFlights(
+      @Nullable String nextPageToken, @Nullable Integer limit, @Nullable FlightFilter inFilter)
+      throws StairwayException, DatabaseOperationException, InterruptedException {
+
+    return DbRetry.retry(
+        "flight.getFlights", () -> getFlightsInner(null, limit, inFilter, nextPageToken));
+  }
+
+  private FlightEnumeration getFlightsInner(
+      Integer offset, Integer limit, FlightFilter inFilter, String nextPageToken)
+      throws SQLException, StairwayException {
     // Make an empty filter if one is not provided
     FlightFilter filter = (inFilter != null) ? inFilter : new FlightFilter();
 
-    return DbRetry.retry("flight.getFlights", () -> getFlightsInner(offset, limit, filter));
-  }
+    // Make a filter access with no paging controls for the count query
+    var countAccess = new FlightFilterAccess(filter, null, null, null);
 
-  private List<FlightState> getFlightsInner(int offset, int limit, FlightFilter filter)
-      throws SQLException, StairwayException {
-    var access = new FlightFilterAccess(filter);
+    // Make another filter access including whatever paging controls we got before
+    var stateAccess = new FlightFilterAccess(filter, offset, limit, nextPageToken);
 
-    String sql = access.makeSql();
+    String countSql = countAccess.makeCountSql();
+    String stateSql = stateAccess.makeSql();
 
     try (Connection connection = dataSource.getConnection();
+        NamedParameterPreparedStatement flightCountStatement =
+            new NamedParameterPreparedStatement(connection, countSql);
         NamedParameterPreparedStatement flightRangeStatement =
-            new NamedParameterPreparedStatement(connection, sql)) {
+            new NamedParameterPreparedStatement(connection, stateSql)) {
       startReadOnlyTransaction(connection);
 
-      access.storePredicateValues(flightRangeStatement);
+      countAccess.storePredicateValues(flightCountStatement);
+      stateAccess.storePredicateValues(flightRangeStatement);
 
-      flightRangeStatement.setInt("limit", limit);
-      flightRangeStatement.setInt("offset", offset);
+      int totalFlights;
+      Instant currentTime;
+      try (ResultSet rs = flightCountStatement.getPreparedStatement().executeQuery()) {
+        rs.next();
+        currentTime = rs.getTimestamp("currenttime").toInstant();
+        totalFlights = rs.getInt("totalflights");
+      }
 
       List<FlightState> flightStateList;
       try (ResultSet rs = flightRangeStatement.getPreparedStatement().executeQuery()) {
         flightStateList = makeFlightStateList(connection, rs);
       }
 
+      // If we found some flights, then the next page token is the last submit time on
+      // the list. If we are at the end of the list, then next page token starts at the
+      // current time. We retrieve the time from the database to avoid skew between the
+      // client time and the database server time.
+      Instant nextPageTokenInstant;
+      int listSize = flightStateList.size();
+      if (listSize == 0) {
+        nextPageTokenInstant = currentTime;
+      } else {
+        nextPageTokenInstant = flightStateList.get(listSize - 1).getSubmitted();
+      }
+
       connection.commit();
-      return flightStateList;
+
+      return new FlightEnumeration(
+          totalFlights, new PageToken(nextPageTokenInstant).makeToken(), flightStateList);
+
     } catch (FlightFilterException ex) {
       throw new DatabaseOperationException("Failed to get flights", ex);
     }

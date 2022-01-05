@@ -37,7 +37,7 @@ public class FilterTest {
     String inputCompareSql =
         String.format("(I.key = 'afield' AND I.value %s :ff%d)", operand, index + 1);
 
-    FlightFilterAccess access = new FlightFilterAccess(filter);
+    FlightFilterAccess access = new FlightFilterAccess(filter, 0, 10, null);
 
     FlightFilterPredicate predicate = filter.getInputPredicates().get(index);
     String flightSql = access.makeFlightPredicateSql(predicate);
@@ -57,7 +57,7 @@ public class FilterTest {
             + " ORDER BY submit_time LIMIT :limit OFFSET :offset";
 
     FlightFilter filter = new FlightFilter();
-    String sql = new FlightFilterAccess(filter).makeSql();
+    String sql = new FlightFilterAccess(filter, 0, 10, null).makeSql();
     assertThat(sql, equalTo(expect));
   }
 
@@ -78,7 +78,7 @@ public class FilterTest {
             .addFilterFlightClass(FlightFilterOp.EQUAL, TestFlight.class)
             .addFilterFlightStatus(FlightFilterOp.EQUAL, FlightStatus.RUNNING)
             .addFilterSubmitTime(FlightFilterOp.LESS_THAN, complete);
-    String sql = new FlightFilterAccess(filter).makeSql();
+    String sql = new FlightFilterAccess(filter, 0, 10, null).makeSql();
     assertThat(sql, equalTo(expect));
   }
 
@@ -96,7 +96,7 @@ public class FilterTest {
         new FlightFilter()
             .addFilterInputParameter("email", FlightFilterOp.EQUAL, "ddtest@gmail.com");
 
-    String sql = new FlightFilterAccess(filter).makeSql();
+    String sql = new FlightFilterAccess(filter, 0, 10, null).makeSql();
     assertThat(sql, equalTo(expect));
   }
 
@@ -116,7 +116,7 @@ public class FilterTest {
             .addFilterInputParameter("email", FlightFilterOp.EQUAL, "ddtest@gmail.com")
             .addFilterFlightClass(FlightFilterOp.EQUAL, TestFlight.class);
 
-    String sql = new FlightFilterAccess(filter).makeSql();
+    String sql = new FlightFilterAccess(filter, 0, 10, null).makeSql();
     assertThat(sql, equalTo(expect));
   }
 
@@ -139,7 +139,7 @@ public class FilterTest {
             .addFilterInputParameter("email", FlightFilterOp.EQUAL, "ddtest@gmail.com")
             .addFilterInputParameter("name", FlightFilterOp.EQUAL, "dd");
 
-    String sql = new FlightFilterAccess(filter).makeSql();
+    String sql = new FlightFilterAccess(filter, 0, 10, null).makeSql();
     assertThat(sql, equalTo(expect));
   }
 
@@ -164,7 +164,49 @@ public class FilterTest {
             .addFilterInputParameter("name", FlightFilterOp.EQUAL, "dd")
             .addFilterFlightClass(FlightFilterOp.EQUAL, TestFlight.class);
 
-    String sql = new FlightFilterAccess(filter).makeSql();
+    String sql = new FlightFilterAccess(filter, 0, 10, null).makeSql();
+    assertThat(sql, equalTo(expect));
+  }
+
+  @Test
+  public void filterForm1NoLimitTest() throws Exception {
+    String expect =
+        "SELECT F.flightid, F.stairway_id, F.submit_time, F.completed_time,"
+            + " F.output_parameters, F.status, F.serialized_exception"
+            + " FROM flight F"
+            + " ORDER BY submit_time OFFSET :offset";
+
+    FlightFilter filter = new FlightFilter();
+    String sql = new FlightFilterAccess(filter, 0, null, null).makeSql();
+    assertThat(sql, equalTo(expect));
+  }
+
+  @Test
+  public void filterForm1NoOffsetTest() throws Exception {
+    String expect =
+        "SELECT F.flightid, F.stairway_id, F.submit_time, F.completed_time,"
+            + " F.output_parameters, F.status, F.serialized_exception"
+            + " FROM flight F"
+            + " ORDER BY submit_time LIMIT :limit";
+
+    FlightFilter filter = new FlightFilter();
+    String sql = new FlightFilterAccess(filter, null, 10, null).makeSql();
+    assertThat(sql, equalTo(expect));
+  }
+
+  @Test
+  public void filterForm1PageTokenTest() throws Exception {
+    String expect =
+        "SELECT F.flightid, F.stairway_id, F.submit_time, F.completed_time,"
+            + " F.output_parameters, F.status, F.serialized_exception"
+            + " FROM flight F"
+            + " WHERE F.submit_time > :pagetoken"
+            + " ORDER BY submit_time LIMIT :limit";
+
+    PageToken pageToken = new PageToken(Instant.now());
+
+    FlightFilter filter = new FlightFilter();
+    String sql = new FlightFilterAccess(filter, null, 10, pageToken.makeToken()).makeSql();
     assertThat(sql, equalTo(expect));
   }
 }
