@@ -10,6 +10,7 @@ import bio.terra.stairway.exception.StairwayExecutionException;
 import bio.terra.stairway.exception.StairwayShutdownException;
 import java.util.List;
 import java.util.concurrent.TimeUnit;
+import javax.annotation.Nullable;
 import javax.sql.DataSource;
 
 /**
@@ -71,10 +72,9 @@ public interface Stairway {
           StairwayExecutionException;
 
   /**
-   * Recover any orphaned flights from a particular Stairway instance.
-   * This method can be called when a server using Stairway discovers that
-   * another Stairway instance has failed. For example, when a Kubernetes listener
-   * notices a pod failure.
+   * Recover any orphaned flights from a particular Stairway instance. This method can be called
+   * when a server using Stairway discovers that another Stairway instance has failed. For example,
+   * when a Kubernetes listener notices a pod failure.
    *
    * @param stairwayName name of a stairway instance to recover
    * @throws InterruptedException interruption during recovery
@@ -245,15 +245,18 @@ public interface Stairway {
           InterruptedException;
 
   /**
-   * Enumerate flights - returns a range of flights ordered by submit time. Note that there can be
-   * "jitter" in the paging through flights if new flights are submitted.
+   * NOTE: This endpoint is maintained for backward compatibility. We recommend switching to the new
+   * getFlights endpoint below.
+   *
+   * <p>Enumerate flights - returns a range of flights ordered by submit time. Note that there can
+   * be "jitter" in the paging through flights if new flights are submitted.
    *
    * <p>You can add one or more predicates in a filter list. The filters are logically ANDed
    * together and applied to the input parameters of flights. That lets you add input parameters
    * (like who is running the flight) and then select by that to show flights being run by that
    * user. {@link FlightFilter} documents the different filters and their arguments.
    *
-   * <p>The and limit are applied after the filtering is done.
+   * <p>The offset and limit are applied after the filtering is done.
    *
    * @param offset offset of the row ordered by most recent flight first
    * @param limit limit the number of rows returned
@@ -264,6 +267,24 @@ public interface Stairway {
    * @throws InterruptedException on shutdown
    */
   List<FlightState> getFlights(int offset, int limit, FlightFilter filter)
+      throws StairwayException, DatabaseOperationException, InterruptedException;
+
+  /**
+   * Enumerate flights - returns a range of flights ordered by submit time. Use of the page token
+   * eliminates jitter issues in the original getFlights endpoint.
+   *
+   * @param nextPageToken starting point for the next page of data. Null means start at the
+   *     beginning of the result set.
+   * @param limit limit the number of rows returned. Null means no limit: return all rows
+   * @param filter predicates to apply to filter flights
+   * @return FlightEnumeration including the total flights in the filtered set, the encoded token
+   *     for the next page of results, as well as the list of Flightstate objects.
+   * @throws StairwayException - other Stairway error
+   * @throws DatabaseOperationException unexpected database errors
+   * @throws InterruptedException on shutdown
+   */
+  FlightEnumeration getFlights(
+      @Nullable String nextPageToken, @Nullable Integer limit, @Nullable FlightFilter filter)
       throws StairwayException, DatabaseOperationException, InterruptedException;
 
   /** @return name of this stairway instance */

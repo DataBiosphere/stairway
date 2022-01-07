@@ -5,6 +5,7 @@ import bio.terra.stairway.exception.FlightFilterException;
 import java.time.Instant;
 import java.util.ArrayList;
 import java.util.List;
+import javax.annotation.Nullable;
 
 /**
  * A FlightFilter is used to filter the flights on a flight enumeration. You can build a filter with
@@ -14,7 +15,7 @@ import java.util.List;
  * FlightFilter filter = new FlightFilter()
  *     .addFilterSubmitTime(GREATER_THAN, yesterday)
  *     .addFilterFlightClass(EQUAL, IngestFlight.class)
- *     .addFilterFlightStatue(EQUAL, FlightStatus.COMPLETED)
+ *     .addFilterFlightStatus(EQUAL, FlightStatus.COMPLETED)
  *     .addFilterInputParameter("email", EQUAL, "ddtest@gmail.com");
  * }</pre>
  *
@@ -49,6 +50,9 @@ public class FlightFilter {
    * @return {@code this}, for fluent style
    */
   public FlightFilter addFilterSubmitTime(FlightFilterOp op, Instant timestamp) {
+    if (timestamp == null) {
+      throw new FlightFilterException("Submit filter timestamp cannot be null");
+    }
     FlightFilterPredicate predicate =
         new FlightFilterPredicate(
             "submit_time", op, timestamp, Datatype.TIMESTAMP, makeParameterName());
@@ -57,16 +61,21 @@ public class FlightFilter {
   }
 
   /**
-   * Filter by completed time. Note that completed time can be NULL.
+   * Filter by completed time. Passing null for the timestamp filters for incomplete flights
+   * regardless of the filter operand.
    *
    * @param op a {@link FlightFilterOp}
    * @param timestamp an Instant
    * @return {@code this}, for fluent style
    */
-  public FlightFilter addFilterCompletedTime(FlightFilterOp op, Instant timestamp) {
+  public FlightFilter addFilterCompletedTime(FlightFilterOp op, @Nullable Instant timestamp) {
     FlightFilterPredicate predicate =
         new FlightFilterPredicate(
-            "completed_time", op, timestamp, Datatype.TIMESTAMP, makeParameterName());
+            "completed_time",
+            op,
+            timestamp,
+            (timestamp == null ? Datatype.NULL : Datatype.TIMESTAMP),
+            makeParameterName());
     flightPredicates.add(predicate);
     return this;
   }
@@ -79,9 +88,24 @@ public class FlightFilter {
    * @return {@code this}, for fluent style
    */
   public FlightFilter addFilterFlightClass(FlightFilterOp op, Class<? extends Flight> clazz) {
+    return addFilterFlightClass(op, clazz.getName());
+  }
+
+  /**
+   * Filter by the class name of the flight. The string class name must be equivalent to the result
+   * of {@code class.getName()}; that is, the full flight class name.
+   *
+   * @param op a {@link FlightFilterOp}
+   * @param className name of the class to filter
+   * @return {@code this}, for fluent style
+   */
+  public FlightFilter addFilterFlightClass(FlightFilterOp op, String className) {
+    if (className == null) {
+      throw new FlightFilterException("Class name cannot be null");
+    }
     FlightFilterPredicate predicate =
         new FlightFilterPredicate(
-            "class_name", op, clazz.getName(), Datatype.STRING, makeParameterName());
+            "class_name", op, className, Datatype.STRING, makeParameterName());
     flightPredicates.add(predicate);
     return this;
   }
@@ -94,6 +118,9 @@ public class FlightFilter {
    * @return {@code this}, for fluent style
    */
   public FlightFilter addFilterFlightStatus(FlightFilterOp op, FlightStatus status) {
+    if (status == null) {
+      throw new FlightFilterException("Status cannot be nul");
+    }
     FlightFilterPredicate predicate =
         new FlightFilterPredicate(
             "status", op, status.name(), Datatype.STRING, makeParameterName());
@@ -117,6 +144,9 @@ public class FlightFilter {
     if (key == null) {
       throw new FlightFilterException("Key must be specified in an input filter");
     }
+    if (value == null) {
+      throw new FlightFilterException("Value cannot be null in an input filter");
+    }
     FlightFilterPredicate predicate =
         new FlightFilterPredicate(key, op, value, Datatype.STRING, makeParameterName());
     inputPredicates.add(predicate);
@@ -129,17 +159,11 @@ public class FlightFilter {
   }
 
   public static class FlightFilterPredicate {
-    public enum Datatype {
-      STRING,
-      TIMESTAMP
-    }
-
     private final FlightFilterOp op;
     private final String key;
     private final Object value;
     private final FlightFilterPredicate.Datatype datatype;
     private final String parameterName;
-
     /**
      * Predicate comparison constructor
      *
@@ -180,6 +204,12 @@ public class FlightFilter {
 
     public String getParameterName() {
       return parameterName;
+    }
+
+    public enum Datatype {
+      STRING,
+      TIMESTAMP,
+      NULL
     }
   }
 }
