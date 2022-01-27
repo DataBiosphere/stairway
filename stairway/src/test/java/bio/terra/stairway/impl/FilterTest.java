@@ -7,6 +7,7 @@ import static org.hamcrest.MatcherAssert.assertThat;
 import bio.terra.stairway.FlightFilter;
 import bio.terra.stairway.FlightFilter.FlightFilterPredicate;
 import bio.terra.stairway.FlightFilterOp;
+import bio.terra.stairway.FlightFilterSortDirection;
 import bio.terra.stairway.FlightStatus;
 import bio.terra.stairway.flights.TestFlight;
 import java.time.Instant;
@@ -54,7 +55,7 @@ public class FilterTest {
         "SELECT F.flightid, F.stairway_id, F.submit_time, F.completed_time,"
             + " F.output_parameters, F.status, F.serialized_exception"
             + " FROM flight F"
-            + " ORDER BY submit_time LIMIT :limit OFFSET :offset";
+            + " ORDER BY submit_time ASC LIMIT :limit OFFSET :offset";
 
     FlightFilter filter = new FlightFilter();
     String sql = new FlightFilterAccess(filter, 0, 10, null).makeSql();
@@ -68,7 +69,7 @@ public class FilterTest {
             + " F.output_parameters, F.status, F.serialized_exception"
             + " FROM flight F WHERE"
             + " F.completed_time > :ff1 AND F.class_name = :ff2 AND F.status = :ff3 AND F.submit_time < :ff4"
-            + " ORDER BY submit_time LIMIT :limit OFFSET :offset";
+            + " ORDER BY submit_time ASC LIMIT :limit OFFSET :offset";
 
     Instant submit = now();
     Instant complete = now();
@@ -90,7 +91,7 @@ public class FilterTest {
             + " FROM flight F INNER JOIN flightinput I"
             + " ON F.flightid = I.flightid"
             + " WHERE (I.key = 'email' AND I.value = :ff1)"
-            + " ORDER BY submit_time LIMIT :limit OFFSET :offset";
+            + " ORDER BY submit_time ASC LIMIT :limit OFFSET :offset";
 
     FlightFilter filter =
         new FlightFilter()
@@ -109,7 +110,7 @@ public class FilterTest {
             + " ON F.flightid = I.flightid"
             + " WHERE (I.key = 'email' AND I.value = :ff1)"
             + " AND F.class_name = :ff2"
-            + " ORDER BY submit_time LIMIT :limit OFFSET :offset";
+            + " ORDER BY submit_time ASC LIMIT :limit OFFSET :offset";
 
     FlightFilter filter =
         new FlightFilter()
@@ -132,7 +133,7 @@ public class FilterTest {
             + " GROUP BY I.flightid) INPUT"
             + " ON F.flightid = INPUT.flightid"
             + " WHERE INPUT.matchCount = 2"
-            + " ORDER BY submit_time LIMIT :limit OFFSET :offset";
+            + " ORDER BY submit_time ASC LIMIT :limit OFFSET :offset";
 
     FlightFilter filter =
         new FlightFilter()
@@ -156,7 +157,7 @@ public class FilterTest {
             + " ON F.flightid = INPUT.flightid"
             + " WHERE INPUT.matchCount = 2"
             + " AND F.class_name = :ff3"
-            + " ORDER BY submit_time LIMIT :limit OFFSET :offset";
+            + " ORDER BY submit_time ASC LIMIT :limit OFFSET :offset";
 
     FlightFilter filter =
         new FlightFilter()
@@ -174,7 +175,7 @@ public class FilterTest {
         "SELECT F.flightid, F.stairway_id, F.submit_time, F.completed_time,"
             + " F.output_parameters, F.status, F.serialized_exception"
             + " FROM flight F"
-            + " ORDER BY submit_time OFFSET :offset";
+            + " ORDER BY submit_time ASC OFFSET :offset";
 
     FlightFilter filter = new FlightFilter();
     String sql = new FlightFilterAccess(filter, 0, null, null).makeSql();
@@ -187,7 +188,7 @@ public class FilterTest {
         "SELECT F.flightid, F.stairway_id, F.submit_time, F.completed_time,"
             + " F.output_parameters, F.status, F.serialized_exception"
             + " FROM flight F"
-            + " ORDER BY submit_time LIMIT :limit";
+            + " ORDER BY submit_time ASC LIMIT :limit";
 
     FlightFilter filter = new FlightFilter();
     String sql = new FlightFilterAccess(filter, null, 10, null).makeSql();
@@ -201,11 +202,28 @@ public class FilterTest {
             + " F.output_parameters, F.status, F.serialized_exception"
             + " FROM flight F"
             + " WHERE F.submit_time > :pagetoken"
-            + " ORDER BY submit_time LIMIT :limit";
+            + " ORDER BY submit_time ASC LIMIT :limit";
 
     PageToken pageToken = new PageToken(Instant.now());
 
     FlightFilter filter = new FlightFilter();
+    String sql = new FlightFilterAccess(filter, null, 10, pageToken.makeToken()).makeSql();
+    assertThat(sql, equalTo(expect));
+  }
+
+  @Test
+  public void filterForm1OrderTest() throws Exception {
+    String expect =
+            "SELECT F.flightid, F.stairway_id, F.submit_time, F.completed_time,"
+                    + " F.output_parameters, F.status, F.serialized_exception"
+                    + " FROM flight F"
+                    + " WHERE F.submit_time > :pagetoken"
+                    + " ORDER BY submit_time DESC LIMIT :limit";
+
+    PageToken pageToken = new PageToken(Instant.now());
+
+    FlightFilter filter = new FlightFilter()
+            .submittedTimeSortDirection(FlightFilterSortDirection.DESC);
     String sql = new FlightFilterAccess(filter, null, 10, pageToken.makeToken()).makeSql();
     assertThat(sql, equalTo(expect));
   }
