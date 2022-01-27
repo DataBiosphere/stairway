@@ -3,6 +3,7 @@ package bio.terra.stairway.impl;
 import bio.terra.stairway.FlightFilter;
 import bio.terra.stairway.FlightFilter.FlightFilterPredicate;
 import bio.terra.stairway.FlightFilter.FlightFilterPredicate.Datatype;
+import bio.terra.stairway.FlightFilterSortDirection;
 import bio.terra.stairway.StairwayMapper;
 import bio.terra.stairway.exception.FlightFilterException;
 import com.fasterxml.jackson.core.JsonProcessingException;
@@ -124,8 +125,8 @@ class FlightFilterAccess {
 
     makeSqlQueryCommon(sb);
 
-    // All forms end with the same order by
-    sb.append(" ORDER BY submit_time");
+    // All forms end with the same order by with the variance being ascending or descending order
+    sb.append(" ORDER BY submit_time").append(" ").append(filter.getSubmittedTimeSortDirection().getSql());
 
     // Add the paging controls if present
     if (limit != null) {

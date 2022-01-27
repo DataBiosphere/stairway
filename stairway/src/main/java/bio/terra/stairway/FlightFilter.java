@@ -17,6 +17,7 @@ import javax.annotation.Nullable;
  *     .addFilterFlightClass(EQUAL, IngestFlight.class)
  *     .addFilterFlightStatus(EQUAL, FlightStatus.COMPLETED)
  *     .addFilterInputParameter("email", EQUAL, "ddtest@gmail.com");
+ *     .submittedTimeSortDirection(FlightFilterSortDirection.DESC)
  * }</pre>
  *
  * That filter would return ingest flights completed in the last day (assuming you'd properly set
@@ -26,11 +27,13 @@ import javax.annotation.Nullable;
 public class FlightFilter {
   private final List<FlightFilterPredicate> flightPredicates;
   private final List<FlightFilterPredicate> inputPredicates;
+  private FlightFilterSortDirection submittedTimeSortDirection;
   private int parameterId;
 
   public FlightFilter() {
     flightPredicates = new ArrayList<>();
     inputPredicates = new ArrayList<>();
+    submittedTimeSortDirection = FlightFilterSortDirection.ASC;
     parameterId = 0;
   }
 
@@ -40,6 +43,10 @@ public class FlightFilter {
 
   public List<FlightFilterPredicate> getInputPredicates() {
     return inputPredicates;
+  }
+
+  public FlightFilterSortDirection getSubmittedTimeSortDirection() {
+    return submittedTimeSortDirection;
   }
 
   /**
@@ -150,6 +157,21 @@ public class FlightFilter {
     FlightFilterPredicate predicate =
         new FlightFilterPredicate(key, op, value, Datatype.STRING, makeParameterName());
     inputPredicates.add(predicate);
+    return this;
+  }
+
+  /**
+   * Specify the sort order based on submitted time for the returned values
+   * @param submittedTimeSortDirection wether to sort in ascending (default) or descending order
+   * @return {@code this}, for fluent style
+   * @throws FlightFilterException if the specified value is null
+   */
+  public FlightFilter submittedTimeSortDirection(FlightFilterSortDirection submittedTimeSortDirection) {
+    if (submittedTimeSortDirection == null) {
+      throw new FlightFilterException("Sort direction cannot be nul");
+    }
+
+    this.submittedTimeSortDirection = submittedTimeSortDirection;
     return this;
   }
 
