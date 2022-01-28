@@ -126,7 +126,7 @@ public class FlightFilter {
    */
   public FlightFilter addFilterFlightStatus(FlightFilterOp op, FlightStatus status) {
     if (status == null) {
-      throw new FlightFilterException("Status cannot be nul");
+      throw new FlightFilterException("Status cannot be null");
     }
     FlightFilterPredicate predicate =
         new FlightFilterPredicate(
@@ -168,7 +168,7 @@ public class FlightFilter {
    */
   public FlightFilter submittedTimeSortDirection(FlightFilterSortDirection submittedTimeSortDirection) {
     if (submittedTimeSortDirection == null) {
-      throw new FlightFilterException("Sort direction cannot be nul");
+      throw new FlightFilterException("Sort direction cannot be null");
     }
 
     this.submittedTimeSortDirection = submittedTimeSortDirection;
