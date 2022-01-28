@@ -1,0 +1,12 @@
+databaseChangeLog:
+  - changeSet:
+      id: flightworking
+      author: nm
+      changes:
+        - createIndex:
+            indexName: idx_flight_submit_time
+            tableName: flight
+            unique: false
+            columns:
+              - column:
+                  name: submit_time

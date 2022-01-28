@@ -2,12 +2,14 @@ package bio.terra.stairway.impl;
 
 import static org.hamcrest.CoreMatchers.equalTo;
 import static org.hamcrest.MatcherAssert.assertThat;
+import static org.hamcrest.Matchers.contains;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import bio.terra.stairway.Flight;
 import bio.terra.stairway.FlightEnumeration;
 import bio.terra.stairway.FlightFilter;
 import bio.terra.stairway.FlightFilterOp;
+import bio.terra.stairway.FlightFilterSortDirection;
 import bio.terra.stairway.FlightMap;
 import bio.terra.stairway.FlightState;
 import bio.terra.stairway.FlightStatus;
@@ -146,14 +148,26 @@ public class EnumerateFlightsTest {
     flightEnum = flightDao.getFlights(pageTokenString, 3, filter);
     checkResults("case 10", flightEnum.getFlightStateList(), Arrays.asList("3", "4", "5"));
     assertThat(flightEnum.getTotalFlights(), equalTo(6));
+
+    // Case 11: sorting in ascending order
+    filter =
+            new FlightFilter()
+                    .submittedTimeSortDirection(FlightFilterSortDirection.ASC);
+    flightList = flightDao.getFlights(0, 100, filter);
+    checkResults("case 11", flightList, Arrays.asList("0", "1", "2", "3", "4", "5"));
+
+    // Case 12: sorting in descending order
+    filter =
+            new FlightFilter()
+                    .submittedTimeSortDirection(FlightFilterSortDirection.DESC);
+    flightList = flightDao.getFlights(0, 100, filter);
+    checkResults("case 12", flightList, Arrays.asList("5", "4", "3", "2", "1", "0"));
   }
 
   private void checkResults(String name, List<FlightState> resultlList, List<String> expectedIds) {
-    assertThat(
-        name + ": right number of elements", resultlList.size(), equalTo(expectedIds.size()));
     List<String> actualIds =
         resultlList.stream().map(FlightState::getFlightId).collect(Collectors.toList());
-    assertTrue(CollectionUtils.isEqualCollection(actualIds, expectedIds), "elements match");
+    assertThat(name + ": elements match in the correct order", actualIds, contains(expectedIds.toArray()));
   }
 
   private FlightState makeFlight(

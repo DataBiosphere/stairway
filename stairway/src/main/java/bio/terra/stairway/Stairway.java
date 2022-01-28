@@ -260,7 +260,7 @@ public interface Stairway {
    *
    * @param offset offset of the row ordered by most recent flight first
    * @param limit limit the number of rows returned
-   * @param filter predicates to apply to filter flights
+   * @param filter predicates to apply to filter flights and retrieval options
    * @return List of FlightState
    * @throws StairwayException - other Stairway error
    * @throws DatabaseOperationException unexpected database errors
