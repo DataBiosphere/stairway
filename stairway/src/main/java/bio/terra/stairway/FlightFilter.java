@@ -162,11 +162,13 @@ public class FlightFilter {
 
   /**
    * Specify the sort order based on submitted time for the returned values
+   *
    * @param submittedTimeSortDirection wether to sort in ascending (default) or descending order
    * @return {@code this}, for fluent style
    * @throws FlightFilterException if the specified value is null
    */
-  public FlightFilter submittedTimeSortDirection(FlightFilterSortDirection submittedTimeSortDirection) {
+  public FlightFilter submittedTimeSortDirection(
+      FlightFilterSortDirection submittedTimeSortDirection) {
     if (submittedTimeSortDirection == null) {
       throw new FlightFilterException("Sort direction cannot be null");
     }

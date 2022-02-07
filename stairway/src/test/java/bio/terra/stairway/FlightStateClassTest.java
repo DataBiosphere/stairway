@@ -23,6 +23,7 @@ public class FlightStateClassTest {
   private static String bad = "bad bad bad";
   private FlightState result;
   private Instant timestamp;
+  private String className;
 
   @BeforeEach
   public void setup() {
@@ -38,6 +39,8 @@ public class FlightStateClassTest {
 
     timestamp = Instant.now();
 
+    className = "bio.terra.stairway.FooFlight";
+
     result = new FlightState();
     result.setFlightId(flightId);
     result.setFlightStatus(FlightStatus.FATAL);
@@ -46,6 +49,7 @@ public class FlightStateClassTest {
     result.setCompleted(timestamp);
     result.setResultMap(outputs);
     result.setException(new RuntimeException(errString));
+    result.setClassName(className);
   }
 
   @Test
@@ -64,6 +68,8 @@ public class FlightStateClassTest {
 
     FlightMap outputMap = result.getResultMap().get();
     assertThat(outputMap.get(fkey, Double.class), is(dubValue));
+
+    assertThat(result.getClassName(), is(className));
   }
 
   @Test

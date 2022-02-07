@@ -3,7 +3,6 @@ package bio.terra.stairway.impl;
 import static org.hamcrest.CoreMatchers.equalTo;
 import static org.hamcrest.MatcherAssert.assertThat;
 import static org.hamcrest.Matchers.contains;
-import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import bio.terra.stairway.Flight;
 import bio.terra.stairway.FlightEnumeration;
@@ -23,7 +22,6 @@ import java.util.Arrays;
 import java.util.Collections;
 import java.util.List;
 import java.util.stream.Collectors;
-import org.apache.commons.collections4.CollectionUtils;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
@@ -150,16 +148,18 @@ public class EnumerateFlightsTest {
     assertThat(flightEnum.getTotalFlights(), equalTo(6));
 
     // Case 11: sorting in ascending order
-    filter =
-            new FlightFilter()
-                    .submittedTimeSortDirection(FlightFilterSortDirection.ASC);
+    filter = new FlightFilter().submittedTimeSortDirection(FlightFilterSortDirection.ASC);
     flightList = flightDao.getFlights(0, 100, filter);
     checkResults("case 11", flightList, Arrays.asList("0", "1", "2", "3", "4", "5"));
+    // explicitly verify that classnames are returned as expected (note that the flights list is in
+    // ascending order)
+    assertThat(
+        "class names are correct",
+        flightList.stream().map(FlightState::getClassName).collect(Collectors.toList()),
+        contains(flights.stream().map(FlightState::getClassName).toArray()));
 
     // Case 12: sorting in descending order
-    filter =
-            new FlightFilter()
-                    .submittedTimeSortDirection(FlightFilterSortDirection.DESC);
+    filter = new FlightFilter().submittedTimeSortDirection(FlightFilterSortDirection.DESC);
     flightList = flightDao.getFlights(0, 100, filter);
     checkResults("case 12", flightList, Arrays.asList("5", "4", "3", "2", "1", "0"));
   }
@@ -167,7 +167,8 @@ public class EnumerateFlightsTest {
   private void checkResults(String name, List<FlightState> resultlList, List<String> expectedIds) {
     List<String> actualIds =
         resultlList.stream().map(FlightState::getFlightId).collect(Collectors.toList());
-    assertThat(name + ": elements match in the correct order", actualIds, contains(expectedIds.toArray()));
+    assertThat(
+        name + ": elements match in the correct order", actualIds, contains(expectedIds.toArray()));
   }
 
   private FlightState makeFlight(

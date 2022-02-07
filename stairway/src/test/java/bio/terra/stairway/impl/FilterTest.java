@@ -53,7 +53,7 @@ public class FilterTest {
   public void filterForm1NoFilterTest() throws Exception {
     String expect =
         "SELECT F.flightid, F.stairway_id, F.submit_time, F.completed_time,"
-            + " F.output_parameters, F.status, F.serialized_exception"
+            + " F.output_parameters, F.status, F.serialized_exception, F.class_name"
             + " FROM flight F"
             + " ORDER BY submit_time ASC LIMIT :limit OFFSET :offset";
 
@@ -66,7 +66,7 @@ public class FilterTest {
   public void filterForm1WithFilterTest() throws Exception {
     String expect =
         "SELECT F.flightid, F.stairway_id, F.submit_time, F.completed_time,"
-            + " F.output_parameters, F.status, F.serialized_exception"
+            + " F.output_parameters, F.status, F.serialized_exception, F.class_name"
             + " FROM flight F WHERE"
             + " F.completed_time > :ff1 AND F.class_name = :ff2 AND F.status = :ff3 AND F.submit_time < :ff4"
             + " ORDER BY submit_time ASC LIMIT :limit OFFSET :offset";
@@ -87,7 +87,7 @@ public class FilterTest {
   public void filterForm2NoFilterTest() throws Exception {
     String expect =
         "SELECT F.flightid, F.stairway_id, F.submit_time, F.completed_time,"
-            + " F.output_parameters, F.status, F.serialized_exception"
+            + " F.output_parameters, F.status, F.serialized_exception, F.class_name"
             + " FROM flight F INNER JOIN flightinput I"
             + " ON F.flightid = I.flightid"
             + " WHERE (I.key = 'email' AND I.value = :ff1)"
@@ -105,7 +105,7 @@ public class FilterTest {
   public void filterForm2WithFilterTest() throws Exception {
     String expect =
         "SELECT F.flightid, F.stairway_id, F.submit_time, F.completed_time,"
-            + " F.output_parameters, F.status, F.serialized_exception"
+            + " F.output_parameters, F.status, F.serialized_exception, F.class_name"
             + " FROM flight F INNER JOIN flightinput I"
             + " ON F.flightid = I.flightid"
             + " WHERE (I.key = 'email' AND I.value = :ff1)"
@@ -125,7 +125,7 @@ public class FilterTest {
   public void filterForm3NoFilterTest() throws Exception {
     String expect =
         "SELECT F.flightid, F.stairway_id, F.submit_time, F.completed_time,"
-            + " F.output_parameters, F.status, F.serialized_exception"
+            + " F.output_parameters, F.status, F.serialized_exception, F.class_name"
             + " FROM flight F INNER JOIN "
             + "(SELECT flightid, COUNT(*) AS matchCount FROM flightinput I"
             + " WHERE (I.key = 'email' AND I.value = :ff1)"
@@ -148,7 +148,7 @@ public class FilterTest {
   public void filterForm3WithFilterTest() throws Exception {
     String expect =
         "SELECT F.flightid, F.stairway_id, F.submit_time, F.completed_time,"
-            + " F.output_parameters, F.status, F.serialized_exception"
+            + " F.output_parameters, F.status, F.serialized_exception, F.class_name"
             + " FROM flight F INNER JOIN "
             + "(SELECT flightid, COUNT(*) AS matchCount FROM flightinput I"
             + " WHERE (I.key = 'email' AND I.value = :ff1)"
@@ -173,7 +173,7 @@ public class FilterTest {
   public void filterForm1NoLimitTest() throws Exception {
     String expect =
         "SELECT F.flightid, F.stairway_id, F.submit_time, F.completed_time,"
-            + " F.output_parameters, F.status, F.serialized_exception"
+            + " F.output_parameters, F.status, F.serialized_exception, F.class_name"
             + " FROM flight F"
             + " ORDER BY submit_time ASC OFFSET :offset";
 
@@ -186,7 +186,7 @@ public class FilterTest {
   public void filterForm1NoOffsetTest() throws Exception {
     String expect =
         "SELECT F.flightid, F.stairway_id, F.submit_time, F.completed_time,"
-            + " F.output_parameters, F.status, F.serialized_exception"
+            + " F.output_parameters, F.status, F.serialized_exception, F.class_name"
             + " FROM flight F"
             + " ORDER BY submit_time ASC LIMIT :limit";
 
@@ -199,7 +199,7 @@ public class FilterTest {
   public void filterForm1PageTokenTest() throws Exception {
     String expect =
         "SELECT F.flightid, F.stairway_id, F.submit_time, F.completed_time,"
-            + " F.output_parameters, F.status, F.serialized_exception"
+            + " F.output_parameters, F.status, F.serialized_exception, F.class_name"
             + " FROM flight F"
             + " WHERE F.submit_time > :pagetoken"
             + " ORDER BY submit_time ASC LIMIT :limit";
@@ -214,16 +214,16 @@ public class FilterTest {
   @Test
   public void filterForm1OrderTest() throws Exception {
     String expect =
-            "SELECT F.flightid, F.stairway_id, F.submit_time, F.completed_time,"
-                    + " F.output_parameters, F.status, F.serialized_exception"
-                    + " FROM flight F"
-                    + " WHERE F.submit_time > :pagetoken"
-                    + " ORDER BY submit_time DESC LIMIT :limit";
+        "SELECT F.flightid, F.stairway_id, F.submit_time, F.completed_time,"
+            + " F.output_parameters, F.status, F.serialized_exception, F.class_name"
+            + " FROM flight F"
+            + " WHERE F.submit_time > :pagetoken"
+            + " ORDER BY submit_time DESC LIMIT :limit";
 
     PageToken pageToken = new PageToken(Instant.now());
 
-    FlightFilter filter = new FlightFilter()
-            .submittedTimeSortDirection(FlightFilterSortDirection.DESC);
+    FlightFilter filter =
+        new FlightFilter().submittedTimeSortDirection(FlightFilterSortDirection.DESC);
     String sql = new FlightFilterAccess(filter, null, 10, pageToken.makeToken()).makeSql();
     assertThat(sql, equalTo(expect));
   }
