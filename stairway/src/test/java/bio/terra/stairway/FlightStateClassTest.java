@@ -20,7 +20,8 @@ import org.junit.jupiter.api.Test;
 
 @Tag("unit")
 public class FlightStateClassTest {
-  private static String bad = "bad bad bad";
+  private static final String BAD = "bad bad bad";
+  private static final String CLASS_NAME = "bio.terra.stairway.FooFlight";
   private FlightState result;
   private Instant timestamp;
 
@@ -46,6 +47,7 @@ public class FlightStateClassTest {
     result.setCompleted(timestamp);
     result.setResultMap(outputs);
     result.setException(new RuntimeException(errString));
+    result.setClassName(CLASS_NAME);
   }
 
   @Test
@@ -64,6 +66,8 @@ public class FlightStateClassTest {
 
     FlightMap outputMap = result.getResultMap().get();
     assertThat(outputMap.get(fkey, Double.class), is(dubValue));
+
+    assertThat(result.getClassName(), is(CLASS_NAME));
   }
 
   @Test
@@ -71,7 +75,7 @@ public class FlightStateClassTest {
     Assertions.assertThrows(
         UnsupportedOperationException.class,
         () -> {
-          result.getResultMap().get().put(bad, bad);
+          result.getResultMap().get().put(BAD, BAD);
         });
   }
 
@@ -80,7 +84,7 @@ public class FlightStateClassTest {
     Assertions.assertThrows(
         UnsupportedOperationException.class,
         () -> {
-          result.getInputParameters().put(bad, bad);
+          result.getInputParameters().put(BAD, BAD);
         });
   }
 }

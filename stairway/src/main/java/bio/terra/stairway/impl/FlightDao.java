@@ -801,7 +801,7 @@ class FlightDao {
 
     final String sqlOneFlight =
         "SELECT stairway_id, flightid, submit_time, "
-            + " completed_time, output_parameters, status, serialized_exception"
+            + " completed_time, output_parameters, status, serialized_exception, class_name"
             + " FROM "
             + FLIGHT_TABLE
             + " WHERE flightid = :flightId";
@@ -971,6 +971,7 @@ class FlightDao {
       flightState.setFlightStatus(FlightStatus.valueOf(rs.getString("status")));
       flightState.setSubmitted(rs.getTimestamp("submit_time").toInstant());
       flightState.setStairwayId(rs.getString("stairway_id"));
+      flightState.setClassName(rs.getString("class_name"));
       List<FlightInput> flightInput = retrieveInputParameters(connection, flightId);
       flightState.setInputParameters(FlightMapUtils.makeFlightMap(flightInput));
 
