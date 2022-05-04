@@ -10,4 +10,6 @@ public class MapKey {
   public static final String COUNTER_END = "counterEnd";
   public static final String COUNTER_STOP = "counterStop";
   public static final String SLEEP_SECONDS = "sleepSeconds";
+  public static final String PROGRESS_NAME1 = "progressName1";
+  public static final String PROGRESS_NAME2 = "progressName2";
 }
