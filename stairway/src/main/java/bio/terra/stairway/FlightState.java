@@ -1,7 +1,6 @@
 package bio.terra.stairway;
 
 import java.time.Instant;
-import java.util.List;
 import java.util.Optional;
 
 /** Class that holds the state of the flight returned to the caller. */
@@ -16,7 +15,7 @@ public class FlightState {
   private Exception exception; // filled in when flightStatus is ERROR or FATAL
   private String stairwayId;
   private String className;
-  private List<ProgressMeterData> progressMeters;
+  private ProgressMeterReader progressMeters;
 
   public FlightState() {}
 
@@ -97,12 +96,16 @@ public class FlightState {
     this.className = className;
   }
 
-  public List<ProgressMeterData> getProgressMeters() {
-    return progressMeters;
+  public void setProgressMeters(ProgressMeterReader progressMeters) {
+    this.progressMeters = progressMeters;
   }
 
-  public void setProgressMeters(List<ProgressMeterData> progressMeters) {
-    this.progressMeters = progressMeters;
+  public Optional<ProgressMeterData> getProgressMeter(String name) {
+    return progressMeters.getProgressMeter(name);
+  }
+
+  public Optional<ProgressMeterData> getFlightStepProgressMeter() {
+    return progressMeters.getFlightStepProgressMeter();
   }
 
   public boolean isActive() {

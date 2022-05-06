@@ -8,7 +8,7 @@ import bio.terra.stairway.fixtures.MapKey;
 import bio.terra.stairway.fixtures.TestPauseController;
 import bio.terra.stairway.fixtures.TestStairwayBuilder;
 import bio.terra.stairway.flights.TestFlightProgress;
-import java.util.List;
+import java.util.Optional;
 import java.util.concurrent.TimeUnit;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Tag;
@@ -53,7 +53,7 @@ public class ProgressTest {
     for (long counter = counterStart; counter <= counterStop; counter++) {
       waitForProgress(flightId, meterName, counter, counterStop);
       logger.info("Set control to {}", counter);
-      TestPauseController.setControl((int)counter);
+      TestPauseController.setControl((int) counter);
       TimeUnit.SECONDS.sleep(1);
     }
     TestPauseController.setControl(0);
@@ -68,7 +68,8 @@ public class ProgressTest {
         logger.info("Meter {} progressed to {} of {}", meterName, targetProgress, targetMax);
         return;
       }
-      logger.info("Meter {} NOT progressed to {} of {} - wait {}", meterName, targetProgress, targetMax, i);
+      logger.info(
+          "Meter {} NOT progressed to {} of {} - wait {}", meterName, targetProgress, targetMax, i);
       TimeUnit.SECONDS.sleep(4);
     }
     logger.error("Meter named {} did not make progress in time", meterName);
@@ -79,23 +80,26 @@ public class ProgressTest {
       String flightId, String meterName, long targetProgress, long targetMax)
       throws InterruptedException {
     FlightState state = stairway.getFlightState(flightId);
-    List<ProgressMeterData> meterList = state.getProgressMeters();
-    logMeters(meterList);
 
-    for (ProgressMeterData meter : meterList) {
-      if (meter.getName().equals(meterName)) {
-        assertThat("meter stop is correct", meter.getV2(), equalTo(targetMax));
-        return (meter.getV1() == targetProgress);
-      }
+    Optional<ProgressMeterData> stepMeter = state.getFlightStepProgressMeter();
+    logMeter("steps", stepMeter);
+
+    Optional<ProgressMeterData> meterData = state.getProgressMeter(meterName);
+    logMeter(meterName, meterData);
+    if (meterData.isEmpty()) {
+      return false;
     }
-    // The test flight may not have written the meter for the first time
-    return false;
+
+    assertThat("meter stop is correct", meterData.get().getV2(), equalTo(targetMax));
+    return (meterData.get().getV1() == targetProgress);
   }
 
-  private void logMeters(List<ProgressMeterData> meterList) {
-    logger.info("Progress Meter State:");
-    for (ProgressMeterData meter : meterList) {
-      logger.info("  meter {} at {} of {}", meter.getName(), meter.getV1(), meter.getV2());
+  private void logMeter(String name, Optional<ProgressMeterData> meterData) {
+    if (meterData.isEmpty()) {
+      logger.info("meter {} is not set", name);
+    } else {
+      ProgressMeterData meter = meterData.get();
+      logger.info("  meter {} at {} of {}", name, meter.getV1(), meter.getV2());
     }
   }
 }

@@ -1,6 +1,7 @@
 package bio.terra.stairway;
 
 import java.util.List;
+import java.util.Optional;
 
 /** Read-only interface to the flight context. See FlightContextImpl for details. */
 public interface FlightContext {
@@ -49,12 +50,17 @@ public interface FlightContext {
   /** @return pretty string describing the flight */
   String flightDesc();
 
-  /** @return the map of meters indexed by name */
-  List<ProgressMeterData> getProgressMeters();
+  /**
+   * Return meter data given the meter name
+   *
+   * @param name name of the meter to lookup
+   * @return optional progress meter data
+   */
+  Optional<ProgressMeterData> getProgressMeter(String name);
 
   /**
-   * Set a progress meter for this flight. Typically, this is used in the form
-   * v1 operations are complete out of v2 total operations.
+   * Set a progress meter for this flight. Typically, this is used in the form v1 operations are
+   * complete out of v2 total operations.
    *
    * @param name name of the meter - should be unique across meters in the flight
    * @param v1 value 1

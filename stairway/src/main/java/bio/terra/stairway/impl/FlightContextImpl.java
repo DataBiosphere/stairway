@@ -17,6 +17,7 @@ import bio.terra.stairway.exception.StairwayExecutionException;
 import java.util.Collections;
 import java.util.LinkedList;
 import java.util.List;
+import java.util.Optional;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.commons.lang3.builder.ToStringBuilder;
 
@@ -92,12 +93,8 @@ public class FlightContextImpl implements FlightContext {
   private final FlightContextLogState logState;
 
   // -- persisted state --
-  // Persisted FlightMap that changes each time a call to set an item is made.
-  // At this point in time, there is only ever a single item: a list of progress meter data.
-  // My position is that exposing a general purpose mechanism like this would lead to bad
-  // flights. So the backend is very general and the front-end is restricted to just the
-  // progress meter interface. Easy to expand if we come across other use cases.
-  private FlightMap persistedStateMap;
+  // Progress Meters
+  private final ProgressMetersImpl progressMeters;
 
   /**
    * Context constructor used for new submitted flights. Initialize the context to start at the
@@ -122,7 +119,7 @@ public class FlightContextImpl implements FlightContext {
     this.debugInfo = debugInfo;
     this.flightStatus = FlightStatus.RUNNING;
     this.logState = new FlightContextLogState(true); // true = fill in the defaults
-    this.persistedStateMap = new FlightMap();
+    this.progressMeters = new ProgressMetersImpl(stairway.getFlightDao(), flightId);
   }
 
   /**
@@ -134,7 +131,7 @@ public class FlightContextImpl implements FlightContext {
    * @param debugInfo debugInfo for this flight
    * @param flightStatus current status of the flight
    * @param logState logged state of the last flight step
-   * @param persistedStateMap persisted state flight map - used for progress meters
+   * @param progressMeters progress meter state for this flight
    */
   public FlightContextImpl(
       String flightId,
@@ -143,7 +140,7 @@ public class FlightContextImpl implements FlightContext {
       FlightDebugInfo debugInfo,
       FlightStatus flightStatus,
       FlightContextLogState logState,
-      FlightMap persistedStateMap) {
+      ProgressMetersImpl progressMeters) {
     this.flightId = flightId;
     this.flightClassName = flightClassName;
     this.inputParameters = inputParameters;
@@ -151,7 +148,7 @@ public class FlightContextImpl implements FlightContext {
     this.debugInfo = debugInfo;
     this.flightStatus = flightStatus;
     this.logState = logState;
-    this.persistedStateMap = persistedStateMap;
+    this.progressMeters = progressMeters;
   }
 
   public void setDynamicContext(StairwayImpl stairway, Flight flight) {
@@ -261,13 +258,12 @@ public class FlightContextImpl implements FlightContext {
   }
 
   @Override
-  public List<ProgressMeterData> getProgressMeters() {
-    return ProgressUtils.getProgressMetersFromMap(persistedStateMap);
+  public Optional<ProgressMeterData> getProgressMeter(String name) {
+    return progressMeters.getProgressMeter(name);
   }
 
   /**
    * Set a progress meter and persist it in the Stairway database
-   * typically in the form at v1 out of v2 operations.
    *
    * @param name name of the meter
    * @param v1 value1
@@ -276,11 +272,10 @@ public class FlightContextImpl implements FlightContext {
    */
   @Override
   public void setProgressMeter(String name, long v1, long v2) throws InterruptedException {
-    ProgressUtils.setProgressMeter(persistedStateMap, name, v1, v2);
-    stairway.getFlightDao().storePersistedStateMap(flightId, persistedStateMap);
+    progressMeters.setProgressMeter(name, v1, v2);
   }
 
-// -- other accessors used in the implementation --
+  // -- other accessors used in the implementation --
 
   StairwayImpl getStairwayImpl() {
     return stairway;
@@ -317,9 +312,8 @@ public class FlightContextImpl implements FlightContext {
   void nextStepIndex() throws InterruptedException {
     logState.nextStepIndex();
     // Update the stairway step progress meter to reflect what we step we are working on
-    setProgressMeter(ProgressUtils.STAIRWAY_STEP_PROGRESS,
-        getStepIndex(),
-        getStepClassNames().size());
+    setProgressMeter(
+        ProgressMetersImpl.STAIRWAY_STEP_PROGRESS, getStepIndex(), getStepClassNames().size());
   }
 
   void setFlightStatus(FlightStatus flightStatus) {
@@ -354,10 +348,6 @@ public class FlightContextImpl implements FlightContext {
     this.flightHooks = flightHooks;
   }
 
-  FlightMap getPersistedStateMap() {
-    return persistedStateMap;
-  }
-
   // -- execution methods -- maybe get rid of these
 
   boolean isDoing() {
@@ -384,7 +374,7 @@ public class FlightContextImpl implements FlightContext {
         .append("debugInfo", debugInfo)
         .append("flightStatus", flightStatus)
         .append("logState", logState)
-        .append("persistedStateMap", persistedStateMap)
+        .append("progressMeters", progressMeters)
         .toString();
   }
 }

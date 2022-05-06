@@ -720,8 +720,8 @@ class FlightDao {
   private FlightContextImpl makeFlightContext(Connection connection, String flightId, ResultSet rs)
       throws DatabaseOperationException, SQLException {
 
-    FlightMap inputParameters = retrieveFlightMap(FLIGHT_INPUT_TABLE, connection, flightId);
-    FlightMap persistedStateMap = retrieveFlightMap(FLIGHT_PERSISTED_TABLE, connection, flightId);
+    FlightMap inputParameters = retrieveInputParameters(connection, flightId);
+    PersistedStateMap persistedStateMap = retrievePersistedStateMap(connection, flightId);
     FlightContextLogState logState = makeLogState(connection, flightId);
 
     // Make debug info, if any
@@ -743,7 +743,7 @@ class FlightDao {
         debugInfo,
         FlightStatus.valueOf(rs.getString("status")),
         logState,
-        persistedStateMap);
+        new ProgressMetersImpl(persistedStateMap));
   }
 
   /**
@@ -1004,11 +1004,11 @@ class FlightDao {
       flightState.setSubmitted(rs.getTimestamp("submit_time").toInstant());
       flightState.setStairwayId(rs.getString("stairway_id"));
       flightState.setClassName(rs.getString("class_name"));
-      FlightMap inputParameters = retrieveFlightMap(FLIGHT_INPUT_TABLE, connection, flightId);
-      flightState.setInputParameters(inputParameters);
+      flightState.setInputParameters(retrieveInputParameters(connection, flightId));
 
-      FlightMap persistedStateMap = retrieveFlightMap(FLIGHT_PERSISTED_TABLE, connection, flightId);
-      flightState.setProgressMeters(ProgressUtils.getProgressMetersFromMap(persistedStateMap));
+      PersistedStateMap persistedStateMap = retrievePersistedStateMap(connection, flightId);
+      ProgressMetersImpl meters = new ProgressMetersImpl(persistedStateMap);
+      flightState.setProgressMeters(meters);
 
       // If the flight is in one of the complete states, then we retrieve the completion data
       if (flightState.getFlightStatus() == FlightStatus.SUCCESS
@@ -1077,9 +1077,26 @@ class FlightDao {
     }
   }
 
-  // Common method for reading out flight map storage for input params and persisted state
-  private FlightMap retrieveFlightMap(String tableName, Connection connection, String flightId)
+  private FlightMap retrieveInputParameters(Connection connection, String flightId)
       throws SQLException {
+    List<FlightInput> inputList = retrieveFlightInputs(FLIGHT_INPUT_TABLE, connection, flightId);
+    var flightMap = new FlightMap();
+    FlightMapUtils.fillInFlightMap(flightMap, inputList);
+    return flightMap;
+  }
+
+  private PersistedStateMap retrievePersistedStateMap(Connection connection, String flightId)
+      throws SQLException {
+    List<FlightInput> inputList =
+        retrieveFlightInputs(FLIGHT_PERSISTED_TABLE, connection, flightId);
+    var persistedStateMap = new PersistedStateMap(this, flightId);
+    FlightMapUtils.fillInFlightMap(persistedStateMap, inputList);
+    return persistedStateMap;
+  }
+
+  // Common method for reading out flight map storage for input params and persisted state
+  private List<FlightInput> retrieveFlightInputs(
+      String tableName, Connection connection, String flightId) throws SQLException {
     final String sqlSelectInput =
         "SELECT flightId, key, value FROM " + tableName + " WHERE flightId = :flightId";
 
@@ -1097,7 +1114,7 @@ class FlightDao {
       }
     }
 
-    return FlightMapUtils.makeFlightMap(inputList);
+    return inputList;
   }
 
   private List<FlightInput> retrieveLatestWorkingParameters(Connection connection, String flightId)
