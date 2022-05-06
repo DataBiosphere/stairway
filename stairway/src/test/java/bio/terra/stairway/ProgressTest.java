@@ -80,11 +80,12 @@ public class ProgressTest {
       String flightId, String meterName, long targetProgress, long targetMax)
       throws InterruptedException {
     FlightState state = stairway.getFlightState(flightId);
+    ProgressMeterReader progressMeters = state.getProgressMeters();
 
-    Optional<ProgressMeterData> stepMeter = state.getFlightStepProgressMeter();
+    Optional<ProgressMeterData> stepMeter = progressMeters.getFlightStepProgressMeter();
     logMeter("steps", stepMeter);
 
-    Optional<ProgressMeterData> meterData = state.getProgressMeter(meterName);
+    Optional<ProgressMeterData> meterData = progressMeters.getProgressMeter(meterName);
     logMeter(meterName, meterData);
     if (meterData.isEmpty()) {
       return false;

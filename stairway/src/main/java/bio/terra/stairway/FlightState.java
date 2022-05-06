@@ -100,12 +100,8 @@ public class FlightState {
     this.progressMeters = progressMeters;
   }
 
-  public Optional<ProgressMeterData> getProgressMeter(String name) {
-    return progressMeters.getProgressMeter(name);
-  }
-
-  public Optional<ProgressMeterData> getFlightStepProgressMeter() {
-    return progressMeters.getFlightStepProgressMeter();
+  public ProgressMeterReader getProgressMeters() {
+    return progressMeters;
   }
 
   public boolean isActive() {
