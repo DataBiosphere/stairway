@@ -1,15 +1,21 @@
-package bio.terra.stairway;
+package bio.terra.stairway.impl;
 
+import static bio.terra.stairway.impl.ProgressMetersImpl.STAIRWAY_RESERVED_METER_PREFIX;
 import static org.hamcrest.CoreMatchers.equalTo;
 import static org.hamcrest.MatcherAssert.assertThat;
 import static org.junit.jupiter.api.Assertions.fail;
 
+import bio.terra.stairway.FlightMap;
+import bio.terra.stairway.FlightState;
+import bio.terra.stairway.ProgressMeter;
+import bio.terra.stairway.ProgressMeterReader;
+import bio.terra.stairway.exception.InvalidMeterName;
 import bio.terra.stairway.fixtures.MapKey;
 import bio.terra.stairway.fixtures.TestPauseController;
 import bio.terra.stairway.fixtures.TestStairwayBuilder;
 import bio.terra.stairway.flights.TestFlightProgress;
-import java.util.Optional;
 import java.util.concurrent.TimeUnit;
+import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
@@ -19,11 +25,21 @@ import org.slf4j.LoggerFactory;
 @Tag("unit")
 public class ProgressTest {
   private final Logger logger = LoggerFactory.getLogger(ProgressTest.class);
-  private Stairway stairway;
+  private StairwayImpl stairway;
 
   @BeforeEach
   public void setup() throws Exception {
-    stairway = new TestStairwayBuilder().build();
+    stairway = (StairwayImpl) new TestStairwayBuilder().build();
+  }
+
+  @Test
+  public void progressValidMeterName() throws Exception {
+    ProgressMetersImpl progressMeters = new ProgressMetersImpl(
+        stairway.getFlightDao(), stairway.createFlightId());
+    String badMeter = STAIRWAY_RESERVED_METER_PREFIX + "_bad_bad_bad";
+
+    Assertions.assertThrows(InvalidMeterName.class,
+        () -> progressMeters.setProgressMeter(badMeter, 3L, 5L));
   }
 
   @Test
@@ -82,25 +98,24 @@ public class ProgressTest {
     FlightState state = stairway.getFlightState(flightId);
     ProgressMeterReader progressMeters = state.getProgressMeters();
 
-    Optional<ProgressMeterData> stepMeter = progressMeters.getFlightStepProgressMeter();
+    ProgressMeter stepMeter = progressMeters.getFlightStepProgressMeter();
     logMeter("steps", stepMeter);
 
-    Optional<ProgressMeterData> meterData = progressMeters.getProgressMeter(meterName);
+    ProgressMeter meterData = progressMeters.getProgressMeter(meterName);
     logMeter(meterName, meterData);
-    if (meterData.isEmpty()) {
+    if (meterData == null) {
       return false;
     }
 
-    assertThat("meter stop is correct", meterData.get().getV2(), equalTo(targetMax));
-    return (meterData.get().getV1() == targetProgress);
+    assertThat("meter stop is correct", meterData.getV2(), equalTo(targetMax));
+    return (meterData.getV1() == targetProgress);
   }
 
-  private void logMeter(String name, Optional<ProgressMeterData> meterData) {
-    if (meterData.isEmpty()) {
+  private void logMeter(String name, ProgressMeter meterData) {
+    if (meterData == null) {
       logger.info("meter {} is not set", name);
     } else {
-      ProgressMeterData meter = meterData.get();
-      logger.info("  meter {} at {} of {}", name, meter.getV1(), meter.getV2());
+      logger.info("  meter {} at {} of {}", name, meterData.getV1(), meterData.getV2());
     }
   }
 }

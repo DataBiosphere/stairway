@@ -7,7 +7,7 @@ import bio.terra.stairway.FlightContext;
 import bio.terra.stairway.FlightDebugInfo;
 import bio.terra.stairway.FlightMap;
 import bio.terra.stairway.FlightStatus;
-import bio.terra.stairway.ProgressMeterData;
+import bio.terra.stairway.ProgressMeter;
 import bio.terra.stairway.RetryRule;
 import bio.terra.stairway.Stairway;
 import bio.terra.stairway.StairwayHook;
@@ -17,7 +17,6 @@ import bio.terra.stairway.exception.StairwayExecutionException;
 import java.util.Collections;
 import java.util.LinkedList;
 import java.util.List;
-import java.util.Optional;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.commons.lang3.builder.ToStringBuilder;
 
@@ -258,7 +257,7 @@ public class FlightContextImpl implements FlightContext {
   }
 
   @Override
-  public Optional<ProgressMeterData> getProgressMeter(String name) {
+  public ProgressMeter getProgressMeter(String name) {
     return progressMeters.getProgressMeter(name);
   }
 
@@ -281,9 +280,13 @@ public class FlightContextImpl implements FlightContext {
     return stairway;
   }
 
+  int getStepCount() {
+    return steps.size();
+  }
+
   Step getCurrentStep() {
     int stepIndex = getStepIndex();
-    if (stepIndex < 0 || stepIndex >= steps.size()) {
+    if (stepIndex < 0 || stepIndex >= getStepCount()) {
       throw new StairwayExecutionException("Invalid step index: " + stepIndex);
     }
 
@@ -292,7 +295,7 @@ public class FlightContextImpl implements FlightContext {
 
   RetryRule getCurrentRetryRule() {
     int stepIndex = getStepIndex();
-    if (stepIndex < 0 || stepIndex >= steps.size()) {
+    if (stepIndex < 0 || stepIndex >= getStepCount()) {
       throw new StairwayExecutionException("Invalid step index: " + stepIndex);
     }
 
@@ -306,14 +309,13 @@ public class FlightContextImpl implements FlightContext {
   // Check if we are 'doing' the last step in the flight.
   // Used to implement the DebugInfo last step failure in FlightRunner
   boolean isDoingLastStep() {
-    return (isDoing() && getStepIndex() == steps.size() - 1);
+    return (isDoing() && getStepIndex() == getStepCount() - 1);
   }
 
   void nextStepIndex() throws InterruptedException {
     logState.nextStepIndex();
     // Update the stairway step progress meter to reflect what we step we are working on
-    setProgressMeter(
-        ProgressMetersImpl.STAIRWAY_STEP_PROGRESS, getStepIndex(), getStepClassNames().size());
+    progressMeters.setStairwayStepProgress(getStepIndex(), getStepCount());
   }
 
   void setFlightStatus(FlightStatus flightStatus) {
@@ -355,7 +357,7 @@ public class FlightContextImpl implements FlightContext {
   }
 
   boolean haveStepToDo() {
-    return logState.haveStepToDo(steps.size());
+    return logState.haveStepToDo(getStepCount());
   }
 
   @Override

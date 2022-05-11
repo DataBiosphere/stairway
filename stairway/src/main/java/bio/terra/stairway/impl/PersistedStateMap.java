@@ -1,8 +1,6 @@
 package bio.terra.stairway.impl;
 
 import bio.terra.stairway.FlightMap;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 
 /**
  * The persisted state class holds a FlightMap that is written back to the database when it is
@@ -13,8 +11,6 @@ import org.slf4j.LoggerFactory;
  * progress. However, if other use cases arise, we may expose it directly to flights.
  */
 public class PersistedStateMap extends FlightMap {
-  private static final Logger logger = LoggerFactory.getLogger(PersistedStateMap.class);
-
   private final FlightDao flightDao;
   private final String flightId;
 

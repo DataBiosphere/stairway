@@ -8,12 +8,12 @@ import com.fasterxml.jackson.annotation.JsonProperty;
  * values. The values are typically used to represent progress in the form of: N things done out of
  * M total things.
  */
-public class ProgressMeterData {
+public class ProgressMeter {
   private final long v1;
   private final long v2;
 
   @JsonCreator
-  public ProgressMeterData(@JsonProperty("v1") long v1, @JsonProperty("v2") long v2) {
+  public ProgressMeter(@JsonProperty("v1") long v1, @JsonProperty("v2") long v2) {
     this.v1 = v1;
     this.v2 = v2;
   }

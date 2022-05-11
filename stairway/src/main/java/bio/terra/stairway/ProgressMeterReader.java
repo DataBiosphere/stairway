@@ -1,7 +1,5 @@
 package bio.terra.stairway;
 
-import java.util.Optional;
-
 public interface ProgressMeterReader {
   /**
    * Retrieve a progress meter by name
@@ -9,7 +7,7 @@ public interface ProgressMeterReader {
    * @param name name to look up
    * @return progress meter data
    */
-  Optional<ProgressMeterData> getProgressMeter(String name);
+  ProgressMeter getProgressMeter(String name);
 
   /**
    * Retrieve the progress meter for the flight steps. The returned v1 is the step in progress. The
@@ -17,5 +15,5 @@ public interface ProgressMeterReader {
    *
    * @return meter data for flight steps
    */
-  Optional<ProgressMeterData> getFlightStepProgressMeter();
+  ProgressMeter getFlightStepProgressMeter();
 }

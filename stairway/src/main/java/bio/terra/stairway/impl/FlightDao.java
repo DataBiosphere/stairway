@@ -664,6 +664,9 @@ class FlightDao {
       startTransaction(connection);
       statement.setString("flightId", flightId);
 
+      // Note that the unlike the Spring NamedParameterPreparedStatement code, the variant used
+      // in Stairway only allows a single use of a substituted name. That is why we need value1
+      // and value2 and give them the same value.
       for (FlightInput input : inputList) {
         statement.setString("key", input.getKey());
         statement.setString("value1", input.getValue());
