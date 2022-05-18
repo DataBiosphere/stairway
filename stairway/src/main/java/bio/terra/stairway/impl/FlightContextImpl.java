@@ -7,6 +7,7 @@ import bio.terra.stairway.FlightContext;
 import bio.terra.stairway.FlightDebugInfo;
 import bio.terra.stairway.FlightMap;
 import bio.terra.stairway.FlightStatus;
+import bio.terra.stairway.ProgressMeter;
 import bio.terra.stairway.RetryRule;
 import bio.terra.stairway.Stairway;
 import bio.terra.stairway.StairwayHook;
@@ -28,6 +29,7 @@ import org.apache.commons.lang3.builder.ToStringBuilder;
  * <p>A subset of the flight context is made visible via the FlightContext interface
  */
 public class FlightContextImpl implements FlightContext {
+
   // -- dynamic state --
   // May be different for each instantiation of the flight
 
@@ -89,6 +91,10 @@ public class FlightContextImpl implements FlightContext {
   // Persisted state that changes each time a step is completed and its log record is written.
   private final FlightContextLogState logState;
 
+  // -- persisted state --
+  // Progress Meters
+  private final ProgressMetersImpl progressMeters;
+
   /**
    * Context constructor used for new submitted flights. Initialize the context to start at the
    * first step (index 0).
@@ -112,6 +118,7 @@ public class FlightContextImpl implements FlightContext {
     this.debugInfo = debugInfo;
     this.flightStatus = FlightStatus.RUNNING;
     this.logState = new FlightContextLogState(true); // true = fill in the defaults
+    this.progressMeters = new ProgressMetersImpl(stairway.getFlightDao(), flightId);
   }
 
   /**
@@ -123,6 +130,7 @@ public class FlightContextImpl implements FlightContext {
    * @param debugInfo debugInfo for this flight
    * @param flightStatus current status of the flight
    * @param logState logged state of the last flight step
+   * @param progressMeters progress meter state for this flight
    */
   public FlightContextImpl(
       String flightId,
@@ -130,7 +138,8 @@ public class FlightContextImpl implements FlightContext {
       FlightMap inputParameters,
       FlightDebugInfo debugInfo,
       FlightStatus flightStatus,
-      FlightContextLogState logState) {
+      FlightContextLogState logState,
+      ProgressMetersImpl progressMeters) {
     this.flightId = flightId;
     this.flightClassName = flightClassName;
     this.inputParameters = inputParameters;
@@ -138,6 +147,7 @@ public class FlightContextImpl implements FlightContext {
     this.debugInfo = debugInfo;
     this.flightStatus = flightStatus;
     this.logState = logState;
+    this.progressMeters = progressMeters;
   }
 
   public void setDynamicContext(StairwayImpl stairway, Flight flight) {
@@ -246,15 +256,37 @@ public class FlightContextImpl implements FlightContext {
         + getFlightId();
   }
 
+  @Override
+  public ProgressMeter getProgressMeter(String name) {
+    return progressMeters.getProgressMeter(name);
+  }
+
+  /**
+   * Set a progress meter and persist it in the Stairway database
+   *
+   * @param name name of the meter
+   * @param v1 value1
+   * @param v2 value2
+   * @throws InterruptedException on interruption during database wait
+   */
+  @Override
+  public void setProgressMeter(String name, long v1, long v2) throws InterruptedException {
+    progressMeters.setProgressMeter(name, v1, v2);
+  }
+
   // -- other accessors used in the implementation --
 
   StairwayImpl getStairwayImpl() {
     return stairway;
   }
 
+  int getStepCount() {
+    return steps.size();
+  }
+
   Step getCurrentStep() {
     int stepIndex = getStepIndex();
-    if (stepIndex < 0 || stepIndex >= steps.size()) {
+    if (stepIndex < 0 || stepIndex >= getStepCount()) {
       throw new StairwayExecutionException("Invalid step index: " + stepIndex);
     }
 
@@ -263,7 +295,7 @@ public class FlightContextImpl implements FlightContext {
 
   RetryRule getCurrentRetryRule() {
     int stepIndex = getStepIndex();
-    if (stepIndex < 0 || stepIndex >= steps.size()) {
+    if (stepIndex < 0 || stepIndex >= getStepCount()) {
       throw new StairwayExecutionException("Invalid step index: " + stepIndex);
     }
 
@@ -277,11 +309,13 @@ public class FlightContextImpl implements FlightContext {
   // Check if we are 'doing' the last step in the flight.
   // Used to implement the DebugInfo last step failure in FlightRunner
   boolean isDoingLastStep() {
-    return (isDoing() && getStepIndex() == steps.size() - 1);
+    return (isDoing() && getStepIndex() == getStepCount() - 1);
   }
 
-  void nextStepIndex() {
+  void nextStepIndex() throws InterruptedException {
     logState.nextStepIndex();
+    // Update the stairway step progress meter to reflect what we step we are working on
+    progressMeters.setStairwayStepProgress(getStepIndex(), getStepCount());
   }
 
   void setFlightStatus(FlightStatus flightStatus) {
@@ -323,7 +357,7 @@ public class FlightContextImpl implements FlightContext {
   }
 
   boolean haveStepToDo() {
-    return logState.haveStepToDo(steps.size());
+    return logState.haveStepToDo(getStepCount());
   }
 
   @Override
@@ -334,6 +368,7 @@ public class FlightContextImpl implements FlightContext {
         .append("stepHooks", stepHooks)
         .append("flightHooks", flightHooks)
         .append("steps", steps)
+        .append("retryRules", retryRules)
         .append("stepClassNames", stepClassNames)
         .append("flightId", flightId)
         .append("flightClassName", flightClassName)
@@ -341,6 +376,7 @@ public class FlightContextImpl implements FlightContext {
         .append("debugInfo", debugInfo)
         .append("flightStatus", flightStatus)
         .append("logState", logState)
+        .append("progressMeters", progressMeters)
         .toString();
   }
 }

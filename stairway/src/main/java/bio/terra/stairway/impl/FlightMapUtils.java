@@ -24,10 +24,20 @@ public class FlightMapUtils {
    */
   static FlightMap makeFlightMap(List<FlightInput> inputList) {
     FlightMap flightMap = new FlightMap();
+    fillInFlightMap(flightMap, inputList);
+    return flightMap;
+  }
+
+  /**
+   * Fill in a flight map from an input list
+   *
+   * @param flightMap incoming flight map
+   * @param inputList input list form of the input parameters
+   */
+  static void fillInFlightMap(FlightMap flightMap, List<FlightInput> inputList) {
     for (FlightInput input : inputList) {
       flightMap.putRaw(input.getKey(), input.getValue());
     }
-    return flightMap;
   }
 
   /**

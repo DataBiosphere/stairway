@@ -1,0 +1,37 @@
+databaseChangeLog:
+  - changeSet:
+      id: flightpersisted
+      author: dd
+      changes:
+        - createTable:
+            tableName: flightpersisted
+            columns:
+              - column:
+                  name: flightid
+                  type: varchar(36)
+                  constraints:
+                    nullable: false
+              - column:
+                  name: key
+                  type: text
+                  constraints:
+                    nullable: false
+              - column:
+                  name: value
+                  type: text
+                  remarks: serialized object representation
+                  constraints:
+                    nullable: false
+        - addPrimaryKey:
+            tableName: flightpersisted
+            columnNames: flightid, key
+            constraintName: pk_flightpersisted
+        - addForeignKeyConstraint:
+            baseTableName: flightpersisted
+            baseColumnNames: flightid
+            referencedTableName: flight
+            referencedColumnNames: flightid
+            onDelete: CASCADE
+            onUpdate: NO ACTION
+            validate: true
+            constraintName: fk_flightpersisted_flight

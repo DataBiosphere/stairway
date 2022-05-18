@@ -15,6 +15,7 @@ public class FlightState {
   private Exception exception; // filled in when flightStatus is ERROR or FATAL
   private String stairwayId;
   private String className;
+  private ProgressMeterReader progressMeters;
 
   public FlightState() {}
 
@@ -93,6 +94,14 @@ public class FlightState {
 
   public void setClassName(String className) {
     this.className = className;
+  }
+
+  public void setProgressMeters(ProgressMeterReader progressMeters) {
+    this.progressMeters = progressMeters;
+  }
+
+  public ProgressMeterReader getProgressMeters() {
+    return progressMeters;
   }
 
   public boolean isActive() {

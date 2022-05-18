@@ -6,7 +6,6 @@ import static bio.terra.stairway.impl.DbUtils.startTransaction;
 
 import bio.terra.stairway.Direction;
 import bio.terra.stairway.ExceptionSerializer;
-import bio.terra.stairway.FlightContext;
 import bio.terra.stairway.FlightDebugInfo;
 import bio.terra.stairway.FlightEnumeration;
 import bio.terra.stairway.FlightFilter;
@@ -71,6 +70,7 @@ class FlightDao {
   static final String FLIGHT_LOG_TABLE = "flightlog";
   static final String FLIGHT_INPUT_TABLE = "flightinput";
   static final String FLIGHT_WORKING_TABLE = "flightworking";
+  static final String FLIGHT_PERSISTED_TABLE = "flightpersisted";
   private static final Logger logger = LoggerFactory.getLogger(FlightDao.class);
   private static final String UNKNOWN = "<unknown>";
 
@@ -163,12 +163,12 @@ class FlightDao {
    * @throws DatabaseOperationException database error
    * @throws InterruptedException thread shutdown
    */
-  void step(FlightContext flightContext)
+  void step(FlightContextImpl flightContext)
       throws StairwayException, DatabaseOperationException, InterruptedException {
     DbRetry.retryVoid("flight.step", () -> stepInner(flightContext));
   }
 
-  private void stepInner(FlightContext flightContext) throws SQLException {
+  private void stepInner(FlightContextImpl flightContext) throws SQLException {
 
     UUID logId = UUID.randomUUID();
 
@@ -640,6 +640,43 @@ class FlightDao {
     }
   }
 
+  void storePersistedStateMap(String flightId, FlightMap persistedStateMap)
+      throws StairwayException, DatabaseOperationException, InterruptedException {
+    DbRetry.retryVoid(
+        "flight.storePersistedStateMap",
+        () -> storePersistedStateMapInner(flightId, persistedStateMap));
+  }
+
+  private void storePersistedStateMapInner(String flightId, FlightMap persistedStateMap)
+      throws SQLException {
+    final String sqlUpsert =
+        "INSERT INTO "
+            + FLIGHT_PERSISTED_TABLE
+            + "(flightId, key, value) VALUES (:flightId, :key, :value1) "
+            + "ON CONFLICT ON CONSTRAINT pk_flightpersisted "
+            + "DO UPDATE SET value = :value2";
+
+    List<FlightInput> inputList = FlightMapUtils.makeFlightInputList(persistedStateMap);
+
+    try (Connection connection = dataSource.getConnection();
+        NamedParameterPreparedStatement statement =
+            new NamedParameterPreparedStatement(connection, sqlUpsert)) {
+      startTransaction(connection);
+      statement.setString("flightId", flightId);
+
+      // Note that the unlike the Spring NamedParameterPreparedStatement code, the variant used
+      // in Stairway only allows a single use of a substituted name. That is why we need value1
+      // and value2 and give them the same value.
+      for (FlightInput input : inputList) {
+        statement.setString("key", input.getKey());
+        statement.setString("value1", input.getValue());
+        statement.setString("value2", input.getValue());
+        statement.getPreparedStatement().executeUpdate();
+      }
+      commitTransaction(connection);
+    }
+  }
+
   /**
    * Given a flightId build the flight context from the database
    *
@@ -686,9 +723,9 @@ class FlightDao {
   private FlightContextImpl makeFlightContext(Connection connection, String flightId, ResultSet rs)
       throws DatabaseOperationException, SQLException {
 
-    // Make the input parameters
-    List<FlightInput> inputList = retrieveInputParameters(connection, flightId);
-    FlightMap inputParameters = FlightMapUtils.makeFlightMap(inputList);
+    FlightMap inputParameters = retrieveInputParameters(connection, flightId);
+    PersistedStateMap persistedStateMap = retrievePersistedStateMap(connection, flightId);
+    FlightContextLogState logState = makeLogState(connection, flightId);
 
     // Make debug info, if any
     FlightDebugInfo debugInfo = null;
@@ -702,16 +739,14 @@ class FlightDao {
       }
     }
 
-    // Make the log state
-    FlightContextLogState logState = makeLogState(connection, flightId);
-
     return new FlightContextImpl(
         flightId,
         rs.getString("class_name"),
         inputParameters,
         debugInfo,
         FlightStatus.valueOf(rs.getString("status")),
-        logState);
+        logState,
+        new ProgressMetersImpl(persistedStateMap));
   }
 
   /**
@@ -972,8 +1007,11 @@ class FlightDao {
       flightState.setSubmitted(rs.getTimestamp("submit_time").toInstant());
       flightState.setStairwayId(rs.getString("stairway_id"));
       flightState.setClassName(rs.getString("class_name"));
-      List<FlightInput> flightInput = retrieveInputParameters(connection, flightId);
-      flightState.setInputParameters(FlightMapUtils.makeFlightMap(flightInput));
+      flightState.setInputParameters(retrieveInputParameters(connection, flightId));
+
+      PersistedStateMap persistedStateMap = retrievePersistedStateMap(connection, flightId);
+      ProgressMetersImpl meters = new ProgressMetersImpl(persistedStateMap);
+      flightState.setProgressMeters(meters);
 
       // If the flight is in one of the complete states, then we retrieve the completion data
       if (flightState.getFlightStatus() == FlightStatus.SUCCESS
@@ -1042,10 +1080,28 @@ class FlightDao {
     }
   }
 
-  private List<FlightInput> retrieveInputParameters(Connection connection, String flightId)
+  private FlightMap retrieveInputParameters(Connection connection, String flightId)
       throws SQLException {
+    List<FlightInput> inputList = retrieveFlightInputs(FLIGHT_INPUT_TABLE, connection, flightId);
+    var flightMap = new FlightMap();
+    FlightMapUtils.fillInFlightMap(flightMap, inputList);
+    return flightMap;
+  }
+
+  private PersistedStateMap retrievePersistedStateMap(Connection connection, String flightId)
+      throws SQLException {
+    List<FlightInput> inputList =
+        retrieveFlightInputs(FLIGHT_PERSISTED_TABLE, connection, flightId);
+    var persistedStateMap = new PersistedStateMap(this, flightId);
+    FlightMapUtils.fillInFlightMap(persistedStateMap, inputList);
+    return persistedStateMap;
+  }
+
+  // Common method for reading out flight map storage for input params and persisted state
+  private List<FlightInput> retrieveFlightInputs(
+      String tableName, Connection connection, String flightId) throws SQLException {
     final String sqlSelectInput =
-        "SELECT flightId, key, value FROM " + FLIGHT_INPUT_TABLE + " WHERE flightId = :flightId";
+        "SELECT flightId, key, value FROM " + tableName + " WHERE flightId = :flightId";
 
     List<FlightInput> inputList = new ArrayList<>();
 
@@ -1060,6 +1116,7 @@ class FlightDao {
         }
       }
     }
+
     return inputList;
   }
 

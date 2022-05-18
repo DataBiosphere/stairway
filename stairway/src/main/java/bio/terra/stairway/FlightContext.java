@@ -48,4 +48,23 @@ public interface FlightContext {
 
   /** @return pretty string describing the flight */
   String flightDesc();
+
+  /**
+   * Return meter data given the meter name
+   *
+   * @param name name of the meter to lookup
+   * @return progress meter data or null if not found
+   */
+  ProgressMeter getProgressMeter(String name);
+
+  /**
+   * Set a progress meter for this flight. Typically, this is used in the form v1 operations are
+   * complete out of v2 total operations.
+   *
+   * @param name name of the meter - should be unique across meters in the flight
+   * @param v1 value 1
+   * @param v2 value 2
+   * @throws InterruptedException on interrupt during database wait
+   */
+  void setProgressMeter(String name, long v1, long v2) throws InterruptedException;
 }
