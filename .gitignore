@@ -42,3 +42,5 @@ logs/
 .openapi-generator/
 pom.xml
 
+### Jenv directory-local version setting
+.java-version
