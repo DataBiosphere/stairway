@@ -9,6 +9,6 @@ repositories {
 }
 
 dependencies {
-    implementation group: 'com.diffplug.spotless', name: 'spotless-plugin-gradle', version: '5.14.0'
+    implementation group: 'com.diffplug.spotless', name: 'spotless-plugin-gradle', version: '6.10.0'
     implementation group: 'gradle.plugin.com.github.spotbugs.snom', name: 'spotbugs-gradle-plugin', version: '4.7.1'
 }
