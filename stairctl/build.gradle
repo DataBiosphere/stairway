@@ -1,44 +1,37 @@
-buildscript {
-    repositories {
-        mavenCentral()
-    }
-}
-
 plugins {
-    id 'stairway.java-conventions'
     id 'application'
-    id "io.spring.dependency-management" version "1.0.10.RELEASE"
-    id "org.springframework.boot" version "2.4.0"
+    id 'stairway.java-conventions'
+
+    id 'io.spring.dependency-management' version '1.0.13.RELEASE'
+    id 'org.springframework.boot' version '2.7.3'
 }
 
 version = gradle.version
 mainClassName = 'bio.terra.stairctl.Application'
 
 dependencies {
-    // alphabetical
-    ext {
-        jackson = "2.10.2"
-        junit = "5.7.1"
-        logback = "1.2.3"
-        springboot = "2.4.5"
-        springshell = "2.0.1.RELEASE"
-    }
+    // Spring boot provides default versions of dependencies if no explicit version specified
+    // https://docs.spring.io/spring-boot/docs/current/reference/html/dependency-versions.html
 
     implementation project(":stairway")
 
-    implementation group: 'org.springframework.boot', name: 'spring-boot-starter', version: "${springboot}"
-    implementation group: 'org.springframework.shell', name: 'spring-shell-starter', version: "${springshell}"
-
-    // Versions via spring dependency management
     implementation group: 'org.apache.commons', name: 'commons-dbcp2'
     implementation group: 'org.apache.commons', name: 'commons-pool2'
     implementation group: 'org.apache.commons', name: 'commons-lang3'
 
-    implementation group: 'ch.qos.logback', name: 'logback-classic', version: "${logback}"
+    // JSON processing
+    implementation group: 'com.fasterxml.jackson.core', name: 'jackson-core'
+    implementation group: 'com.fasterxml.jackson.datatype', name: 'jackson-datatype-jsr310'
 
-    implementation group: 'com.fasterxml.jackson.core', name: 'jackson-core', version: "${jackson}"
-    implementation group: 'com.fasterxml.jackson.datatype', name: 'jackson-datatype-jsr310', version: "${jackson}"
+    implementation group: 'org.springframework.boot', name: 'spring-boot-starter'
+    implementation group: 'org.springframework.shell', name: 'spring-shell-starter', version: '2.1.1'
 
-    runtimeOnly group: "org.postgresql", name: "postgresql", version: "42.2.18"
-    runtimeOnly group: 'org.codehaus.groovy', name: 'groovy', version: '3.0.7'
+    // Database
+    runtimeOnly group: 'org.postgresql', name: 'postgresql'
+
+    // Log control during unit testing
+    testImplementation group: 'ch.qos.logback', name: 'logback-classic'
+    testRuntimeOnly group: 'org.codehaus.groovy', name: 'groovy'
 }
+
+apply from: "$rootDir/gradle/dependency-locking.gradle"

@@ -1,0 +1,5 @@
+task testConnected(type: Test) {
+    useJUnitPlatform {
+        includeTags 'connected'
+    }
+}
