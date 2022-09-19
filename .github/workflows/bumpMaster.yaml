@@ -1,7 +1,7 @@
 name: master version bump
 on:
   push:
-    branches: [ develop ]
+    branches: [ master ]
     paths-ignore: [ '**.md' ]
   workflow_dispatch:
     inputs:

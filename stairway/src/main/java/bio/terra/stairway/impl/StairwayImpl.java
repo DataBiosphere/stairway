@@ -549,7 +549,9 @@ public class StairwayImpl implements Stairway {
     return flightDao.getFlights(nextPageToken, limit, filter);
   }
 
-  /** @return name of this stairway instance */
+  /**
+   * @return name of this stairway instance
+   */
   public String getStairwayName() {
     return stairwayName;
   }

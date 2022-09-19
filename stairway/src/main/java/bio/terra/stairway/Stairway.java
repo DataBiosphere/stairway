@@ -287,6 +287,8 @@ public interface Stairway {
       @Nullable String nextPageToken, @Nullable Integer limit, @Nullable FlightFilter filter)
       throws StairwayException, DatabaseOperationException, InterruptedException;
 
-  /** @return name of this stairway instance */
+  /**
+   * @return name of this stairway instance
+   */
   String getStairwayName();
 }
