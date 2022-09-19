@@ -18,7 +18,8 @@ public class ProgressMetersImpl implements ProgressMeterReader {
   public static final String STAIRWAY_RESERVED_METER_PREFIX = "STAIRWAY";
 
   /** Progress meter for the flight step we are on */
-  public static final String STAIRWAY_STEP_PROGRESS = STAIRWAY_RESERVED_METER_PREFIX + "_STEP_PROGRESS";
+  public static final String STAIRWAY_STEP_PROGRESS =
+      STAIRWAY_RESERVED_METER_PREFIX + "_STEP_PROGRESS";
 
   // Progress meters
   private final PersistedStateMap persistedStateMap;
@@ -45,7 +46,8 @@ public class ProgressMetersImpl implements ProgressMeterReader {
 
   void setProgressMeter(String name, long v1, long v2) throws InterruptedException {
     if (StringUtils.startsWith(name, STAIRWAY_RESERVED_METER_PREFIX)) {
-      throw new InvalidMeterName("Invalid meter name: it cannot start with " + STAIRWAY_RESERVED_METER_PREFIX);
+      throw new InvalidMeterName(
+          "Invalid meter name: it cannot start with " + STAIRWAY_RESERVED_METER_PREFIX);
     }
     setProgressMeterWorker(name, v1, v2);
   }
