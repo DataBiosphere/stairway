@@ -1,32 +1,18 @@
 plugins {
     id 'idea'
     id 'maven-publish'
-    id 'com.jfrog.artifactory' version '4.13.0'
+
+    id 'com.jfrog.artifactory' version '4.29.0'
 }
 
-def artifactory_repo_key = System.getenv("ARTIFACTORY_REPO_KEY") != null ? System.getenv("ARTIFACTORY_REPO_KEY") : 'libs-snapshot-local'
-def artifactory_username = System.getenv('ARTIFACTORY_USERNAME')
-def artifactory_password = System.getenv('ARTIFACTORY_PASSWORD')
+group = 'bio.terra'
 
-gradle.taskGraph.whenReady { taskGraph ->
-    if (taskGraph.hasTask(artifactoryPublish) &&
-            (artifactory_username == null || artifactory_password == null)) {
-        throw new GradleException("Set env vars ARTIFACTORY_USERNAME and ARTIFACTORY_PASSWORD to publish")
-    }
+// task dependencies is NOT recursively executed on subprojects
+// https://docs.gradle.org/current/userguide/dependency_locking.html#generating_and_updating_dependency_locks
+tasks.named('dependencies') {
+    dependsOn(':stairway:dependencies')
+    dependsOn(':stairway-gcp:dependencies')
+    dependsOn(':stairctl:dependencies')
 }
 
-artifactory {
-    publish {
-        contextUrl = 'https://broadinstitute.jfrog.io/broadinstitute/'
-        repository {
-            repoKey = "${artifactory_repo_key}"
-            username = "${artifactory_username}"
-            password = "${artifactory_password}"
-        }
-        defaults {
-            publications(
-                    'stairway',
-                    'stairway-gcp')
-        }
-    }
-}
+apply from: "$rootDir/gradle/artifactory.gradle"

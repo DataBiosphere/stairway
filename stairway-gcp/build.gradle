@@ -3,34 +3,28 @@ plugins {
 }
 
 dependencies {
-    // Google dependencies
-    constraints {
-        implementation 'com.google.guava:guava:30.1.1-jre' // "-jre" for Java 8 or higher
-    }
-    implementation platform('com.google.cloud:libraries-bom:20.2.0')
-
     api project(':stairway')
 
-    implementation group: 'org.apache.commons', name: 'commons-lang3', version: '3.11'
+    implementation group: 'org.apache.commons', name: 'commons-lang3', version: '3.12.0'
     implementation group: 'org.apache.commons', name: 'commons-collections4', version: '4.4'
 
     // JSON processing
-    implementation('com.fasterxml.jackson.core:jackson-databind:2.12.3')
-    implementation('com.fasterxml.jackson.datatype:jackson-datatype-jsr310:2.12.3')
-    implementation('com.fasterxml.jackson.datatype:jackson-datatype-jdk8:2.12.3')
-    implementation('com.fasterxml.jackson.module:jackson-module-parameter-names:2.12.3')
-    implementation group: 'org.openapitools', name: 'jackson-databind-nullable', version: '0.2.1'
-
-    // For PubSub
-    implementation group: 'com.google.cloud', name: 'google-cloud-pubsub'
-
-    // For log control during unit testsing
-    testImplementation group: 'ch.qos.logback', name: 'logback-classic', version: '1.2.3'
-    testRuntimeOnly group: 'org.codehaus.groovy', name: 'groovy', version: '2.5.7'
-}
-
-task testConnected(type: Test) {
-    useJUnitPlatform {
-        includeTags 'connected'
+    ext {
+        jackson = '2.13.4'
     }
+    implementation group: 'com.fasterxml.jackson.core', name: 'jackson-databind', version: "${jackson}"
+    implementation group: 'com.fasterxml.jackson.datatype', name: 'jackson-datatype-jdk8', version: "${jackson}"
+    implementation group: 'com.fasterxml.jackson.datatype', name: 'jackson-datatype-jsr310', version: "${jackson}"
+    implementation group: 'com.fasterxml.jackson.module', name: 'jackson-module-parameter-names', version: "${jackson}"
+    implementation group: 'org.openapitools', name: 'jackson-databind-nullable', version: '0.2.3'
+
+    // Google dependencies
+    constraints {
+        implementation group: 'com.google.guava', name: 'guava', version: '31.1-jre' // "-jre" for Java 8 or higher
+    }
+    implementation platform('com.google.cloud:libraries-bom:26.1.1') // use common bom
+    implementation group: 'com.google.cloud', name: 'google-cloud-pubsub'
 }
+
+apply from: "$rootDir/gradle/dependency-locking.gradle"
+apply from: "$rootDir/gradle/test.gradle"

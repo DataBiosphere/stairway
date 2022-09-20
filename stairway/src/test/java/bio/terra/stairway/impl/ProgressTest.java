@@ -34,12 +34,12 @@ public class ProgressTest {
 
   @Test
   public void progressValidMeterName() throws Exception {
-    ProgressMetersImpl progressMeters = new ProgressMetersImpl(
-        stairway.getFlightDao(), stairway.createFlightId());
+    ProgressMetersImpl progressMeters =
+        new ProgressMetersImpl(stairway.getFlightDao(), stairway.createFlightId());
     String badMeter = STAIRWAY_RESERVED_METER_PREFIX + "_bad_bad_bad";
 
-    Assertions.assertThrows(InvalidMeterName.class,
-        () -> progressMeters.setProgressMeter(badMeter, 3L, 5L));
+    Assertions.assertThrows(
+        InvalidMeterName.class, () -> progressMeters.setProgressMeter(badMeter, 3L, 5L));
   }
 
   @Test

@@ -15,17 +15,23 @@ public class FlightEnumeration {
     this.flightStateList = flightStateList;
   }
 
-  /** @return total number of flights in the filtered set */
+  /**
+   * @return total number of flights in the filtered set
+   */
   public int getTotalFlights() {
     return totalFlights;
   }
 
-  /** @return encoded string describing the start of the next page */
+  /**
+   * @return encoded string describing the start of the next page
+   */
   public String getNextPageToken() {
     return nextPageToken;
   }
 
-  /** @return list of FlightState in this page */
+  /**
+   * @return list of FlightState in this page
+   */
   public List<FlightState> getFlightStateList() {
     return flightStateList;
   }

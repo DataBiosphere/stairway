@@ -6,26 +6,15 @@ plugins {
     id 'stairway.java-conventions'
 }
 
-group = 'bio.terra'
-sourceCompatibility = JavaVersion.VERSION_11
-
-repositories {
-    mavenCentral()
-    google()
-}
-
-// Modify the standard :test task to only include unit-tagged tests.
-test {
-    useJUnitPlatform {
-        includeTags 'unit'
-    }
-}
-
 java {
     // Builds Javadoc into the published package as part of the 'assemble' task.
     withJavadocJar()
+
     // Builds sources into the published package as part of the 'assemble' task.
     withSourcesJar()
+}
+tasks.withType(Javadoc) {
+    options.addStringOption('Xdoclint:none', '-quiet')
 }
 
 publishing {
