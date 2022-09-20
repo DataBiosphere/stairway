@@ -10,28 +10,25 @@ version = gradle.version
 mainClassName = 'bio.terra.stairctl.Application'
 
 dependencies {
-    // Spring boot provides default versions of dependencies if no explicit version specified
-    // https://docs.spring.io/spring-boot/docs/current/reference/html/dependency-versions.html
-
     implementation project(":stairway")
 
-    implementation group: 'org.apache.commons', name: 'commons-dbcp2'
-    implementation group: 'org.apache.commons', name: 'commons-pool2'
-    implementation group: 'org.apache.commons', name: 'commons-lang3'
+    implementation group: 'org.apache.commons', name: 'commons-dbcp2', version: '2.9.0'
+    implementation group: 'org.apache.commons', name: 'commons-pool2', version: '2.11.1'
+    implementation group: 'org.apache.commons', name: 'commons-lang3', version: '3.12.0'
 
     // JSON processing
-    implementation group: 'com.fasterxml.jackson.core', name: 'jackson-core'
-    implementation group: 'com.fasterxml.jackson.datatype', name: 'jackson-datatype-jsr310'
+    ext {
+        jackson = '2.13.4'
+    }
+    implementation group: 'com.fasterxml.jackson.core', name: 'jackson-core', version: "${jackson}"
+    implementation group: 'com.fasterxml.jackson.datatype', name: 'jackson-datatype-jsr310', version: "${jackson}"
 
-    implementation group: 'org.springframework.boot', name: 'spring-boot-starter'
+    // Spring
+    implementation group: 'org.springframework.boot', name: 'spring-boot-starter' // version from spring-boot-plugin
     implementation group: 'org.springframework.shell', name: 'spring-shell-starter', version: '2.1.1'
 
     // Database
     runtimeOnly group: 'org.postgresql', name: 'postgresql'
-
-    // Log control during unit testing
-    testImplementation group: 'ch.qos.logback', name: 'logback-classic'
-    testRuntimeOnly group: 'org.codehaus.groovy', name: 'groovy'
 }
 
 apply from: "$rootDir/gradle/dependency-locking.gradle"

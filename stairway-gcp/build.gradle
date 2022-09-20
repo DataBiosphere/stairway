@@ -3,9 +3,6 @@ plugins {
 }
 
 dependencies {
-    // Spring boot provides default versions of dependencies if no explicit version specified
-    // https://docs.spring.io/spring-boot/docs/current/reference/html/dependency-versions.html
-
     api project(':stairway')
 
     implementation group: 'org.apache.commons', name: 'commons-lang3', version: '3.12.0'
@@ -27,10 +24,6 @@ dependencies {
     }
     implementation platform('com.google.cloud:libraries-bom:26.1.1') // use common bom
     implementation group: 'com.google.cloud', name: 'google-cloud-pubsub'
-
-    // Log control during unit testing
-    testImplementation group: 'ch.qos.logback', name: 'logback-classic', version: '1.4.1'
-    testRuntimeOnly group: 'org.codehaus.groovy', name: 'groovy', version: '3.0.13'
 }
 
 apply from: "$rootDir/gradle/dependency-locking.gradle"
