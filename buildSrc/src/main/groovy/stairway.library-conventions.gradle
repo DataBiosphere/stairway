@@ -17,6 +17,7 @@ tasks.withType(Javadoc) {
     options.addStringOption('Xdoclint:none', '-quiet')
 }
 
+group = 'bio.terra'
 publishing {
     publications {
         "$project.name"(MavenPublication) {
