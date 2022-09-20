@@ -6,12 +6,6 @@ plugins {
     id 'stairway.java-conventions'
 }
 
-/*
-repositories {
-    mavenCentral()
-    google()
-} */
-
 java {
     // Builds Javadoc into the published package as part of the 'assemble' task.
     withJavadocJar()
