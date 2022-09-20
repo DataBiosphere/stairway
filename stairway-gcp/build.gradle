@@ -8,16 +8,18 @@ dependencies {
 
     api project(':stairway')
 
-    implementation group: 'org.apache.commons', name: 'commons-lang3'
+    implementation group: 'org.apache.commons', name: 'commons-lang3', version: '3.12.0'
     implementation group: 'org.apache.commons', name: 'commons-collections4', version: '4.4'
 
     // JSON processing
-    implementation group: 'com.fasterxml.jackson.core', name: 'jackson-databind'
-    implementation group: 'com.fasterxml.jackson.datatype', name: 'jackson-datatype-jdk8'
-    implementation group: 'com.fasterxml.jackson.datatype', name: 'jackson-datatype-jsr310'
-    implementation group: 'com.fasterxml.jackson.module', name: 'jackson-module-parameter-names'
+    ext {
+        jackson = '2.13.4'
+    }
+    implementation group: 'com.fasterxml.jackson.core', name: 'jackson-databind', version: "${jackson}"
+    implementation group: 'com.fasterxml.jackson.datatype', name: 'jackson-datatype-jdk8', version: "${jackson}"
+    implementation group: 'com.fasterxml.jackson.datatype', name: 'jackson-datatype-jsr310', version: "${jackson}"
+    implementation group: 'com.fasterxml.jackson.module', name: 'jackson-module-parameter-names', version: "${jackson}"
     implementation group: 'org.openapitools', name: 'jackson-databind-nullable', version: '0.2.3'
-
 
     // Google dependencies
     constraints {
@@ -27,8 +29,8 @@ dependencies {
     implementation group: 'com.google.cloud', name: 'google-cloud-pubsub'
 
     // Log control during unit testing
-    testImplementation group: 'ch.qos.logback', name: 'logback-classic'
-    testRuntimeOnly group: 'org.codehaus.groovy', name: 'groovy'
+    testImplementation group: 'ch.qos.logback', name: 'logback-classic', version: '1.4.1'
+    testRuntimeOnly group: 'org.codehaus.groovy', name: 'groovy', version: '3.0.13'
 }
 
 apply from: "$rootDir/gradle/dependency-locking.gradle"

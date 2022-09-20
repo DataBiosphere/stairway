@@ -3,7 +3,7 @@
 ## Branching and Versioning
 The initial design of Stairway branches was that we would use two main branches in github.
 
-The **master** branch ws intended to be used for distributing code
+The **master** branch is intended to be used for distributing code
 for other components to consume for alpha, staging, and production. It is published to the `libs-release-local`
 repository inside of artifactory. It always has simple semantic version numbers: _major_._minor_._patch_
 
@@ -14,6 +14,10 @@ inside of artifactory. It has a semantic version number and the word snapshot:  
 The current practice is that we are releasing from the **develop** branch and that is
 being consumed by other components. As things stabilize, we will have to decide if we want
 to continue with direct release or move to indirect release.
+
+## Requirements
+
+Java 17
 
 ## Testing
 
