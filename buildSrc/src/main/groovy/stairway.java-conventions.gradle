@@ -15,7 +15,6 @@ repositories {
 dependencies {
     // For SpotBugs annotations (still using FindBugs annotations)
     implementation group: 'com.github.spotbugs', name: 'spotbugs-annotations', version: '4.7.2'
-    //implementation group: 'com.google.code.findbugs', name: 'annotations', version: '3.0.1' // TODO
 
     // For logging
     implementation group: 'org.slf4j', name: 'slf4j-api', version: '1.7.36'
