@@ -3,6 +3,7 @@ package bio.terra.stairway.impl;
 import bio.terra.stairway.FlightFilter;
 import bio.terra.stairway.FlightFilter.FlightFilterPredicate;
 import bio.terra.stairway.FlightFilter.FlightFilterPredicate.Datatype;
+import bio.terra.stairway.FlightFilterSortDirection;
 import bio.terra.stairway.StairwayMapper;
 import bio.terra.stairway.exception.FlightFilterException;
 import com.fasterxml.jackson.core.JsonProcessingException;
@@ -216,7 +217,11 @@ class FlightFilterAccess {
 
       // Add the page token paging control if present
       if (pageToken != null) {
-        sb.append(inter).append("F.submit_time > :pagetoken");
+        if (filter.getSubmittedTimeSortDirection() == FlightFilterSortDirection.ASC) {
+          sb.append(inter).append("F.submit_time > :pagetoken");
+        } else {
+          sb.append(inter).append("F.submit_time < :pagetoken");
+        }
       }
     }
   }
