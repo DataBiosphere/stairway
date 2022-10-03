@@ -217,7 +217,7 @@ public class FilterTest {
         "SELECT F.flightid, F.stairway_id, F.submit_time, F.completed_time,"
             + " F.output_parameters, F.status, F.serialized_exception, F.class_name"
             + " FROM flight F"
-            + " WHERE F.submit_time > :pagetoken"
+            + " WHERE F.submit_time < :pagetoken"
             + " ORDER BY submit_time DESC LIMIT :limit";
 
     PageToken pageToken = new PageToken(Instant.now());

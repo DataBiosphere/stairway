@@ -147,10 +147,22 @@ public class EnumerateFlightsTest {
     checkResults("case 10", flightEnum.getFlightStateList(), Arrays.asList("3", "4", "5"));
     assertThat(flightEnum.getTotalFlights(), equalTo(6));
 
-    // Case 11: sorting in ascending order
+    // Case 11: page token in descending order
+    pageTokenString = new PageToken(flights.get(3).getSubmitted()).makeToken();
+    filter = new FlightFilter().submittedTimeSortDirection(FlightFilterSortDirection.DESC);
+    flightEnum = flightDao.getFlights(null, 3, filter);
+    checkResults("case 11", flightEnum.getFlightStateList(), Arrays.asList("5", "4", "3"));
+    assertThat(flightEnum.getTotalFlights(), equalTo(6));
+    assertThat(flightEnum.getNextPageToken(), equalTo(pageTokenString));
+
+    flightEnum = flightDao.getFlights(pageTokenString, 3, filter);
+    checkResults("case 11", flightEnum.getFlightStateList(), Arrays.asList("2", "1", "0"));
+    assertThat(flightEnum.getTotalFlights(), equalTo(6));
+
+    // Case 12: sorting in ascending order
     filter = new FlightFilter().submittedTimeSortDirection(FlightFilterSortDirection.ASC);
     flightList = flightDao.getFlights(0, 100, filter);
-    checkResults("case 11", flightList, Arrays.asList("0", "1", "2", "3", "4", "5"));
+    checkResults("case 12", flightList, Arrays.asList("0", "1", "2", "3", "4", "5"));
     // explicitly verify that classnames are returned as expected (note that the flights list is in
     // ascending order)
     assertThat(
@@ -158,10 +170,10 @@ public class EnumerateFlightsTest {
         flightList.stream().map(FlightState::getClassName).collect(Collectors.toList()),
         contains(flights.stream().map(FlightState::getClassName).toArray()));
 
-    // Case 12: sorting in descending order
+    // Case 13: sorting in descending order
     filter = new FlightFilter().submittedTimeSortDirection(FlightFilterSortDirection.DESC);
     flightList = flightDao.getFlights(0, 100, filter);
-    checkResults("case 12", flightList, Arrays.asList("5", "4", "3", "2", "1", "0"));
+    checkResults("case 13", flightList, Arrays.asList("5", "4", "3", "2", "1", "0"));
   }
 
   private void checkResults(String name, List<FlightState> resultlList, List<String> expectedIds) {
