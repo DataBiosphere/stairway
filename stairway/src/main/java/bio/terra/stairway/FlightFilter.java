@@ -136,6 +136,24 @@ public class FlightFilter {
   }
 
   /**
+   * Filter by flight ids
+   *
+   * @param flightIds A list of flight ids to filter by
+   * @return {@code this}, for fluent style
+   */
+  public FlightFilter addFilterFlightIds(List<String> flightIds) {
+    if (flightIds == null) {
+      throw new FlightFilterException("flightIds can not be null");
+    }
+    FlightFilterPredicate predicate =
+            new FlightFilterPredicate(
+                    "flightid", FlightFilterOp.IN, flightIds, Datatype.LIST, makeParameterName());
+    flightPredicates.add(predicate);
+    return this;
+  }
+
+
+  /**
    * Filter by an input parameter. This is processed by converting the {@code value} into JSON and
    * doing a string comparison against the input parameter stored in the database. The {@code value}
    * object must be <b>exactly</b> the same class as the input parameter.
@@ -154,8 +172,12 @@ public class FlightFilter {
     if (value == null) {
       throw new FlightFilterException("Value cannot be null in an input filter");
     }
-    FlightFilterPredicate predicate =
-        new FlightFilterPredicate(key, op, value, Datatype.STRING, makeParameterName());
+    FlightFilterPredicate predicate;
+    if (op == FlightFilterOp.IN) {
+      predicate = new FlightFilterPredicate(key, op, value, Datatype.LIST, makeParameterName());
+    } else {
+      predicate = new FlightFilterPredicate(key, op, value, Datatype.STRING, makeParameterName());
+    }
     inputPredicates.add(predicate);
     return this;
   }
@@ -233,6 +255,7 @@ public class FlightFilter {
     public enum Datatype {
       STRING,
       TIMESTAMP,
+      LIST,
       NULL
     }
   }

@@ -22,6 +22,8 @@ import java.util.Arrays;
 import java.util.Collections;
 import java.util.List;
 import java.util.stream.Collectors;
+
+import org.apache.commons.collections4.ListUtils;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
@@ -174,6 +176,21 @@ public class EnumerateFlightsTest {
     filter = new FlightFilter().submittedTimeSortDirection(FlightFilterSortDirection.DESC);
     flightList = flightDao.getFlights(0, 100, filter);
     checkResults("case 13", flightList, Arrays.asList("5", "4", "3", "2", "1", "0"));
+
+    // Case 14: filter input on an in clause
+    filter =
+            new FlightFilter()
+                    .addFilterInputParameter("in0", FlightFilterOp.IN, Arrays.asList(int1, int2));
+    flightList = flightDao.getFlights(0, 100, filter);
+    checkResults("case 14", flightList, Arrays.asList("1", "2", "3", "4"));
+
+    // Case 15: filter flight on an in clause
+    filter =
+            new FlightFilter()
+                    .addFilterFlightIds(Arrays.asList("0", "1", "3"));
+    flightList = flightDao.getFlights(0, 100, filter);
+    checkResults("case 15", flightList, Arrays.asList("0", "1", "3"));
+
   }
 
   private void checkResults(String name, List<FlightState> resultlList, List<String> expectedIds) {

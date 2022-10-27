@@ -7,10 +7,14 @@ import bio.terra.stairway.FlightFilterSortDirection;
 import bio.terra.stairway.StairwayMapper;
 import bio.terra.stairway.exception.FlightFilterException;
 import com.fasterxml.jackson.core.JsonProcessingException;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import com.google.common.annotations.VisibleForTesting;
 import java.sql.SQLException;
 import java.time.Instant;
+import java.util.ArrayList;
+import java.util.List;
 import java.util.Optional;
+
 import org.apache.commons.lang3.StringUtils;
 
 /**
@@ -27,6 +31,8 @@ class FlightFilterAccess {
   private final Integer offset;
   private final Integer limit;
   private final PageToken pageToken;
+  // Mapper should be used to deserialize to generic Postgres JSON
+  private final ObjectMapper pgJsonMapper = new ObjectMapper();
 
   public FlightFilterAccess(
       FlightFilter filter, Integer offset, Integer limit, String pageTokenString) {
@@ -252,6 +258,10 @@ class FlightFilterAccess {
     if (predicate.getDatatype() == Datatype.NULL) {
       return "F." + predicate.getKey() + " IS NULL";
     }
+    if (predicate.getDatatype() == Datatype.LIST) {
+      return "F." + predicate.getKey() + " " + predicate.getOp().getSql()
+              + " (SELECT JSON_ARRAY_ELEMENTS_TEXT(CAST(:" + predicate.getParameterName() + " AS JSON)))";
+    }
     return "F."
         + predicate.getKey()
         + predicate.getOp().getSql()
@@ -267,10 +277,13 @@ class FlightFilterAccess {
    */
   private void storeFlightPredicateValue(
       FlightFilterPredicate predicate, NamedParameterPreparedStatement statement)
-      throws SQLException {
+        throws SQLException, JsonProcessingException {
     switch (predicate.getDatatype()) {
       case STRING:
         statement.setString(predicate.getParameterName(), (String) predicate.getValue());
+        break;
+      case LIST:
+        statement.setString(predicate.getParameterName(), pgJsonMapper.writeValueAsString(predicate.getValue()));
         break;
       case TIMESTAMP:
         statement.setInstant(predicate.getParameterName(), (Instant) predicate.getValue());
@@ -289,19 +302,37 @@ class FlightFilterAccess {
    */
   @VisibleForTesting
   String makeInputPredicateSql(FlightFilterPredicate predicate) {
+    String valuePredicate = "";
+    if (predicate.getDatatype() == Datatype.NULL) {
+      return "I.value IS NULL";
+    } else if (predicate.getDatatype() == Datatype.LIST) {
+      valuePredicate = "I.value " + predicate.getOp().getSql()
+              + " (SELECT JSON_ARRAY_ELEMENTS_TEXT(CAST(:" + predicate.getParameterName() + " AS JSON)))";
+    } else {
+      valuePredicate = "I.value" + predicate.getOp().getSql() + ":" + predicate.getParameterName();
+    }
+
     return "(I.key = '"
         + predicate.getKey()
-        + "' AND I.value"
-        + predicate.getOp().getSql()
-        + ":"
-        + predicate.getParameterName()
-        + ")";
+        + "' AND " + valuePredicate +")";
   }
 
   private void storeInputPredicateValue(
       FlightFilterPredicate predicate, NamedParameterPreparedStatement statement)
       throws SQLException, JsonProcessingException {
-    String jsonValue = StairwayMapper.getObjectMapper().writeValueAsString(predicate.getValue());
+
+    String jsonValue;
+    if (predicate.getDatatype() == Datatype.LIST) {
+      List<String> values = new ArrayList<>();
+      for (Object value : ((List<?>) predicate.getValue())) {
+        // Need to double encode in order for strings to match
+        values.add(StairwayMapper.getObjectMapper()
+                .writeValueAsString(StairwayMapper.getObjectMapper().writeValueAsString(value)));
+      }
+      jsonValue = "[" + StringUtils.join(values, ",") + "]";
+    } else {
+      jsonValue = StairwayMapper.getObjectMapper().writeValueAsString(predicate.getValue());
+    }
     statement.setString(predicate.getParameterName(), jsonValue);
   }
 }
