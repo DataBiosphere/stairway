@@ -1,5 +1,8 @@
 package bio.terra.stairway.impl;
 
+import static bio.terra.stairway.FlightFilter.FlightBooleanOperationExpression.createAnd;
+import static bio.terra.stairway.FlightFilter.FlightBooleanOperationExpression.createOr;
+import static bio.terra.stairway.FlightFilter.FlightBooleanOperationExpression.createPredicate;
 import static java.time.Instant.now;
 import static org.hamcrest.CoreMatchers.equalTo;
 import static org.hamcrest.MatcherAssert.assertThat;
@@ -36,7 +39,11 @@ public class FilterTest {
   private void testPredicate(FlightFilter filter, int index, String operand) {
     String flightCompareSql = String.format("F.afield %s :ff%d", operand, index + 1);
     String inputCompareSql =
-        String.format("(I.key = 'afield' AND I.value %s :ff%d)", operand, index + 1);
+        String.format(
+            "EXISTS (SELECT 0 FROM flightinput I WHERE F.flightid = I.flightid "
+                + "AND I.key = 'afield' "
+                + "AND I.value %s :ff%d)",
+            operand, index + 1);
 
     FlightFilterAccess access = new FlightFilterAccess(filter, 0, 10, null);
 
@@ -47,14 +54,13 @@ public class FilterTest {
     assertThat(inputSql, equalTo(inputCompareSql));
   }
 
-  // There next 6 tests are all the possibilities for
-  // query forms 1, 2, and 3 with and without flight filters
   @Test
-  public void filterForm1NoFilterTest() throws Exception {
+  public void filterNoInputFilterNoFlightFiltersTest() throws Exception {
     String expect =
         "SELECT F.flightid, F.stairway_id, F.submit_time, F.completed_time,"
             + " F.output_parameters, F.status, F.serialized_exception, F.class_name"
             + " FROM flight F"
+            + " WHERE (1=1)"
             + " ORDER BY submit_time ASC LIMIT :limit OFFSET :offset";
 
     FlightFilter filter = new FlightFilter();
@@ -63,11 +69,11 @@ public class FilterTest {
   }
 
   @Test
-  public void filterForm1WithFilterTest() throws Exception {
+  public void filterNoInputFilterWithFlightFilterTest() throws Exception {
     String expect =
         "SELECT F.flightid, F.stairway_id, F.submit_time, F.completed_time,"
             + " F.output_parameters, F.status, F.serialized_exception, F.class_name"
-            + " FROM flight F WHERE"
+            + " FROM flight F WHERE (1=1) AND"
             + " F.completed_time > :ff1 AND F.class_name = :ff2 AND F.status = :ff3 AND F.submit_time < :ff4"
             + " ORDER BY submit_time ASC LIMIT :limit OFFSET :offset";
 
@@ -84,13 +90,14 @@ public class FilterTest {
   }
 
   @Test
-  public void filterForm2NoFilterTest() throws Exception {
+  public void filterSingleInputFilterNoFlightFiltersTest() throws Exception {
     String expect =
         "SELECT F.flightid, F.stairway_id, F.submit_time, F.completed_time,"
             + " F.output_parameters, F.status, F.serialized_exception, F.class_name"
-            + " FROM flight F INNER JOIN flightinput I"
-            + " ON F.flightid = I.flightid"
-            + " WHERE (I.key = 'email' AND I.value = :ff1)"
+            + " FROM flight F"
+            + " WHERE (1=1)"
+            + " AND EXISTS"
+            + " (SELECT 0 FROM flightinput I WHERE F.flightid = I.flightid AND I.key = 'email' AND I.value = :ff1)"
             + " ORDER BY submit_time ASC LIMIT :limit OFFSET :offset";
 
     FlightFilter filter =
@@ -102,13 +109,14 @@ public class FilterTest {
   }
 
   @Test
-  public void filterForm2WithFilterTest() throws Exception {
+  public void filterSingleInputFilterWithFlightFilterTest() throws Exception {
     String expect =
         "SELECT F.flightid, F.stairway_id, F.submit_time, F.completed_time,"
             + " F.output_parameters, F.status, F.serialized_exception, F.class_name"
-            + " FROM flight F INNER JOIN flightinput I"
-            + " ON F.flightid = I.flightid"
-            + " WHERE (I.key = 'email' AND I.value = :ff1)"
+            + " FROM flight F"
+            + " WHERE (1=1)"
+            + " AND EXISTS"
+            + " (SELECT 0 FROM flightinput I WHERE F.flightid = I.flightid AND I.key = 'email' AND I.value = :ff1)"
             + " AND F.class_name = :ff2"
             + " ORDER BY submit_time ASC LIMIT :limit OFFSET :offset";
 
@@ -122,17 +130,16 @@ public class FilterTest {
   }
 
   @Test
-  public void filterForm3NoFilterTest() throws Exception {
+  public void filterMultipleInputFiltersNoFlightFiltersTest() throws Exception {
     String expect =
         "SELECT F.flightid, F.stairway_id, F.submit_time, F.completed_time,"
             + " F.output_parameters, F.status, F.serialized_exception, F.class_name"
-            + " FROM flight F INNER JOIN "
-            + "(SELECT flightid, COUNT(*) AS matchCount FROM flightinput I"
-            + " WHERE (I.key = 'email' AND I.value = :ff1)"
-            + " OR (I.key = 'name' AND I.value = :ff2)"
-            + " GROUP BY I.flightid) INPUT"
-            + " ON F.flightid = INPUT.flightid"
-            + " WHERE INPUT.matchCount = 2"
+            + " FROM flight F"
+            + " WHERE (1=1)"
+            + " AND EXISTS"
+            + " (SELECT 0 FROM flightinput I WHERE F.flightid = I.flightid AND I.key = 'email' AND I.value = :ff1)"
+            + " AND EXISTS"
+            + " (SELECT 0 FROM flightinput I WHERE F.flightid = I.flightid AND I.key = 'name' AND I.value = :ff2)"
             + " ORDER BY submit_time ASC LIMIT :limit OFFSET :offset";
 
     FlightFilter filter =
@@ -145,17 +152,16 @@ public class FilterTest {
   }
 
   @Test
-  public void filterForm3WithFilterTest() throws Exception {
+  public void filterMultipleInputFiltersWithFlightFilterTest() throws Exception {
     String expect =
         "SELECT F.flightid, F.stairway_id, F.submit_time, F.completed_time,"
             + " F.output_parameters, F.status, F.serialized_exception, F.class_name"
-            + " FROM flight F INNER JOIN "
-            + "(SELECT flightid, COUNT(*) AS matchCount FROM flightinput I"
-            + " WHERE (I.key = 'email' AND I.value = :ff1)"
-            + " OR (I.key = 'name' AND I.value = :ff2)"
-            + " GROUP BY I.flightid) INPUT"
-            + " ON F.flightid = INPUT.flightid"
-            + " WHERE INPUT.matchCount = 2"
+            + " FROM flight F"
+            + " WHERE (1=1)"
+            + " AND EXISTS"
+            + " (SELECT 0 FROM flightinput I WHERE F.flightid = I.flightid AND I.key = 'email' AND I.value = :ff1)"
+            + " AND EXISTS"
+            + " (SELECT 0 FROM flightinput I WHERE F.flightid = I.flightid AND I.key = 'name' AND I.value = :ff2)"
             + " AND F.class_name = :ff3"
             + " ORDER BY submit_time ASC LIMIT :limit OFFSET :offset";
 
@@ -170,11 +176,11 @@ public class FilterTest {
   }
 
   @Test
-  public void filterForm1NoLimitTest() throws Exception {
+  public void filterNoInputFilterNoLimitTest() throws Exception {
     String expect =
         "SELECT F.flightid, F.stairway_id, F.submit_time, F.completed_time,"
             + " F.output_parameters, F.status, F.serialized_exception, F.class_name"
-            + " FROM flight F"
+            + " FROM flight F WHERE (1=1)"
             + " ORDER BY submit_time ASC OFFSET :offset";
 
     FlightFilter filter = new FlightFilter();
@@ -183,11 +189,11 @@ public class FilterTest {
   }
 
   @Test
-  public void filterForm1NoOffsetTest() throws Exception {
+  public void filterNoInputFilterNoOffsetTest() throws Exception {
     String expect =
         "SELECT F.flightid, F.stairway_id, F.submit_time, F.completed_time,"
             + " F.output_parameters, F.status, F.serialized_exception, F.class_name"
-            + " FROM flight F"
+            + " FROM flight F WHERE (1=1)"
             + " ORDER BY submit_time ASC LIMIT :limit";
 
     FlightFilter filter = new FlightFilter();
@@ -196,12 +202,12 @@ public class FilterTest {
   }
 
   @Test
-  public void filterForm1PageTokenTest() throws Exception {
+  public void filterNoInputFilterPageTokenTest() throws Exception {
     String expect =
         "SELECT F.flightid, F.stairway_id, F.submit_time, F.completed_time,"
             + " F.output_parameters, F.status, F.serialized_exception, F.class_name"
             + " FROM flight F"
-            + " WHERE F.submit_time > :pagetoken"
+            + " WHERE (1=1) AND F.submit_time > :pagetoken"
             + " ORDER BY submit_time ASC LIMIT :limit";
 
     PageToken pageToken = new PageToken(Instant.now());
@@ -212,12 +218,12 @@ public class FilterTest {
   }
 
   @Test
-  public void filterForm1OrderTest() throws Exception {
+  public void filterNoInputFilterOrderTest() throws Exception {
     String expect =
         "SELECT F.flightid, F.stairway_id, F.submit_time, F.completed_time,"
             + " F.output_parameters, F.status, F.serialized_exception, F.class_name"
             + " FROM flight F"
-            + " WHERE F.submit_time < :pagetoken"
+            + " WHERE (1=1) AND F.submit_time < :pagetoken"
             + " ORDER BY submit_time DESC LIMIT :limit";
 
     PageToken pageToken = new PageToken(Instant.now());
@@ -225,6 +231,39 @@ public class FilterTest {
     FlightFilter filter =
         new FlightFilter().submittedTimeSortDirection(FlightFilterSortDirection.DESC);
     String sql = new FlightFilterAccess(filter, null, 10, pageToken.makeToken()).makeSql();
+    assertThat(sql, equalTo(expect));
+  }
+
+  @Test
+  public void filterBooleanExpressionTest() throws Exception {
+    String expect =
+        "SELECT F.flightid, F.stairway_id, F.submit_time, F.completed_time,"
+            + " F.output_parameters, F.status, F.serialized_exception, F.class_name"
+            + " FROM flight F"
+            + " WHERE (1=1)"
+            + " AND (EXISTS"
+            + " (SELECT 0 FROM flightinput I WHERE F.flightid = I.flightid AND I.key = 'email' AND I.value = :ff1)"
+            + " OR"
+            + " (EXISTS"
+            + " (SELECT 0 FROM flightinput I WHERE F.flightid = I.flightid AND I.key = 'name' AND I.value = :ff2)"
+            + " AND"
+            + " EXISTS"
+            + " (SELECT 0 FROM flightinput I WHERE F.flightid = I.flightid AND I.key = 'resource' AND I.value = :ff3)))"
+            + " ORDER BY submit_time ASC LIMIT :limit OFFSET :offset";
+
+    FlightFilter filter =
+        new FlightFilter()
+            .setFilterInputBooleanOperationParameter(
+                f ->
+                    createOr(
+                        createPredicate(
+                            f.makeInputPredicate(
+                                "email", FlightFilterOp.EQUAL, "ddtest@gmail.com")),
+                        createAnd(
+                            f.makeInputPredicate("name", FlightFilterOp.EQUAL, "dd"),
+                            f.makeInputPredicate("resource", FlightFilterOp.EQUAL, "resoureId"))));
+
+    String sql = new FlightFilterAccess(filter, 0, 10, null).makeSql();
     assertThat(sql, equalTo(expect));
   }
 }

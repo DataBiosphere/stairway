@@ -4,7 +4,9 @@ import bio.terra.stairway.FlightFilter.FlightFilterPredicate.Datatype;
 import bio.terra.stairway.exception.FlightFilterException;
 import java.time.Instant;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.List;
+import java.util.function.Function;
 import javax.annotation.Nullable;
 
 /**
@@ -27,6 +29,7 @@ import javax.annotation.Nullable;
 public class FlightFilter {
   private final List<FlightFilterPredicate> flightPredicates;
   private final List<FlightFilterPredicate> inputPredicates;
+  private FlightBooleanOperationExpression inputBooleanOperationExpression;
   private FlightFilterSortDirection submittedTimeSortDirection;
   private int parameterId;
 
@@ -43,6 +46,10 @@ public class FlightFilter {
 
   public List<FlightFilterPredicate> getInputPredicates() {
     return inputPredicates;
+  }
+
+  public FlightBooleanOperationExpression getInputBooleanOperationExpression() {
+    return inputBooleanOperationExpression;
   }
 
   public FlightFilterSortDirection getSubmittedTimeSortDirection() {
@@ -146,12 +153,11 @@ public class FlightFilter {
       throw new FlightFilterException("flightIds can not be null");
     }
     FlightFilterPredicate predicate =
-            new FlightFilterPredicate(
-                    "flightid", FlightFilterOp.IN, flightIds, Datatype.LIST, makeParameterName());
+        new FlightFilterPredicate(
+            "flightid", FlightFilterOp.IN, flightIds, Datatype.LIST, makeParameterName());
     flightPredicates.add(predicate);
     return this;
   }
-
 
   /**
    * Filter by an input parameter. This is processed by converting the {@code value} into JSON and
@@ -166,19 +172,27 @@ public class FlightFilter {
    */
   public FlightFilter addFilterInputParameter(String key, FlightFilterOp op, Object value)
       throws FlightFilterException {
-    if (key == null) {
-      throw new FlightFilterException("Key must be specified in an input filter");
+    inputPredicates.add(makeInputPredicate(key, op, value));
+    return this;
+  }
+
+  /**
+   * Filter by a boolean operation. This is an OR or AND statement with a list of
+   * FlightBooleanOperationExpression objects or a PREDICATE that just contains a single
+   * FlightFilterPredicate (it's a wrapper to allow to nest general FlightFilterPredicate objects in
+   * these boolean operations).
+   *
+   * @param expression The boolean operation expression to add
+   * @return {@code this}, for fluent style
+   * @throws FlightFilterException if predicate is not supplied
+   */
+  public FlightFilter setFilterInputBooleanOperationParameter(
+      Function<FlightFilter, FlightBooleanOperationExpression> expression)
+      throws FlightFilterException {
+    if (expression == null) {
+      throw new FlightFilterException("Expression must be specified in an input filter");
     }
-    if (value == null) {
-      throw new FlightFilterException("Value cannot be null in an input filter");
-    }
-    FlightFilterPredicate predicate;
-    if (op == FlightFilterOp.IN) {
-      predicate = new FlightFilterPredicate(key, op, value, Datatype.LIST, makeParameterName());
-    } else {
-      predicate = new FlightFilterPredicate(key, op, value, Datatype.STRING, makeParameterName());
-    }
-    inputPredicates.add(predicate);
+    inputBooleanOperationExpression = expression.apply(this);
     return this;
   }
 
@@ -197,6 +211,35 @@ public class FlightFilter {
 
     this.submittedTimeSortDirection = submittedTimeSortDirection;
     return this;
+  }
+
+  /**
+   * Create an input parameter filter object. This is processed by converting the {@code value} into
+   * JSON and doing a string comparison against the input parameter stored in the database. The
+   * {@code value} object must be <b>exactly</b> the same class as the input parameter.
+   *
+   * @param key name of the parameter to compare
+   * @param op a {@link FlightFilterOp}
+   * @param value some object for comparison
+   * @return A newly created FlightFilterPredicate object
+   * @throws FlightFilterException if predicate is not supplied
+   */
+  public FlightFilterPredicate makeInputPredicate(String key, FlightFilterOp op, Object value) {
+    if (key == null) {
+      throw new FlightFilterException("Key must be specified in an input filter");
+    }
+    if (value == null && op != FlightFilterOp.EQUAL) {
+      throw new FlightFilterException(
+          "Value cannot be null in an input filter if not doing an equality check");
+    }
+
+    if (op == FlightFilterOp.IN) {
+      return new FlightFilterPredicate(key, op, value, Datatype.LIST, makeParameterName());
+    } else if (value == null) {
+      return new FlightFilterPredicate(key, op, null, Datatype.NULL, null);
+    } else {
+      return new FlightFilterPredicate(key, op, value, Datatype.STRING, makeParameterName());
+    }
   }
 
   private String makeParameterName() {
@@ -257,6 +300,79 @@ public class FlightFilter {
       TIMESTAMP,
       LIST,
       NULL
+    }
+  }
+
+  public static class FlightBooleanOperationExpression {
+
+    private final Operation operation;
+    private final FlightFilterPredicate basePredicate;
+    private final List<FlightBooleanOperationExpression> expressions;
+
+    private FlightBooleanOperationExpression(
+        Operation operation,
+        FlightFilterPredicate basePredicate,
+        FlightBooleanOperationExpression... expressions) {
+      this.operation = operation;
+      this.basePredicate = basePredicate;
+      this.expressions = Arrays.asList(expressions);
+    }
+
+    public Operation getOperation() {
+      return operation;
+    }
+
+    public FlightFilterPredicate getBasePredicate() {
+      return basePredicate;
+    }
+
+    public List<FlightBooleanOperationExpression> getExpressions() {
+      return expressions;
+    }
+
+    public static FlightBooleanOperationExpression createPredicate(
+        FlightFilterPredicate predicate) {
+      return new FlightBooleanOperationExpression(Operation.PREDICATE, predicate);
+    }
+
+    public static FlightBooleanOperationExpression createAnd(FlightFilterPredicate... predicates) {
+      return createAnd(
+          Arrays.stream(predicates)
+              .map(FlightBooleanOperationExpression::createPredicate)
+              .toArray(FlightBooleanOperationExpression[]::new));
+    }
+
+    public static FlightBooleanOperationExpression createAnd(
+        FlightBooleanOperationExpression... expressions) {
+      return new FlightBooleanOperationExpression(Operation.AND, null, expressions);
+    }
+
+    public static FlightBooleanOperationExpression createOr(FlightFilterPredicate... predicates) {
+      return createOr(
+          Arrays.stream(predicates)
+              .map(FlightBooleanOperationExpression::createPredicate)
+              .toArray(FlightBooleanOperationExpression[]::new));
+    }
+
+    public static FlightBooleanOperationExpression createOr(
+        FlightBooleanOperationExpression... expressions) {
+      return new FlightBooleanOperationExpression(Operation.OR, null, expressions);
+    }
+
+    public enum Operation {
+      PREDICATE(null),
+      AND(" AND "),
+      OR(" OR ");
+
+      private final String sql;
+
+      Operation(String sql) {
+        this.sql = sql;
+      }
+
+      public String getSql() {
+        return sql;
+      }
     }
   }
 }

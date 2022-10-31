@@ -10,4 +10,5 @@
     <include file="changesets/20210416_flightworking.yaml" relativeToChangelogFile="true"/>
     <include file="changesets/20220127_created_at_index.yaml" relativeToChangelogFile="true"/>
     <include file="changesets/20220411_progress.yaml" relativeToChangelogFile="true"/>
+    <include file="changesets/20221028_input_index.yaml" relativeToChangelogFile="true"/>
 </databaseChangeLog>

@@ -1,0 +1,12 @@
+databaseChangeLog:
+  - changeSet:
+      id: inputindex
+      author: nm
+      changes:
+        - createIndex:
+            indexName: flightinput_key_idx
+            tableName: flightinput
+            unique: false
+            columns:
+              - column:
+                  name: key

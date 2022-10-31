@@ -1,6 +1,7 @@
 package bio.terra.stairway.impl;
 
 import bio.terra.stairway.FlightFilter;
+import bio.terra.stairway.FlightFilter.FlightBooleanOperationExpression;
 import bio.terra.stairway.FlightFilter.FlightFilterPredicate;
 import bio.terra.stairway.FlightFilter.FlightFilterPredicate.Datatype;
 import bio.terra.stairway.FlightFilterSortDirection;
@@ -14,7 +15,7 @@ import java.time.Instant;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Optional;
-
+import java.util.stream.Collectors;
 import org.apache.commons.lang3.StringUtils;
 
 /**
@@ -57,6 +58,11 @@ class FlightFilterAccess {
       for (FlightFilterPredicate predicate : filter.getInputPredicates()) {
         storeInputPredicateValue(predicate, statement);
       }
+
+      if (filter.getInputBooleanOperationExpression() != null) {
+        storeInputPredicateValue(filter.getInputBooleanOperationExpression(), statement);
+      }
+
       // Add any values for paging controls we have
       if (pageToken != null) {
         statement.setInstant("pagetoken", pageToken.getTimestamp());
@@ -76,50 +82,42 @@ class FlightFilterAccess {
    * Generate the enumeration query for flights. The list may be restricted by providing one or more
    * filters. The filters are logically ANDed together.
    *
-   * <p>For performance, there are three forms of the query.
-   *
-   * <p><bold>Form 1: no input parameter filters</bold>
-   *
-   * <p>When there are no input parameter filters, then we can do a single table query on the flight
-   * table like: {@code SELECT flight.* FROM flight WHERE flight-filters ORDER BY } The WHERE and
-   * flight-filters are omitted if there are none to apply.
-   *
-   * <p><bold>Form 2: one input parameter</bold>
-   *
-   * <p>When there is one input filter restriction, we can do a simple join with a restricting join
-   * against the input table like:
+   * <p>Input parameter filters are ANDed together by default or can be organized using
+   * FlightBooleanOperationExpression objects. The generated SQL might look like
    *
    * <pre>{@code
-   * SELECT flight.*
-   * FROM flight JOIN flight_input
-   *   ON flight.flightid = flight_input.flightid
-   * WHERE flight-filters
-   *   AND flight_input.key = 'key' AND flight_input.value = 'json-of-object'
-   * }</pre>
-   *
-   * <bold>Form 3: more than one input parameter</bold>
-   *
-   * <p>This one gets complicated. We do a subquery that filters by the OR of the input filters and
-   * groups by the COUNT of the matches. Only flights where we have inputs that qualify by the
-   * filter will have the right count of matches. The query form is like:
-   *
-   * <pre>{@code
-   * SELECT flight.*
+   * SELECT *
    * FROM flight
-   * JOIN (SELECT flightid, COUNT(*) AS matchCount
-   *       FROM flight_input
-   *       WHERE (flight_input.key = 'key1' AND flight_input.value = 'json-of-object')
-   *          OR (flight_input.key = 'key1' AND flight_input.value = 'json-of-object')
-   *          OR (flight_input.key = 'key1' AND flight_input.value = 'json-of-object')
-   *       GROUP BY flightid) INPUT
-   * ON flight.flightid = INPUT.flightid
-   * WHERE flight-filters
-   *   AND INPUT.matchCount = 3
+   * WHERE (1=1)
+   * AND EXISTS (SELECT 0 FROM flightinput I
+   *             WHERE F.flightid=I.flightid
+   *             AND I.key = 'key'
+   *             AND I.value = 'json-of-object')
    * }</pre>
    *
-   * <p>In all cases, the result is sorted like this: {@code ORDER BY submit_time}. If limit is
-   * present, then the {@code LIMIT :limit} is included. If offset is present, then the {@code
-   * OFFSET :offset} is included.
+   * <p>This format allows for more complex boolean filtering logic such as
+   *
+   * <pre>{@code
+   * SELECT *
+   * FROM flight
+   * WHERE (1=1)
+   * AND (EXISTS (SELECT 0 FROM flightinput I
+   *             WHERE F.flightid=I.flightid
+   *             AND I.key = 'key1'
+   *             AND I.value = 'json-of-object1')
+   *   OR EXISTS (SELECT 0 FROM flightinput I
+   *             WHERE F.flightid=I.flightid
+   *             AND I.key = 'key2'
+   *             AND I.value = 'json-of-object2'))
+   * AND EXISTS (SELECT 0 FROM flightinput I
+   *             WHERE F.flightid=I.flightid
+   *             AND I.key = 'key3'
+   *             AND I.value = 'json-of-object3)
+   * }</pre>
+   *
+   * <p>The result is sorted like this: {@code ORDER BY submit_time ASC|DESC}. If limit is present,
+   * then the {@code LIMIT :limit} is included. If offset is present, then the {@code OFFSET
+   * :offset} is included.
    */
   String makeSql() {
     StringBuilder sb = new StringBuilder();
@@ -129,7 +127,7 @@ class FlightFilterAccess {
         .append(" F.output_parameters, F.status, F.serialized_exception, F.class_name")
         .append(" FROM ");
 
-    makeSqlQueryCommon(sb);
+    makeSqlForm(sb);
 
     // All forms end with the same order by with the variance being ascending or descending order
     sb.append(" ORDER BY submit_time")
@@ -156,52 +154,22 @@ class FlightFilterAccess {
   String makeCountSql() {
     StringBuilder sb = new StringBuilder();
     sb.append("SELECT CURRENT_TIMESTAMP AS currenttime, COUNT(*) AS totalflights FROM ");
-    makeSqlQueryCommon(sb);
+    makeSqlForm(sb);
     return sb.toString();
   }
 
-  // Make the common form of the query string
-  private void makeSqlQueryCommon(StringBuilder sb) {
-    // Decide which form of the query to build.
-    switch (filter.getInputPredicates().size()) {
-      case 0: // Form 1
-        makeSqlForm1(sb);
-        break;
-      case 1: // Form 2
-        makeSqlForm2(sb);
-        break;
-      default: // Form 3
-        makeSqlForm3(sb);
+  private void makeSqlForm(StringBuilder sb) {
+    sb.append(FlightDao.FLIGHT_TABLE).append(" F WHERE (1=1)");
+
+    for (FlightFilterPredicate predicate : filter.getInputPredicates()) {
+      sb.append(" AND ").append(makeInputPredicateSql(predicate));
     }
-  }
 
-  // Form1: only flight table filtering
-  private void makeSqlForm1(StringBuilder sb) {
-    sb.append(FlightDao.FLIGHT_TABLE).append(" F");
-    makeFlightFilter(sb, " WHERE ");
-  }
+    if (filter.getInputBooleanOperationExpression() != null) {
+      sb.append(" AND ")
+          .append(makeBooleanExpressionsFilters(filter.getInputBooleanOperationExpression()));
+    }
 
-  // Form2: flight table filtering and a single input parameter filter
-  private void makeSqlForm2(StringBuilder sb) {
-    sb.append(FlightDao.FLIGHT_TABLE)
-        .append(" F INNER JOIN ")
-        .append(FlightDao.FLIGHT_INPUT_TABLE)
-        .append(" I ON F.flightid = I.flightid WHERE ")
-        .append(makeInputPredicateSql(filter.getInputPredicates().get(0)));
-    makeFlightFilter(sb, " AND ");
-  }
-
-  // Form3: flight table filtering and more than one input parameter filter
-  private void makeSqlForm3(StringBuilder sb) {
-    sb.append(FlightDao.FLIGHT_TABLE)
-        .append(" F INNER JOIN (SELECT flightid, COUNT(*) AS matchCount")
-        .append(" FROM ")
-        .append(FlightDao.FLIGHT_INPUT_TABLE)
-        .append(" I WHERE ");
-    makeInputFilter(sb);
-    sb.append(" GROUP BY I.flightid) INPUT ON F.flightid = INPUT.flightid")
-        .append(" WHERE INPUT.matchCount = ")
-        .append(filter.getInputPredicates().size());
     makeFlightFilter(sb, " AND ");
   }
 
@@ -232,17 +200,19 @@ class FlightFilterAccess {
     }
   }
 
-  /**
-   * Generate the filter for the flight input table for Form 3: the case where there is more that
-   * one predicate.
-   */
-  private void makeInputFilter(StringBuilder sb) {
-    String inter = StringUtils.EMPTY;
-
-    for (FlightFilterPredicate predicate : filter.getInputPredicates()) {
-      String sql = makeInputPredicateSql(predicate);
-      sb.append(inter).append(sql);
-      inter = " OR ";
+  // -- boolean expression methods
+  private String makeBooleanExpressionsFilters(FlightBooleanOperationExpression expression) {
+    switch (expression.getOperation()) {
+      case PREDICATE:
+        return makeInputPredicateSql(expression.getBasePredicate());
+      case AND, OR:
+        return "("
+            + expression.getExpressions().stream()
+                .map(this::makeBooleanExpressionsFilters)
+                .collect(Collectors.joining(expression.getOperation().getSql()))
+            + ")";
+      default:
+        throw new FlightFilterException("Unrecognized boolean operation");
     }
   }
 
@@ -259,8 +229,13 @@ class FlightFilterAccess {
       return "F." + predicate.getKey() + " IS NULL";
     }
     if (predicate.getDatatype() == Datatype.LIST) {
-      return "F." + predicate.getKey() + " " + predicate.getOp().getSql()
-              + " (SELECT JSON_ARRAY_ELEMENTS_TEXT(CAST(:" + predicate.getParameterName() + " AS JSON)))";
+      return "F."
+          + predicate.getKey()
+          + " "
+          + predicate.getOp().getSql()
+          + " (SELECT JSON_ARRAY_ELEMENTS_TEXT(CAST(:"
+          + predicate.getParameterName()
+          + " AS JSON)))";
     }
     return "F."
         + predicate.getKey()
@@ -277,13 +252,14 @@ class FlightFilterAccess {
    */
   private void storeFlightPredicateValue(
       FlightFilterPredicate predicate, NamedParameterPreparedStatement statement)
-        throws SQLException, JsonProcessingException {
+      throws SQLException, JsonProcessingException {
     switch (predicate.getDatatype()) {
       case STRING:
         statement.setString(predicate.getParameterName(), (String) predicate.getValue());
         break;
       case LIST:
-        statement.setString(predicate.getParameterName(), pgJsonMapper.writeValueAsString(predicate.getValue()));
+        statement.setString(
+            predicate.getParameterName(), pgJsonMapper.writeValueAsString(predicate.getValue()));
         break;
       case TIMESTAMP:
         statement.setInstant(predicate.getParameterName(), (Instant) predicate.getValue());
@@ -304,29 +280,58 @@ class FlightFilterAccess {
   String makeInputPredicateSql(FlightFilterPredicate predicate) {
     String valuePredicate = "";
     if (predicate.getDatatype() == Datatype.NULL) {
-      return "I.value IS NULL";
+      return "(EXISTS (SELECT 0 FROM flightinput I WHERE F.flightid = I.flightid AND I.key = "
+          + "'"
+          + predicate.getKey()
+          + "' AND I.value IS NULL) "
+          + "OR NOT EXISTS (SELECT 0 FROM flightinput I WHERE F.flightid = I.flightid AND I.key = "
+          + "'"
+          + predicate.getKey()
+          + "'))";
     } else if (predicate.getDatatype() == Datatype.LIST) {
-      valuePredicate = "I.value " + predicate.getOp().getSql()
-              + " (SELECT JSON_ARRAY_ELEMENTS_TEXT(CAST(:" + predicate.getParameterName() + " AS JSON)))";
+      valuePredicate =
+          "I.value "
+              + predicate.getOp().getSql()
+              + " (SELECT JSON_ARRAY_ELEMENTS_TEXT(CAST(:"
+              + predicate.getParameterName()
+              + " AS JSON)))";
     } else {
       valuePredicate = "I.value" + predicate.getOp().getSql() + ":" + predicate.getParameterName();
     }
 
-    return "(I.key = '"
+    return "EXISTS (SELECT 0 FROM flightinput I WHERE F.flightid = I.flightid AND I.key = "
+        + "'"
         + predicate.getKey()
-        + "' AND " + valuePredicate +")";
+        + "' AND "
+        + valuePredicate
+        + ")";
+  }
+
+  private void storeInputPredicateValue(
+      FlightBooleanOperationExpression booleanExpression, NamedParameterPreparedStatement statement)
+      throws SQLException, JsonProcessingException {
+
+    for (FlightBooleanOperationExpression expression : booleanExpression.getExpressions()) {
+      storeInputPredicateValue(expression, statement);
+    }
+    if (booleanExpression.getBasePredicate() != null) {
+      storeInputPredicateValue(booleanExpression.getBasePredicate(), statement);
+    }
   }
 
   private void storeInputPredicateValue(
       FlightFilterPredicate predicate, NamedParameterPreparedStatement statement)
       throws SQLException, JsonProcessingException {
-
+    if (predicate.getDatatype() == Datatype.NULL) {
+      return;
+    }
     String jsonValue;
     if (predicate.getDatatype() == Datatype.LIST) {
       List<String> values = new ArrayList<>();
       for (Object value : ((List<?>) predicate.getValue())) {
         // Need to double encode in order for strings to match
-        values.add(StairwayMapper.getObjectMapper()
+        values.add(
+            StairwayMapper.getObjectMapper()
                 .writeValueAsString(StairwayMapper.getObjectMapper().writeValueAsString(value)));
       }
       jsonValue = "[" + StringUtils.join(values, ",") + "]";
