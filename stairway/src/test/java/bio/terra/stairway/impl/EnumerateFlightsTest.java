@@ -252,6 +252,20 @@ public class EnumerateFlightsTest {
             .addFilterInputParameter("in2", FlightFilterOp.IN, Arrays.asList(pojo1, pojo2));
     flightList = flightDao.getFlights(0, 100, filter);
     checkResults("case 21", flightList, Arrays.asList("1", "2", "3", "4"));
+
+    // Case 22: mix of generic boolean with input filter (the two get ANDed)
+    filter =
+        new FlightFilter()
+            .addFilterInputParameter("in2", FlightFilterOp.EQUAL, pojo1)
+            .setFilterInputBooleanOperationParameter(
+                (f) ->
+                    createAnd(
+                        f.makeInputPredicate("in0", FlightFilterOp.EQUAL, int1),
+                        f.makeInputPredicate(
+                            "in1", FlightFilterOp.IN, Arrays.asList(string1, string2))));
+
+    flightList = flightDao.getFlights(0, 100, filter);
+    checkResults("case 22", flightList, Arrays.asList("1"));
   }
 
   private void checkResults(String name, List<FlightState> resultlList, List<String> expectedIds) {

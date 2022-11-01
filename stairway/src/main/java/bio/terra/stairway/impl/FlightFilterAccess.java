@@ -206,11 +206,9 @@ class FlightFilterAccess {
       case PREDICATE:
         return makeInputPredicateSql(expression.getBasePredicate());
       case AND, OR:
-        return "("
-            + expression.getExpressions().stream()
-                .map(this::makeBooleanExpressionsFilters)
-                .collect(Collectors.joining(expression.getOperation().getSql()))
-            + ")";
+        return expression.getExpressions().stream()
+            .map(this::makeBooleanExpressionsFilters)
+            .collect(Collectors.joining(expression.getOperation().getSql(), "(", ")"));
       default:
         throw new FlightFilterException("Unrecognized boolean operation");
     }
@@ -334,7 +332,7 @@ class FlightFilterAccess {
             StairwayMapper.getObjectMapper()
                 .writeValueAsString(StairwayMapper.getObjectMapper().writeValueAsString(value)));
       }
-      jsonValue = "[" + StringUtils.join(values, ",") + "]";
+      jsonValue = "[" + String.join(",", values) + "]";
     } else {
       jsonValue = StairwayMapper.getObjectMapper().writeValueAsString(predicate.getValue());
     }
