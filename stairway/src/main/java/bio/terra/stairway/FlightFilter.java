@@ -4,7 +4,6 @@ import bio.terra.stairway.FlightFilter.FlightFilterPredicate.Datatype;
 import bio.terra.stairway.exception.FlightFilterException;
 import java.time.Instant;
 import java.util.ArrayList;
-import java.util.Arrays;
 import java.util.List;
 import java.util.function.Function;
 import javax.annotation.Nullable;
@@ -25,6 +24,18 @@ import javax.annotation.Nullable;
  * That filter would return ingest flights completed in the last day (assuming you'd properly set
  * the value of {@code yesterday}) run by user ddtest (assuming you'd passed the email as an input
  * parameter.
+ *
+ * <p>You can also initialize the filter with more complex boolean filters:
+ *
+ * <pre>{@code
+ * FlightFilter filter = new FlightFilter(
+ *     makeAnd(
+ *         makePredicate("other_num", LESS_THAN, 456)),
+ *         makeOr(
+ *             makePredicate("email", EQUAL, "ddtest@gmail.com"),
+ *             makePredicate("num", GREATER_THAN, 123)))
+ *     .submittedTimeSortDirection(FlightFilterSortDirection.DESC)
+ * }</pre>
  */
 public class FlightFilter {
   private final List<FlightFilterPredicate> flightPredicates;
@@ -38,6 +49,16 @@ public class FlightFilter {
     inputPredicates = new ArrayList<>();
     submittedTimeSortDirection = FlightFilterSortDirection.ASC;
     parameterId = 0;
+  }
+
+  /**
+   * Use this constructor to allow for more complex selection criteria. This takes in expression
+   * builder methods that are created using static methods on this class.
+   */
+  public FlightFilter(
+      FlightBooleanOperationExpression.Builder inputBooleanOperationExpressionBuilder) {
+    this();
+    this.inputBooleanOperationExpression = inputBooleanOperationExpressionBuilder.build(this);
   }
 
   public List<FlightFilterPredicate> getFlightPredicates() {
@@ -172,7 +193,7 @@ public class FlightFilter {
    */
   public FlightFilter addFilterInputParameter(String key, FlightFilterOp op, Object value)
       throws FlightFilterException {
-    inputPredicates.add(makeInputPredicate(key, op, value));
+    inputPredicates.add(makeInputPredicate(key, op, value).build(this));
     return this;
   }
 
@@ -224,7 +245,8 @@ public class FlightFilter {
    * @return A newly created FlightFilterPredicate object
    * @throws FlightFilterException if predicate is not supplied
    */
-  public FlightFilterPredicate makeInputPredicate(String key, FlightFilterOp op, Object value) {
+  public static FlightFilterPredicate.Builder makeInputPredicate(
+      String key, FlightFilterOp op, Object value) {
     if (key == null) {
       throw new FlightFilterException("Key must be specified in an input filter");
     }
@@ -234,12 +256,40 @@ public class FlightFilter {
     }
 
     if (op == FlightFilterOp.IN) {
-      return new FlightFilterPredicate(key, op, value, Datatype.LIST, makeParameterName());
+      return new FlightFilterPredicate.Builder(
+          key, op, value, Datatype.LIST, FlightFilter::makeParameterName);
     } else if (value == null) {
-      return new FlightFilterPredicate(key, op, null, Datatype.NULL, null);
+      return new FlightFilterPredicate.Builder(key, op, null, Datatype.NULL, (f) -> null);
     } else {
-      return new FlightFilterPredicate(key, op, value, Datatype.STRING, makeParameterName());
+      return new FlightFilterPredicate.Builder(
+          key, op, value, Datatype.STRING, FlightFilter::makeParameterName);
     }
+  }
+
+  /**
+   * Provide builders for expressions to be ANDed together
+   *
+   * @param expressions Builders for expressions. These are created with static methods on this
+   *     class
+   * @return A newly created expression builder
+   */
+  public static FlightBooleanOperationExpression.Builder makeAnd(
+      FlightFilterPredicateInterface.Builder... expressions) {
+    return new FlightBooleanOperationExpression.Builder(
+        FlightBooleanOperationExpression.Operation.AND, expressions);
+  }
+
+  /**
+   * Provide builders for expressions to be ANDed together
+   *
+   * @param expressions Builders for expressions. These are created with static methods on this
+   *     class
+   * @return A newly created expression builder
+   */
+  public static FlightBooleanOperationExpression.Builder makeOr(
+      FlightFilterPredicateInterface.Builder... expressions) {
+    return new FlightBooleanOperationExpression.Builder(
+        FlightBooleanOperationExpression.Operation.OR, expressions);
   }
 
   private String makeParameterName() {
@@ -247,7 +297,13 @@ public class FlightFilter {
     return "ff" + parameterId;
   }
 
-  public static class FlightFilterPredicate {
+  public interface FlightFilterPredicateInterface {
+    interface Builder {
+      FlightFilterPredicateInterface build(FlightFilter filter);
+    }
+  }
+
+  public static class FlightFilterPredicate implements FlightFilterPredicateInterface {
     private final FlightFilterOp op;
     private final String key;
     private final Object value;
@@ -301,66 +357,81 @@ public class FlightFilter {
       LIST,
       NULL
     }
+
+    public static class Builder implements FlightFilterPredicateInterface.Builder {
+      private final FlightFilterOp op;
+      private final String key;
+      private final Object value;
+      private final FlightFilterPredicate.Datatype datatype;
+      private final Function<FlightFilter, String> parameterNameSupplier;
+
+      public Builder(
+          String key,
+          FlightFilterOp op,
+          Object value,
+          Datatype datatype,
+          Function<FlightFilter, String> parameterNameSupplier) {
+        this.key = key;
+        this.op = op;
+        this.value = value;
+        this.datatype = datatype;
+        this.parameterNameSupplier = parameterNameSupplier;
+      }
+
+      public FlightFilterPredicate build(FlightFilter filter) {
+        String parameterName =
+            parameterNameSupplier != null ? parameterNameSupplier.apply(filter) : null;
+        return new FlightFilterPredicate(key, op, value, datatype, parameterName);
+      }
+    }
   }
 
-  public static class FlightBooleanOperationExpression {
+  public static class FlightBooleanOperationExpression implements FlightFilterPredicateInterface {
 
     private final Operation operation;
-    private final FlightFilterPredicate basePredicate;
-    private final List<FlightBooleanOperationExpression> expressions;
+    private final List<FlightFilterPredicateInterface> expressions;
 
     private FlightBooleanOperationExpression(
-        Operation operation,
-        FlightFilterPredicate basePredicate,
-        FlightBooleanOperationExpression... expressions) {
+        Operation operation, FlightFilterPredicateInterface... expressions) {
+      this(operation, List.of(expressions));
+    }
+
+    private FlightBooleanOperationExpression(
+        Operation operation, List<FlightFilterPredicateInterface> expressions) {
       this.operation = operation;
-      this.basePredicate = basePredicate;
-      this.expressions = Arrays.asList(expressions);
+      this.expressions = expressions;
     }
 
     public Operation getOperation() {
       return operation;
     }
 
-    public FlightFilterPredicate getBasePredicate() {
-      return basePredicate;
-    }
-
-    public List<FlightBooleanOperationExpression> getExpressions() {
+    public List<FlightFilterPredicateInterface> getExpressions() {
       return expressions;
     }
 
-    public static FlightBooleanOperationExpression createPredicate(
-        FlightFilterPredicate predicate) {
-      return new FlightBooleanOperationExpression(Operation.PREDICATE, predicate);
-    }
+    public static class Builder implements FlightFilterPredicateInterface.Builder {
+      private final Operation operation;
+      private final List<FlightFilterPredicateInterface.Builder> expressions;
 
-    public static FlightBooleanOperationExpression createAnd(FlightFilterPredicate... predicates) {
-      return createAnd(
-          Arrays.stream(predicates)
-              .map(FlightBooleanOperationExpression::createPredicate)
-              .toArray(FlightBooleanOperationExpression[]::new));
-    }
+      public Builder(Operation operation, FlightFilterPredicateInterface.Builder[] expressions) {
+        this(operation, List.of(expressions));
+      }
 
-    public static FlightBooleanOperationExpression createAnd(
-        FlightBooleanOperationExpression... expressions) {
-      return new FlightBooleanOperationExpression(Operation.AND, null, expressions);
-    }
+      public Builder(
+          Operation operation, List<FlightFilterPredicateInterface.Builder> expressions) {
+        this.operation = operation;
+        this.expressions = expressions;
+      }
 
-    public static FlightBooleanOperationExpression createOr(FlightFilterPredicate... predicates) {
-      return createOr(
-          Arrays.stream(predicates)
-              .map(FlightBooleanOperationExpression::createPredicate)
-              .toArray(FlightBooleanOperationExpression[]::new));
-    }
-
-    public static FlightBooleanOperationExpression createOr(
-        FlightBooleanOperationExpression... expressions) {
-      return new FlightBooleanOperationExpression(Operation.OR, null, expressions);
+      @Override
+      public FlightBooleanOperationExpression build(FlightFilter filter) {
+        return new FlightBooleanOperationExpression(
+            operation, expressions.stream().map(e -> e.build(filter)).toList());
+      }
     }
 
     public enum Operation {
-      PREDICATE(null),
       AND(" AND "),
       OR(" OR ");
 

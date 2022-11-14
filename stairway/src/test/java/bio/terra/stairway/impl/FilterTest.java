@@ -1,8 +1,8 @@
 package bio.terra.stairway.impl;
 
-import static bio.terra.stairway.FlightFilter.FlightBooleanOperationExpression.createAnd;
-import static bio.terra.stairway.FlightFilter.FlightBooleanOperationExpression.createOr;
-import static bio.terra.stairway.FlightFilter.FlightBooleanOperationExpression.createPredicate;
+import static bio.terra.stairway.FlightFilter.makeAnd;
+import static bio.terra.stairway.FlightFilter.makeInputPredicate;
+import static bio.terra.stairway.FlightFilter.makeOr;
 import static java.time.Instant.now;
 import static org.hamcrest.CoreMatchers.equalTo;
 import static org.hamcrest.MatcherAssert.assertThat;
@@ -252,16 +252,12 @@ public class FilterTest {
             + " ORDER BY submit_time ASC LIMIT :limit OFFSET :offset";
 
     FlightFilter filter =
-        new FlightFilter()
-            .setFilterInputBooleanOperationParameter(
-                f ->
-                    createOr(
-                        createPredicate(
-                            f.makeInputPredicate(
-                                "email", FlightFilterOp.EQUAL, "ddtest@gmail.com")),
-                        createAnd(
-                            f.makeInputPredicate("name", FlightFilterOp.EQUAL, "dd"),
-                            f.makeInputPredicate("resource", FlightFilterOp.EQUAL, "resoureId"))));
+        new FlightFilter(
+            makeOr(
+                makeInputPredicate("email", FlightFilterOp.EQUAL, "ddtest@gmail.com"),
+                makeAnd(
+                    makeInputPredicate("name", FlightFilterOp.EQUAL, "dd"),
+                    makeInputPredicate("resource", FlightFilterOp.EQUAL, "resoureId"))));
 
     String sql = new FlightFilterAccess(filter, 0, 10, null).makeSql();
     assertThat(sql, equalTo(expect));

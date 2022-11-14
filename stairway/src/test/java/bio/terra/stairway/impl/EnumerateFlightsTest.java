@@ -1,7 +1,8 @@
 package bio.terra.stairway.impl;
 
-import static bio.terra.stairway.FlightFilter.FlightBooleanOperationExpression.createAnd;
-import static bio.terra.stairway.FlightFilter.FlightBooleanOperationExpression.createOr;
+import static bio.terra.stairway.FlightFilter.makeAnd;
+import static bio.terra.stairway.FlightFilter.makeInputPredicate;
+import static bio.terra.stairway.FlightFilter.makeOr;
 import static org.hamcrest.CoreMatchers.equalTo;
 import static org.hamcrest.MatcherAssert.assertThat;
 import static org.hamcrest.Matchers.contains;
@@ -20,7 +21,6 @@ import bio.terra.stairway.flights.TestFlightEnum1;
 import bio.terra.stairway.flights.TestFlightEnum2;
 import java.time.Instant;
 import java.util.ArrayList;
-import java.util.Arrays;
 import java.util.Collections;
 import java.util.List;
 import java.util.stream.Collectors;
@@ -73,7 +73,7 @@ public class EnumerateFlightsTest {
             .addFilterSubmitTime(FlightFilterOp.GREATER_THAN, minSubmit)
             .addFilterSubmitTime(FlightFilterOp.LESS_THAN, maxSubmit);
     List<FlightState> flightList = flightDao.getFlights(0, 100, filter);
-    checkResults("case 1", flightList, Arrays.asList("1", "2", "3", "4"));
+    checkResults("case 1", flightList, List.of("1", "2", "3", "4"));
 
     // Case 2: date range
     filter =
@@ -81,17 +81,17 @@ public class EnumerateFlightsTest {
             .addFilterSubmitTime(FlightFilterOp.GREATER_EQUAL, minSubmit)
             .addFilterSubmitTime(FlightFilterOp.LESS_EQUAL, maxSubmit);
     flightList = flightDao.getFlights(0, 100, filter);
-    checkResults("case 2", flightList, Arrays.asList("0", "1", "2", "3", "4", "5"));
+    checkResults("case 2", flightList, List.of("0", "1", "2", "3", "4", "5"));
 
     // Case 3.1: date with values
     filter = new FlightFilter().addFilterCompletedTime(FlightFilterOp.GREATER_THAN, minSubmit);
     flightList = flightDao.getFlights(0, 100, filter);
-    checkResults("case 3.1", flightList, Arrays.asList("0", "1", "2"));
+    checkResults("case 3.1", flightList, List.of("0", "1", "2"));
 
     // Case 3.2: date with null values
     filter = new FlightFilter().addFilterCompletedTime(FlightFilterOp.EQUAL, null);
     flightList = flightDao.getFlights(0, 100, filter);
-    checkResults("case 3.2", flightList, Arrays.asList("3", "4", "5"));
+    checkResults("case 3.2", flightList, List.of("3", "4", "5"));
 
     // Case 4: status and flight class
     filter =
@@ -99,12 +99,12 @@ public class EnumerateFlightsTest {
             .addFilterFlightStatus(FlightFilterOp.EQUAL, FlightStatus.RUNNING)
             .addFilterFlightClass(FlightFilterOp.EQUAL, TestFlightEnum2.class);
     flightList = flightDao.getFlights(0, 100, filter);
-    checkResults("case 4", flightList, Arrays.asList("3", "4"));
+    checkResults("case 4", flightList, List.of("3", "4"));
 
     // Case 5: one in param
     filter = new FlightFilter().addFilterInputParameter("in0", FlightFilterOp.NOT_EQUAL, 5);
     flightList = flightDao.getFlights(0, 100, filter);
-    checkResults("case 5", flightList, Arrays.asList("2", "4"));
+    checkResults("case 5", flightList, List.of("2", "4"));
 
     // Case 6: class and one in param
     filter =
@@ -112,12 +112,12 @@ public class EnumerateFlightsTest {
             .addFilterFlightClass(FlightFilterOp.EQUAL, TestFlightEnum2.class)
             .addFilterInputParameter("in1", FlightFilterOp.EQUAL, "5");
     flightList = flightDao.getFlights(0, 100, filter);
-    checkResults("case 6", flightList, Arrays.asList("1", "4"));
+    checkResults("case 6", flightList, List.of("1", "4"));
 
     // Case 7: pojo param
     filter = new FlightFilter().addFilterInputParameter("in2", FlightFilterOp.EQUAL, pojo2);
     flightList = flightDao.getFlights(0, 100, filter);
-    checkResults("case 7", flightList, Arrays.asList("2", "3"));
+    checkResults("case 7", flightList, List.of("2", "3"));
 
     // Case 8: three params
     filter =
@@ -141,30 +141,30 @@ public class EnumerateFlightsTest {
     String pageTokenString = new PageToken(midSubmit).makeToken();
     filter = new FlightFilter();
     FlightEnumeration flightEnum = flightDao.getFlights(null, 3, filter);
-    checkResults("case 10", flightEnum.getFlightStateList(), Arrays.asList("0", "1", "2"));
+    checkResults("case 10", flightEnum.getFlightStateList(), List.of("0", "1", "2"));
     assertThat(flightEnum.getTotalFlights(), equalTo(6));
     assertThat(flightEnum.getNextPageToken(), equalTo(pageTokenString));
 
     flightEnum = flightDao.getFlights(pageTokenString, 3, filter);
-    checkResults("case 10", flightEnum.getFlightStateList(), Arrays.asList("3", "4", "5"));
+    checkResults("case 10", flightEnum.getFlightStateList(), List.of("3", "4", "5"));
     assertThat(flightEnum.getTotalFlights(), equalTo(6));
 
     // Case 11: page token in descending order
     pageTokenString = new PageToken(flights.get(3).getSubmitted()).makeToken();
     filter = new FlightFilter().submittedTimeSortDirection(FlightFilterSortDirection.DESC);
     flightEnum = flightDao.getFlights(null, 3, filter);
-    checkResults("case 11", flightEnum.getFlightStateList(), Arrays.asList("5", "4", "3"));
+    checkResults("case 11", flightEnum.getFlightStateList(), List.of("5", "4", "3"));
     assertThat(flightEnum.getTotalFlights(), equalTo(6));
     assertThat(flightEnum.getNextPageToken(), equalTo(pageTokenString));
 
     flightEnum = flightDao.getFlights(pageTokenString, 3, filter);
-    checkResults("case 11", flightEnum.getFlightStateList(), Arrays.asList("2", "1", "0"));
+    checkResults("case 11", flightEnum.getFlightStateList(), List.of("2", "1", "0"));
     assertThat(flightEnum.getTotalFlights(), equalTo(6));
 
     // Case 12: sorting in ascending order
     filter = new FlightFilter().submittedTimeSortDirection(FlightFilterSortDirection.ASC);
     flightList = flightDao.getFlights(0, 100, filter);
-    checkResults("case 12", flightList, Arrays.asList("0", "1", "2", "3", "4", "5"));
+    checkResults("case 12", flightList, List.of("0", "1", "2", "3", "4", "5"));
     // explicitly verify that classnames are returned as expected (note that the flights list is in
     // ascending order)
     assertThat(
@@ -175,97 +175,83 @@ public class EnumerateFlightsTest {
     // Case 13: sorting in descending order
     filter = new FlightFilter().submittedTimeSortDirection(FlightFilterSortDirection.DESC);
     flightList = flightDao.getFlights(0, 100, filter);
-    checkResults("case 13", flightList, Arrays.asList("5", "4", "3", "2", "1", "0"));
+    checkResults("case 13", flightList, List.of("5", "4", "3", "2", "1", "0"));
 
     // Case 14: filter input on an in clause
     filter =
-        new FlightFilter()
-            .addFilterInputParameter("in0", FlightFilterOp.IN, Arrays.asList(int1, int2));
+        new FlightFilter().addFilterInputParameter("in0", FlightFilterOp.IN, List.of(int1, int2));
     flightList = flightDao.getFlights(0, 100, filter);
-    checkResults("case 14", flightList, Arrays.asList("1", "2", "3", "4"));
+    checkResults("case 14", flightList, List.of("1", "2", "3", "4"));
 
     // Case 15: filter flight on an in clause
-    filter = new FlightFilter().addFilterFlightIds(Arrays.asList("0", "1", "3"));
+    filter = new FlightFilter().addFilterFlightIds(List.of("0", "1", "3"));
     flightList = flightDao.getFlights(0, 100, filter);
-    checkResults("case 15", flightList, Arrays.asList("0", "1", "3"));
+    checkResults("case 15", flightList, List.of("0", "1", "3"));
 
     // Case 16: filter flight on a boolean clause (OR)...result should look similar to the in clause
     filter =
-        new FlightFilter()
-            .setFilterInputBooleanOperationParameter(
-                (f) ->
-                    createOr(
-                        f.makeInputPredicate("in0", FlightFilterOp.EQUAL, int1),
-                        f.makeInputPredicate("in0", FlightFilterOp.EQUAL, int2)));
+        new FlightFilter(
+            makeOr(
+                makeInputPredicate("in0", FlightFilterOp.EQUAL, int1),
+                makeInputPredicate("in0", FlightFilterOp.EQUAL, int2)));
     flightList = flightDao.getFlights(0, 100, filter);
-    checkResults("case 16", flightList, Arrays.asList("1", "2", "3", "4"));
+    checkResults("case 16", flightList, List.of("1", "2", "3", "4"));
 
     // Case 17: filter flight on a boolean clause (AND)
     filter =
-        new FlightFilter()
-            .setFilterInputBooleanOperationParameter(
-                (f) ->
-                    createAnd(
-                        f.makeInputPredicate("in0", FlightFilterOp.EQUAL, int1),
-                        f.makeInputPredicate("in1", FlightFilterOp.EQUAL, string1)));
+        new FlightFilter(
+            makeAnd(
+                makeInputPredicate("in0", FlightFilterOp.EQUAL, int1),
+                makeInputPredicate("in1", FlightFilterOp.EQUAL, string1)));
     flightList = flightDao.getFlights(0, 100, filter);
-    checkResults("case 17", flightList, Arrays.asList("1"));
+    checkResults("case 17", flightList, List.of("1"));
 
     // Case 18: filter flight with nested a boolean clauses
     filter =
-        new FlightFilter()
-            .setFilterInputBooleanOperationParameter(
-                (f) ->
-                    createOr(
-                        createAnd(
-                            f.makeInputPredicate("in0", FlightFilterOp.EQUAL, int1),
-                            f.makeInputPredicate("in1", FlightFilterOp.EQUAL, string1)),
-                        createAnd(
-                            f.makeInputPredicate("in0", FlightFilterOp.EQUAL, int2),
-                            f.makeInputPredicate("in1", FlightFilterOp.EQUAL, string2))));
+        new FlightFilter(
+            makeOr(
+                makeAnd(
+                    makeInputPredicate("in0", FlightFilterOp.EQUAL, int1),
+                    makeInputPredicate("in1", FlightFilterOp.EQUAL, string1)),
+                makeAnd(
+                    makeInputPredicate("in0", FlightFilterOp.EQUAL, int2),
+                    makeInputPredicate("in1", FlightFilterOp.EQUAL, string2))));
 
     flightList = flightDao.getFlights(0, 100, filter);
-    checkResults("case 18", flightList, Arrays.asList("1", "2"));
+    checkResults("case 18", flightList, List.of("1", "2"));
 
     // Case 19: filter flight with a boolean clause and an in clause
     filter =
-        new FlightFilter()
-            .setFilterInputBooleanOperationParameter(
-                (f) ->
-                    createAnd(
-                        f.makeInputPredicate("in0", FlightFilterOp.EQUAL, int1),
-                        f.makeInputPredicate(
-                            "in1", FlightFilterOp.IN, Arrays.asList(string1, string2))));
+        new FlightFilter(
+            makeAnd(
+                makeInputPredicate("in0", FlightFilterOp.EQUAL, int1),
+                makeInputPredicate("in1", FlightFilterOp.IN, List.of(string1, string2))));
 
     flightList = flightDao.getFlights(0, 100, filter);
-    checkResults("case 19", flightList, Arrays.asList("1", "3"));
+    checkResults("case 19", flightList, List.of("1", "3"));
 
     // Case 20: filter flight with a null check for a field that doesn't exist
     filter = new FlightFilter().addFilterInputParameter("in10000", FlightFilterOp.EQUAL, null);
 
     flightList = flightDao.getFlights(0, 100, filter);
-    checkResults("case 20", flightList, Arrays.asList("0", "1", "2", "3", "4", "5"));
+    checkResults("case 20", flightList, List.of("0", "1", "2", "3", "4", "5"));
 
     // Case 21: filter input on an in clause with a POJO
     filter =
-        new FlightFilter()
-            .addFilterInputParameter("in2", FlightFilterOp.IN, Arrays.asList(pojo1, pojo2));
+        new FlightFilter().addFilterInputParameter("in2", FlightFilterOp.IN, List.of(pojo1, pojo2));
     flightList = flightDao.getFlights(0, 100, filter);
-    checkResults("case 21", flightList, Arrays.asList("1", "2", "3", "4"));
+    checkResults("case 21", flightList, List.of("1", "2", "3", "4"));
 
     // Case 22: mix of generic boolean with input filter (the two get ANDed)
     filter =
-        new FlightFilter()
-            .addFilterInputParameter("in2", FlightFilterOp.EQUAL, pojo1)
-            .setFilterInputBooleanOperationParameter(
-                (f) ->
-                    createAnd(
-                        f.makeInputPredicate("in0", FlightFilterOp.EQUAL, int1),
-                        f.makeInputPredicate(
-                            "in1", FlightFilterOp.IN, Arrays.asList(string1, string2))));
+        new FlightFilter(
+                makeAnd(
+                    makeInputPredicate("in0", FlightFilterOp.EQUAL, int1),
+                    makeInputPredicate("in1", FlightFilterOp.IN, List.of(string1, string2))))
+            .addFilterInputParameter("in2", FlightFilterOp.EQUAL, pojo1);
 
     flightList = flightDao.getFlights(0, 100, filter);
-    checkResults("case 22", flightList, Arrays.asList("1"));
+    checkResults("case 22", flightList, List.of("1"));
   }
 
   private void checkResults(String name, List<FlightState> resultlList, List<String> expectedIds) {

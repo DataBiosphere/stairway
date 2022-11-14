@@ -4,6 +4,7 @@ import bio.terra.stairway.FlightFilter;
 import bio.terra.stairway.FlightFilter.FlightBooleanOperationExpression;
 import bio.terra.stairway.FlightFilter.FlightFilterPredicate;
 import bio.terra.stairway.FlightFilter.FlightFilterPredicate.Datatype;
+import bio.terra.stairway.FlightFilter.FlightFilterPredicateInterface;
 import bio.terra.stairway.FlightFilterSortDirection;
 import bio.terra.stairway.StairwayMapper;
 import bio.terra.stairway.exception.FlightFilterException;
@@ -201,16 +202,16 @@ class FlightFilterAccess {
   }
 
   // -- boolean expression methods
-  private String makeBooleanExpressionsFilters(FlightBooleanOperationExpression expression) {
-    switch (expression.getOperation()) {
-      case PREDICATE:
-        return makeInputPredicateSql(expression.getBasePredicate());
-      case AND, OR:
-        return expression.getExpressions().stream()
-            .map(this::makeBooleanExpressionsFilters)
-            .collect(Collectors.joining(expression.getOperation().getSql(), "(", ")"));
-      default:
-        throw new FlightFilterException("Unrecognized boolean operation");
+  private String makeBooleanExpressionsFilters(FlightFilterPredicateInterface expression) {
+    if (expression instanceof FlightFilterPredicate expressionAsPredicate) {
+      return makeInputPredicateSql(expressionAsPredicate);
+    } else if (expression instanceof FlightBooleanOperationExpression expressionAsBooleanOp) {
+      return expressionAsBooleanOp.getExpressions().stream()
+          .map(this::makeBooleanExpressionsFilters)
+          .collect(Collectors.joining(expressionAsBooleanOp.getOperation().getSql(), "(", ")"));
+    } else {
+      throw new FlightFilterException(
+          "Unrecognized filter class: %s".formatted(expression.getClass().getName()));
     }
   }
 
@@ -309,11 +310,15 @@ class FlightFilterAccess {
       FlightBooleanOperationExpression booleanExpression, NamedParameterPreparedStatement statement)
       throws SQLException, JsonProcessingException {
 
-    for (FlightBooleanOperationExpression expression : booleanExpression.getExpressions()) {
-      storeInputPredicateValue(expression, statement);
-    }
-    if (booleanExpression.getBasePredicate() != null) {
-      storeInputPredicateValue(booleanExpression.getBasePredicate(), statement);
+    for (FlightFilterPredicateInterface expression : booleanExpression.getExpressions()) {
+      if (expression instanceof FlightFilterPredicate expressionAsPredicate) {
+        storeInputPredicateValue(expressionAsPredicate, statement);
+      } else if (expression instanceof FlightBooleanOperationExpression expressionAsBooleanOp) {
+        storeInputPredicateValue(expressionAsBooleanOp, statement);
+      } else {
+        throw new FlightFilterException(
+            "Unrecognized filter class: %s".formatted(expression.getClass().getName()));
+      }
     }
   }
 
