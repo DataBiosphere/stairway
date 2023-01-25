@@ -2,10 +2,32 @@ def artifactory_repo_key = System.getenv("ARTIFACTORY_REPO_KEY") != null ? Syste
 def artifactory_username = System.getenv('ARTIFACTORY_USERNAME')
 def artifactory_password = System.getenv('ARTIFACTORY_PASSWORD')
 
+java {
+    // Builds Javadoc into the published package as part of the 'assemble' task.
+    withJavadocJar()
+
+    // Builds sources into the published package as part of the 'assemble' task.
+    withSourcesJar()
+}
+tasks.withType(Javadoc) {
+    options.addStringOption('Xdoclint:none', '-quiet')
+}
+
 gradle.taskGraph.whenReady { taskGraph ->
     if (taskGraph.hasTask(artifactoryPublish) &&
             (artifactory_username == null || artifactory_password == null)) {
         throw new GradleException("Set env vars ARTIFACTORY_USERNAME and ARTIFACTORY_PASSWORD to publish")
+    }
+}
+
+publishing {
+    publications {
+        "$project.name"(MavenPublication) {
+            groupId project.group
+            artifactId project.name
+            version gradle.version
+            from components.java
+        }
     }
 }
 

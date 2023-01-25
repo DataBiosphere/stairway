@@ -13,18 +13,29 @@ repositories {
 }
 
 dependencies {
-    // For SpotBugs annotations (still using FindBugs annotations)
-    implementation group: 'com.github.spotbugs', name: 'spotbugs-annotations', version: '4.7.2'
+    ext {
+        slf4j = '4.10.0'
 
-    // For logging
-    implementation group: 'org.slf4j', name: 'slf4j-api', version: '1.7.36'
+        spotbugs = '4.7.3'
 
-    // For testing
-    testImplementation group: 'org.junit.jupiter', name: 'junit-jupiter-api', version: '5.9.0'
-    testImplementation group: 'org.junit.jupiter', name: 'junit-jupiter-engine', version: '5.9.0'
-    testImplementation group: 'org.hamcrest', name: 'hamcrest', version: '2.2'
-    testImplementation group: 'ch.qos.logback', name: 'logback-classic', version: '1.4.1'
-    testRuntimeOnly group: 'org.codehaus.groovy', name: 'groovy', version: '3.0.13'
+        groovy = '4.0.8'
+        hamcrest = '2.2'
+        junitJupiter = '5.9.2'
+        logback = '1.4.5'
+    }
+
+    // Logging dependencies
+    implementation group: 'org.slf4j', name: 'slf4j-api', version: "${slf4j}"
+
+    // Spotbugs dependencies
+    implementation group: 'com.github.spotbugs', name: 'spotbugs-annotations', version: "${spotbugs}"
+
+    // Test dependencies
+    testImplementation group: 'ch.qos.logback', name: 'logback-classic', version:  "${logback}"
+    testImplementation group: 'org.junit.jupiter', name: 'junit-jupiter-api', version: "${junitJupiter}"
+    testImplementation group: 'org.junit.jupiter', name: 'junit-jupiter-engine', version: "${junitJupiter}"
+    testImplementation group: 'org.hamcrest', name: 'hamcrest', version: "${hamcrest}"
+    testRuntimeOnly group: 'org.apache.groovy', name: 'groovy', version: "${groovy}"
 }
 
 java {
@@ -33,8 +44,25 @@ java {
     }
 }
 
-// Linter - Spotless configuration
+// for scans
+if (hasProperty('buildScan')) {
+    buildScan {
+        termsOfServiceUrl = 'https://gradle.com/terms-of-service'
+        termsOfServiceAgree = 'yes'
+    }
+}
+
+dependencyLocking {
+    lockAllConfigurations()
+    lockMode = LockMode.STRICT
+}
+
+// Spotless configuration
 spotless {
+    groovyGradle {
+        target "${rootDir}/**/*.gradle"
+        indentWithSpaces()
+    }
     java {
         googleJavaFormat()
         removeUnusedImports()
@@ -43,16 +71,15 @@ spotless {
 }
 build.dependsOn spotlessApply
 
-// Static Analysis - Spotbugs configuration
+// Spotbugs configuration
 spotbugs {
     effort = 'max'
-    extraArgs = [ '-emacs'] // formats 'html' reports as plain text & viewable in IntelliJ
 }
 spotbugsMain {
     reports {
         html {
             enabled = true
-            destination = file("$buildDir/reports/spotbugs/main.txt")
+            destination = file("$buildDir/reports/spotbugs/main.html")
             stylesheet = 'fancy.xsl'
         }
     }
@@ -61,7 +88,7 @@ spotbugsTest {
     reports {
         html {
             enabled = true
-            destination = file("$buildDir/reports/spotbugs/test.txt")
+            destination = file("$buildDir/reports/spotbugs/test.html")
             stylesheet = 'fancy.xsl'
         }
     }

@@ -2,33 +2,35 @@ plugins {
     id 'application'
     id 'stairway.java-conventions'
 
-    id 'io.spring.dependency-management' version '1.0.13.RELEASE'
-    id 'org.springframework.boot' version '2.7.3'
+    id 'io.spring.dependency-management' version '1.1.0'
+    id 'org.springframework.boot' version '2.7.8'
 }
 
 version = gradle.version
 mainClassName = 'bio.terra.stairctl.Application'
 
 dependencies {
+    ext {
+        commonsDbcp2 = '2.9.0'
+        commonsLang3 = '3.12.0'
+        commonsPool2 = '2.11.1'
+        jackson = '2.14.1'
+        postgresql = '42.5.1'
+
+        springShell = '2.1.5'
+    }
+
     implementation project(":stairway")
 
-    implementation group: 'org.apache.commons', name: 'commons-dbcp2', version: '2.9.0'
-    implementation group: 'org.apache.commons', name: 'commons-pool2', version: '2.11.1'
-    implementation group: 'org.apache.commons', name: 'commons-lang3', version: '3.12.0'
-
-    // JSON processing
-    ext {
-        jackson = '2.13.4'
-    }
+    // Misc. versioned direct dependencies
     implementation group: 'com.fasterxml.jackson.core', name: 'jackson-core', version: "${jackson}"
     implementation group: 'com.fasterxml.jackson.datatype', name: 'jackson-datatype-jsr310', version: "${jackson}"
+    implementation group: 'org.apache.commons', name: 'commons-dbcp2', version: "${commonsDbcp2}"
+    implementation group: 'org.apache.commons', name: 'commons-lang3', version: "${commonsLang3}"
+    implementation group: 'org.apache.commons', name: 'commons-pool2', version: "${commonsPool2}"
+    runtimeOnly group: 'org.postgresql', name: 'postgresql', version: "${postgresql}"
 
-    // Spring
+    // Spring dependencies
     implementation group: 'org.springframework.boot', name: 'spring-boot-starter' // version from spring-boot-plugin
-    implementation group: 'org.springframework.shell', name: 'spring-shell-starter', version: '2.1.1'
-
-    // Database
-    runtimeOnly group: 'org.postgresql', name: 'postgresql'
+    implementation group: 'org.springframework.shell', name: 'spring-shell-starter', version: "${springShell}"
 }
-
-apply from: "$rootDir/gradle/dependency-locking.gradle"

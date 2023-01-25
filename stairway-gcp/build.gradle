@@ -1,30 +1,35 @@
 plugins {
-    id 'stairway.library-conventions'
+    id 'stairway.java-conventions'
 }
 
 dependencies {
+    ext {
+        commonsCollection4 = '4.4'
+        commonsLang3 = '3.12.0'
+        jackson = '2.14.1'
+        openapiTools = '0.2.3'
+
+        guava = '31.1-jre'
+        googleBom = '26.3.0'
+    }
+
     api project(':stairway')
 
-    implementation group: 'org.apache.commons', name: 'commons-lang3', version: '3.12.0'
-    implementation group: 'org.apache.commons', name: 'commons-collections4', version: '4.4'
-
-    // JSON processing
-    ext {
-        jackson = '2.13.4'
-    }
+    // Misc. versioned direct dependencies
     implementation group: 'com.fasterxml.jackson.core', name: 'jackson-databind', version: "${jackson}"
     implementation group: 'com.fasterxml.jackson.datatype', name: 'jackson-datatype-jdk8', version: "${jackson}"
     implementation group: 'com.fasterxml.jackson.datatype', name: 'jackson-datatype-jsr310', version: "${jackson}"
     implementation group: 'com.fasterxml.jackson.module', name: 'jackson-module-parameter-names', version: "${jackson}"
-    implementation group: 'org.openapitools', name: 'jackson-databind-nullable', version: '0.2.3'
+    implementation group: 'org.apache.commons', name: 'commons-collections4', version: "${commonsCollection4}"
+    implementation group: 'org.apache.commons', name: 'commons-lang3', version: "${commonsLang3}"
+    implementation group: 'org.openapitools', name: 'jackson-databind-nullable', version: "${openapiTools}"
 
     // Google dependencies
     constraints {
-        implementation group: 'com.google.guava', name: 'guava', version: '31.1-jre' // "-jre" for Java 8 or higher
+        implementation group: 'com.google.guava', name: 'guava', version: "${guava}"
     }
-    implementation platform('com.google.cloud:libraries-bom:26.0.0') // use common bom
+    implementation platform("com.google.cloud:libraries-bom:${googleBom}")
     implementation group: 'com.google.cloud', name: 'google-cloud-pubsub'
 }
 
-apply from: "$rootDir/gradle/dependency-locking.gradle"
-apply from: "$rootDir/gradle/test.gradle"
+apply from: "$rootDir/gradle/testing.gradle"

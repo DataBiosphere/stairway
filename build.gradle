@@ -1,16 +1,17 @@
 plugins {
     id 'idea'
+    id 'java'
     id 'maven-publish'
 
-    id 'com.jfrog.artifactory' version '4.29.0'
+    id 'com.jfrog.artifactory' version '4.31.0'
 }
 
-// task dependencies is NOT recursively executed on subprojects
-// https://docs.gradle.org/current/userguide/dependency_locking.html#generating_and_updating_dependency_locks
+group = 'bio.terra'
+
 tasks.named('dependencies') {
     dependsOn(':stairway:dependencies')
     dependsOn(':stairway-gcp:dependencies')
     dependsOn(':stairctl:dependencies')
 }
 
-apply from: "$rootDir/gradle/artifactory.gradle"
+apply from: "$rootDir/gradle/publishing.gradle"

@@ -1,43 +1,54 @@
 plugins {
-    id 'stairway.library-conventions'
+    id 'stairway.java-conventions'
 }
 
 dependencies {
-    implementation group: 'org.apache.commons', name: 'commons-dbcp2', version: '2.9.0'
-    implementation group: 'org.apache.commons', name: 'commons-pool2', version: '2.11.1'
-    implementation group: 'org.apache.commons', name: 'commons-lang3', version: '3.12.0'
-    implementation group: 'org.apache.commons', name: 'commons-collections4', version: '4.4'
-
-    // JSON processing
     ext {
-        jackson = '2.13.4'
+        commonsCollection4 = '4.4'
+        commonsDbcp2 = '2.9.0'
+        commonsLang3 = '3.12.0'
+        commonsPool2 = '2.11.1'
+        jackson = '2.14.1'
+        liquibase = '4.18.0'
+        openapiTools = '0.2.3'
+        postgresql = '42.5.1'
+        snakeyaml = '1.33'
+
+        guava = '31.1-jre'
+        googleBom = '26.3.0'
+
+        springWeb = '6.0.4'
+
+        commonsIo = '2.11.0'
     }
+
+    // Misc. versioned direct dependencies
     implementation group: 'com.fasterxml.jackson.core', name: 'jackson-databind', version: "${jackson}"
     implementation group: 'com.fasterxml.jackson.datatype', name: 'jackson-datatype-guava', version: "${jackson}"
     implementation group: 'com.fasterxml.jackson.datatype', name: 'jackson-datatype-jdk8', version: "${jackson}"
     implementation group: 'com.fasterxml.jackson.datatype', name: 'jackson-datatype-jsr310', version: "${jackson}"
     implementation group: 'com.fasterxml.jackson.module', name: 'jackson-module-parameter-names', version: "${jackson}"
-    implementation group: 'org.openapitools', name: 'jackson-databind-nullable', version: '0.2.3'
-
-    // Spring
-    implementation group: 'org.springframework', name: 'spring-web', version: '5.3.23'
-
-    // Database
-    implementation group: 'org.liquibase', name: 'liquibase-core', version: '4.8.0'
-    implementation group: 'org.yaml', name: 'snakeyaml', version: '1.27'
-
-    runtimeOnly group: 'org.postgresql', name: 'postgresql', version: '42.5.0'
+    implementation group: 'org.apache.commons', name: 'commons-collections4', version: "${commonsCollection4}"
+    implementation group: 'org.apache.commons', name: 'commons-dbcp2', version: "${commonsDbcp2}"
+    implementation group: 'org.apache.commons', name: 'commons-lang3', version: "${commonsLang3}"
+    implementation group: 'org.apache.commons', name: 'commons-pool2', version: "${commonsPool2}"
+    implementation group: 'org.openapitools', name: 'jackson-databind-nullable', version: "${openapiTools}"
+    implementation group: 'org.liquibase', name: 'liquibase-core', version: "${liquibase}"
+    implementation group: 'org.yaml', name: 'snakeyaml', version: "${snakeyaml}"
+    runtimeOnly group: 'org.postgresql', name: 'postgresql', version: "${postgresql}"
 
     // Google dependencies
     constraints {
-        implementation group: 'com.google.guava', name: 'guava', version: '31.1-jre' // "-jre" for Java 8 or higher
+        implementation group: 'com.google.guava', name: 'guava', version: "${guava}"
     }
-    implementation platform('com.google.cloud:libraries-bom:26.0.0') // use common bom
+    implementation platform("com.google.cloud:libraries-bom:${googleBom}")
     implementation group: 'com.google.cloud', name: 'google-cloud-pubsub'
 
-    // File handling during testing
-    testImplementation group: 'commons-io', name: 'commons-io', version: '2.11.0'
+    // Spring dependencies
+    implementation group: 'org.springframework', name: 'spring-web', version: "${springWeb}"
+
+    // Test dependencies
+    testImplementation group: 'commons-io', name: 'commons-io', version: "${commonsIo}"
 }
 
-apply from: "$rootDir/gradle/dependency-locking.gradle"
-apply from: "$rootDir/gradle/test.gradle"
+apply from: "$rootDir/gradle/testing.gradle"
