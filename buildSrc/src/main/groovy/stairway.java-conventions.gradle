@@ -14,7 +14,7 @@ repositories {
 
 dependencies {
     ext {
-        slf4j = '4.10.0'
+        slf4j = '2.0.6'
 
         spotbugs = '4.7.3'
 
@@ -54,7 +54,6 @@ if (hasProperty('buildScan')) {
 
 dependencyLocking {
     lockAllConfigurations()
-    lockMode = LockMode.STRICT
 }
 
 // Spotless configuration

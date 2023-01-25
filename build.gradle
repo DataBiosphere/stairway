@@ -8,6 +8,7 @@ plugins {
 
 group = 'bio.terra'
 
+// task dependencies is NOT recursively executed on subprojects
 tasks.named('dependencies') {
     dependsOn(':stairway:dependencies')
     dependsOn(':stairway-gcp:dependencies')
