@@ -4,4 +4,4 @@ include 'stairway-gcp'
 include 'stairctl'
 
 gradle.ext.group = 'bio.terra'
-gradle.ext.version = "local-stairway-0125-1"
+gradle.ext.version = "0.0.75-SNAPSHOT"
