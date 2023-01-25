@@ -1,12 +1,6 @@
 plugins {
     id 'idea'
-    id 'java'
-    id 'maven-publish'
-
-    id 'com.jfrog.artifactory' version '4.31.0'
 }
-
-group = 'bio.terra'
 
 // task dependencies is NOT recursively executed on subprojects
 tasks.named('dependencies') {
@@ -14,5 +8,3 @@ tasks.named('dependencies') {
     dependsOn(':stairway-gcp:dependencies')
     dependsOn(':stairctl:dependencies')
 }
-
-apply from: "$rootDir/gradle/publishing.gradle"

@@ -1,5 +1,9 @@
 plugins {
     id 'stairway.java-conventions'
+    id 'java'
+    id 'maven-publish'
+
+    id 'com.jfrog.artifactory' version '4.31.0'
 }
 
 dependencies {
@@ -51,4 +55,5 @@ dependencies {
     testImplementation group: 'commons-io', name: 'commons-io', version: "${commonsIo}"
 }
 
+apply from: "$rootDir/gradle/publishing.gradle"
 apply from: "$rootDir/gradle/testing.gradle"

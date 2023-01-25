@@ -23,7 +23,7 @@ gradle.taskGraph.whenReady { taskGraph ->
 publishing {
     publications {
         "$project.name"(MavenPublication) {
-            groupId project.group
+            groupId gradle.group
             artifactId project.name
             version gradle.version
             from components.java
