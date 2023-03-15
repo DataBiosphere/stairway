@@ -139,9 +139,10 @@ public class FlightRunner implements Runnable {
       }
 
       // Part 3 - dismal failure - undo failed!
-      // Record the undo failure
+      // The call to "step" will record the undo failure on the step.
+      // We do not overwrite the original failure from the DO that triggered
+      // the UNDO in the first place.
       flightDao.step(flightContext);
-      flightContext.setResult(undoResult);
       logger.error(
           "DISMAL FAILURE: non-retry-able error during undo. Flight: {}({}) Step: {}({})",
           flightContext.getFlightId(),
