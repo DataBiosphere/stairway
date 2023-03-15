@@ -45,6 +45,7 @@ build.dependsOn spotlessApply
 
 // Static Analysis - Spotbugs configuration
 spotbugs {
+    toolVersion = '4.7.0'
     effort = 'max'
     extraArgs = [ '-emacs'] // formats 'html' reports as plain text & viewable in IntelliJ
 }
