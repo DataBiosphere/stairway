@@ -31,7 +31,7 @@ jobs:
           echo ::set-output name=semver-part::$SEMVER_PART
           echo ::set-output name=checkout-branch::$CHECKOUT_BRANCH
       - name: Checkout
-        uses: actions/checkout@v2
+        uses: actions/checkout@v3
         with:
           ref: ${{ steps.controls.outputs.checkout-branch }}
           token: ${{ secrets.BROADBOT_GITHUB_TOKEN }}
