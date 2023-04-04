@@ -49,6 +49,6 @@ jobs:
         with:
           arguments: "artifactoryPublish"
         env:
-          ARTIFACTORY_USERNAME: ${{ secrets.ARTIFACTORY_USER }}
+          ARTIFACTORY_USERNAME: ${{ secrets.ARTIFACTORY_USERNAME }}
           ARTIFACTORY_PASSWORD: ${{ secrets.ARTIFACTORY_PASSWORD }}
           ARTIFACTORY_REPO_KEY: "libs-snapshot-local"
