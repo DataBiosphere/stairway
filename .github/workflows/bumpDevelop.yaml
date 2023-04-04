@@ -34,11 +34,11 @@ jobs:
         uses: actions/checkout@v3
         with:
           ref: ${{ steps.controls.outputs.checkout-branch }}
-          token: ${{ secrets.BROADBOT_GITHUB_TOKEN }}
+          token: ${{ secrets.BROADBOT_TOKEN }}
       - name: "Bump the tag to a new version"
         uses: databiosphere/github-actions/actions/bumper@bumper-0.0.6
         env:
-          GITHUB_TOKEN: ${{ secrets.BROADBOT_GITHUB_TOKEN }}
+          GITHUB_TOKEN: ${{ secrets.BROADBOT_TOKEN }}
           DEFAULT_BUMP: patch
           RELEASE_BRANCHES: master,develop
           VERSION_FILE_PATH: settings.gradle
@@ -49,6 +49,6 @@ jobs:
         with:
           arguments: "artifactoryPublish"
         env:
-          ARTIFACTORY_USERNAME: ${{ secrets.ARTIFACTORY_USER }}
+          ARTIFACTORY_USERNAME: ${{ secrets.ARTIFACTORY_USERNAME }}
           ARTIFACTORY_PASSWORD: ${{ secrets.ARTIFACTORY_PASSWORD }}
           ARTIFACTORY_REPO_KEY: "libs-snapshot-local"
