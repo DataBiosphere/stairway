@@ -10,7 +10,7 @@ version = gradle.version
 mainClassName = 'bio.terra.stairctl.Application'
 
 dependencies {
-    implementation project(":stairway")
+    implementation project(':stairway')
 
     implementation group: 'org.apache.commons', name: 'commons-dbcp2', version: '2.9.0'
     implementation group: 'org.apache.commons', name: 'commons-pool2', version: '2.11.1'
