@@ -40,4 +40,4 @@ dependencies {
 }
 
 apply from: "$rootDir/gradle/dependency-locking.gradle"
-apply from: "$rootDir/gradle/test.gradle"
+apply from: "$rootDir/gradle/testing.gradle"
