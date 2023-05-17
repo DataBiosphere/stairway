@@ -36,7 +36,7 @@ jobs:
           ref: ${{ steps.controls.outputs.checkout-branch }}
           token: ${{ secrets.BROADBOT_TOKEN }}
       - name: "Bump the tag to a new version"
-        uses: databiosphere/github-actions/actions/bumper@bumper-0.0.6
+        uses: databiosphere/github-actions/actions/bumper@bumper-0.1.0
         env:
           GITHUB_TOKEN: ${{ secrets.BROADBOT_TOKEN }}
           DEFAULT_BUMP: patch
