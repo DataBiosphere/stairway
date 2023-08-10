@@ -204,7 +204,16 @@ class FlightFilterAccess {
   // -- boolean expression methods
   private String makeBooleanExpressionsFilters(FlightFilterPredicateInterface expression) {
     if (expression instanceof FlightFilterPredicate expressionAsPredicate) {
-      return makeInputPredicateSql(expressionAsPredicate);
+      switch (expressionAsPredicate.getType()) {
+        case INPUT -> {
+          return makeInputPredicateSql(expressionAsPredicate);
+        }
+        case FLIGHT -> {
+          return makeFlightPredicateSql(expressionAsPredicate);
+        }
+        default -> throw new FlightFilterException(
+            "Unrecognized predicate type: %s".formatted(expressionAsPredicate.getType()));
+      }
     } else if (expression instanceof FlightBooleanOperationExpression expressionAsBooleanOp) {
       return expressionAsBooleanOp.getExpressions().stream()
           .map(this::makeBooleanExpressionsFilters)
@@ -312,7 +321,12 @@ class FlightFilterAccess {
 
     for (FlightFilterPredicateInterface expression : booleanExpression.getExpressions()) {
       if (expression instanceof FlightFilterPredicate expressionAsPredicate) {
-        storeInputPredicateValue(expressionAsPredicate, statement);
+        switch (expressionAsPredicate.getType()) {
+          case INPUT -> storeInputPredicateValue(expressionAsPredicate, statement);
+          case FLIGHT -> storeFlightPredicateValue(expressionAsPredicate, statement);
+          default -> throw new FlightFilterException(
+              "Unrecognized predicate type: %s".formatted(expressionAsPredicate.getType()));
+        }
       } else if (expression instanceof FlightBooleanOperationExpression expressionAsBooleanOp) {
         storeInputPredicateValue(expressionAsBooleanOp, statement);
       } else {

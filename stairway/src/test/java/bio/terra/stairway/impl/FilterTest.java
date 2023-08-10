@@ -1,8 +1,9 @@
 package bio.terra.stairway.impl;
 
 import static bio.terra.stairway.FlightFilter.makeAnd;
-import static bio.terra.stairway.FlightFilter.makeInputPredicate;
 import static bio.terra.stairway.FlightFilter.makeOr;
+import static bio.terra.stairway.FlightFilter.makePredicateFlightClass;
+import static bio.terra.stairway.FlightFilter.makePredicateInput;
 import static java.time.Instant.now;
 import static org.hamcrest.CoreMatchers.equalTo;
 import static org.hamcrest.MatcherAssert.assertThat;
@@ -241,23 +242,25 @@ public class FilterTest {
             + " F.output_parameters, F.status, F.serialized_exception, F.class_name"
             + " FROM flight F"
             + " WHERE (1=1)"
-            + " AND (EXISTS"
-            + " (SELECT 0 FROM flightinput I WHERE F.flightid = I.flightid AND I.key = 'email' AND I.value = :ff1)"
+            + " AND (F.class_name = :ff1"
+            + " OR EXISTS"
+            + " (SELECT 0 FROM flightinput I WHERE F.flightid = I.flightid AND I.key = 'email' AND I.value = :ff2)"
             + " OR"
             + " (EXISTS"
-            + " (SELECT 0 FROM flightinput I WHERE F.flightid = I.flightid AND I.key = 'name' AND I.value = :ff2)"
+            + " (SELECT 0 FROM flightinput I WHERE F.flightid = I.flightid AND I.key = 'name' AND I.value = :ff3)"
             + " AND"
             + " EXISTS"
-            + " (SELECT 0 FROM flightinput I WHERE F.flightid = I.flightid AND I.key = 'resource' AND I.value = :ff3)))"
+            + " (SELECT 0 FROM flightinput I WHERE F.flightid = I.flightid AND I.key = 'resource' AND I.value = :ff4)))"
             + " ORDER BY submit_time ASC LIMIT :limit OFFSET :offset";
 
     FlightFilter filter =
         new FlightFilter(
             makeOr(
-                makeInputPredicate("email", FlightFilterOp.EQUAL, "ddtest@gmail.com"),
+                makePredicateFlightClass(FlightFilterOp.EQUAL, TestFlight.class),
+                makePredicateInput("email", FlightFilterOp.EQUAL, "ddtest@gmail.com"),
                 makeAnd(
-                    makeInputPredicate("name", FlightFilterOp.EQUAL, "dd"),
-                    makeInputPredicate("resource", FlightFilterOp.EQUAL, "resoureId"))));
+                    makePredicateInput("name", FlightFilterOp.EQUAL, "dd"),
+                    makePredicateInput("resource", FlightFilterOp.EQUAL, "resoureId"))));
 
     String sql = new FlightFilterAccess(filter, 0, 10, null).makeSql();
     assertThat(sql, equalTo(expect));

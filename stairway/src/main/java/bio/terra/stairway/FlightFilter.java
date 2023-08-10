@@ -30,10 +30,11 @@ import javax.annotation.Nullable;
  * <pre>{@code
  * FlightFilter filter = new FlightFilter(
  *     makeAnd(
- *         makePredicate("other_num", LESS_THAN, 456)),
+ *         makePredicateFlightStatus(EQUAL, FlightStatus.ERROR),
+ *         makePredicateInput("other_num", LESS_THAN, 456)),
  *         makeOr(
- *             makePredicate("email", EQUAL, "ddtest@gmail.com"),
- *             makePredicate("num", GREATER_THAN, 123)))
+ *             makePredicateInput("email", EQUAL, "ddtest@gmail.com"),
+ *             makePredicateInput("num", GREATER_THAN, 123)))
  *     .submittedTimeSortDirection(FlightFilterSortDirection.DESC)
  * }</pre>
  */
@@ -90,7 +91,12 @@ public class FlightFilter {
     }
     FlightFilterPredicate predicate =
         new FlightFilterPredicate(
-            "submit_time", op, timestamp, Datatype.TIMESTAMP, makeParameterName());
+            FlightFilterPredicate.FilterType.FLIGHT,
+            "submit_time",
+            op,
+            timestamp,
+            Datatype.TIMESTAMP,
+            makeParameterName());
     flightPredicates.add(predicate);
     return this;
   }
@@ -106,6 +112,7 @@ public class FlightFilter {
   public FlightFilter addFilterCompletedTime(FlightFilterOp op, @Nullable Instant timestamp) {
     FlightFilterPredicate predicate =
         new FlightFilterPredicate(
+            FlightFilterPredicate.FilterType.FLIGHT,
             "completed_time",
             op,
             timestamp,
@@ -140,7 +147,12 @@ public class FlightFilter {
     }
     FlightFilterPredicate predicate =
         new FlightFilterPredicate(
-            "class_name", op, className, Datatype.STRING, makeParameterName());
+            FlightFilterPredicate.FilterType.FLIGHT,
+            "class_name",
+            op,
+            className,
+            Datatype.STRING,
+            makeParameterName());
     flightPredicates.add(predicate);
     return this;
   }
@@ -158,7 +170,12 @@ public class FlightFilter {
     }
     FlightFilterPredicate predicate =
         new FlightFilterPredicate(
-            "status", op, status.name(), Datatype.STRING, makeParameterName());
+            FlightFilterPredicate.FilterType.FLIGHT,
+            "status",
+            op,
+            status.name(),
+            Datatype.STRING,
+            makeParameterName());
     flightPredicates.add(predicate);
     return this;
   }
@@ -175,7 +192,12 @@ public class FlightFilter {
     }
     FlightFilterPredicate predicate =
         new FlightFilterPredicate(
-            "flightid", FlightFilterOp.IN, flightIds, Datatype.LIST, makeParameterName());
+            FlightFilterPredicate.FilterType.FLIGHT,
+            "flightid",
+            FlightFilterOp.IN,
+            flightIds,
+            Datatype.LIST,
+            makeParameterName());
     flightPredicates.add(predicate);
     return this;
   }
@@ -193,27 +215,7 @@ public class FlightFilter {
    */
   public FlightFilter addFilterInputParameter(String key, FlightFilterOp op, Object value)
       throws FlightFilterException {
-    inputPredicates.add(makeInputPredicate(key, op, value).build(this));
-    return this;
-  }
-
-  /**
-   * Filter by a boolean operation. This is an OR or AND statement with a list of
-   * FlightBooleanOperationExpression objects or a PREDICATE that just contains a single
-   * FlightFilterPredicate (it's a wrapper to allow to nest general FlightFilterPredicate objects in
-   * these boolean operations).
-   *
-   * @param expression The boolean operation expression to add
-   * @return {@code this}, for fluent style
-   * @throws FlightFilterException if predicate is not supplied
-   */
-  public FlightFilter setFilterInputBooleanOperationParameter(
-      Function<FlightFilter, FlightBooleanOperationExpression> expression)
-      throws FlightFilterException {
-    if (expression == null) {
-      throw new FlightFilterException("Expression must be specified in an input filter");
-    }
-    inputBooleanOperationExpression = expression.apply(this);
+    inputPredicates.add(makePredicateInput(key, op, value).build(this));
     return this;
   }
 
@@ -235,6 +237,90 @@ public class FlightFilter {
   }
 
   /**
+   * Create a filter object that will filter on a flight's submission time.
+   *
+   * @param op a {@link FlightFilterOp}
+   * @param timestamp the flights' submission time
+   * @return A newly created FlightFilterPredicate object
+   */
+  public static FlightFilterPredicate.Builder makePredicateSubmitTime(
+      FlightFilterOp op, @Nullable Instant timestamp) {
+    return makePredicateFlight("submit_time", op, timestamp, Datatype.TIMESTAMP);
+  }
+
+  /**
+   * Create a filter object that will filter on a flight's submission time.
+   *
+   * @param op a {@link FlightFilterOp}
+   * @param timestamp the flights' submission time
+   * @return A newly created FlightFilterPredicate object
+   */
+  public static FlightFilterPredicate.Builder makePredicateCompletedTime(
+      FlightFilterOp op, @Nullable Instant timestamp) {
+    return makePredicateFlight("completed_time", op, timestamp, Datatype.TIMESTAMP);
+  }
+
+  /**
+   * Create a filter object that will filter on a flight's class.
+   *
+   * @param op a {@link FlightFilterOp}
+   * @param clazz the flights' class
+   * @return A newly created FlightFilterPredicate object
+   */
+  public static FlightFilterPredicate.Builder makePredicateFlightClass(
+      FlightFilterOp op, Class<? extends Flight> clazz) {
+    return makePredicateFlightClass(op, clazz.getName());
+  }
+
+  /**
+   * Create a filter object that will filter on a flight's class.
+   *
+   * @param op a {@link FlightFilterOp}
+   * @param className the name of the flights' class
+   * @return A newly created FlightFilterPredicate object
+   */
+  public static FlightFilterPredicate.Builder makePredicateFlightClass(
+      FlightFilterOp op, String className) {
+    return makePredicateFlight("class_name", op, className, Datatype.STRING);
+  }
+
+  /**
+   * Create a predicate object that will filter on a flight's status.
+   *
+   * @param op a {@link FlightFilterOp}
+   * @param status the flights' status
+   * @return A newly created FlightFilterPredicate object
+   */
+  public static FlightFilterPredicate.Builder makePredicateFlightStatus(
+      FlightFilterOp op, FlightStatus status) {
+    return makePredicateFlight("status", op, status.name(), Datatype.STRING);
+  }
+
+  /**
+   * Create a predicate object that will filter on a flight's ids.
+   *
+   * @param flightIds Flight ids to filter on
+   * @return A newly created FlightFilterPredicate object
+   */
+  public static FlightFilterPredicate.Builder makePredicateFlightIds(List<String> flightIds) {
+    return makePredicateFlight("flightid", FlightFilterOp.IN, flightIds, Datatype.LIST);
+  }
+
+  /**
+   * Create a predicate object that will filter on a flight level parameter.
+   *
+   * @param key name of the parameter to compare
+   * @param op a {@link FlightFilterOp}
+   * @param value some object for comparison
+   * @param datatype comparison datatype for the value
+   * @return A newly created FlightFilterPredicate object
+   */
+  private static FlightFilterPredicate.Builder makePredicateFlight(
+      String key, FlightFilterOp op, Object value, Datatype datatype) {
+    return makePredicate(FlightFilterPredicate.FilterType.FLIGHT, key, op, value, datatype);
+  }
+
+  /**
    * Create an input parameter filter object. This is processed by converting the {@code value} into
    * JSON and doing a string comparison against the input parameter stored in the database. The
    * {@code value} object must be <b>exactly</b> the same class as the input parameter.
@@ -245,8 +331,27 @@ public class FlightFilter {
    * @return A newly created FlightFilterPredicate object
    * @throws FlightFilterException if predicate is not supplied
    */
-  public static FlightFilterPredicate.Builder makeInputPredicate(
+  public static FlightFilterPredicate.Builder makePredicateInput(
       String key, FlightFilterOp op, Object value) {
+    return makePredicate(FlightFilterPredicate.FilterType.INPUT, key, op, value, Datatype.STRING);
+  }
+
+  /**
+   * Create a predicate object.
+   *
+   * @param type the type of predicate
+   * @param key name of the parameter to compare
+   * @param op a {@link FlightFilterOp}
+   * @param value some object for comparison
+   * @param datatype comparison datatype for the value
+   * @return A newly created FlightFilterPredicate object
+   */
+  private static FlightFilterPredicate.Builder makePredicate(
+      FlightFilterPredicate.FilterType type,
+      String key,
+      FlightFilterOp op,
+      Object value,
+      Datatype datatype) {
     if (key == null) {
       throw new FlightFilterException("Key must be specified in an input filter");
     }
@@ -257,12 +362,12 @@ public class FlightFilter {
 
     if (op == FlightFilterOp.IN) {
       return new FlightFilterPredicate.Builder(
-          key, op, value, Datatype.LIST, FlightFilter::makeParameterName);
+          type, key, op, value, Datatype.LIST, FlightFilter::makeParameterName);
     } else if (value == null) {
-      return new FlightFilterPredicate.Builder(key, op, null, Datatype.NULL, (f) -> null);
+      return new FlightFilterPredicate.Builder(type, key, op, null, Datatype.NULL, (f) -> null);
     } else {
       return new FlightFilterPredicate.Builder(
-          key, op, value, Datatype.STRING, FlightFilter::makeParameterName);
+          type, key, op, value, datatype, FlightFilter::makeParameterName);
     }
   }
 
@@ -304,6 +409,7 @@ public class FlightFilter {
   }
 
   public static class FlightFilterPredicate implements FlightFilterPredicateInterface {
+    private final FilterType type;
     private final FlightFilterOp op;
     private final String key;
     private final Object value;
@@ -312,6 +418,7 @@ public class FlightFilter {
     /**
      * Predicate comparison constructor
      *
+     * @param type type of filter
      * @param key name of the input parameter
      * @param op comparison operator
      * @param value value to compare against
@@ -319,16 +426,22 @@ public class FlightFilter {
      * @param parameterName placeholder parameter name for this predicate value
      */
     FlightFilterPredicate(
+        FilterType type,
         String key,
         FlightFilterOp op,
         Object value,
         FlightFilterPredicate.Datatype datatype,
         String parameterName) {
+      this.type = type;
       this.key = key;
       this.op = op;
       this.value = value;
       this.datatype = datatype;
       this.parameterName = parameterName;
+    }
+
+    public FilterType getType() {
+      return type;
     }
 
     public FlightFilterOp getOp() {
@@ -358,7 +471,13 @@ public class FlightFilter {
       NULL
     }
 
+    public enum FilterType {
+      FLIGHT, // Does this filter apply to flight level attributes
+      INPUT // Does this filter apply to flight input level attributes
+    }
+
     public static class Builder implements FlightFilterPredicateInterface.Builder {
+      private final FilterType type;
       private final FlightFilterOp op;
       private final String key;
       private final Object value;
@@ -366,11 +485,13 @@ public class FlightFilter {
       private final Function<FlightFilter, String> parameterNameSupplier;
 
       public Builder(
+          FilterType type,
           String key,
           FlightFilterOp op,
           Object value,
           Datatype datatype,
           Function<FlightFilter, String> parameterNameSupplier) {
+        this.type = type;
         this.key = key;
         this.op = op;
         this.value = value;
@@ -381,7 +502,7 @@ public class FlightFilter {
       public FlightFilterPredicate build(FlightFilter filter) {
         String parameterName =
             parameterNameSupplier != null ? parameterNameSupplier.apply(filter) : null;
-        return new FlightFilterPredicate(key, op, value, datatype, parameterName);
+        return new FlightFilterPredicate(type, key, op, value, datatype, parameterName);
       }
     }
   }

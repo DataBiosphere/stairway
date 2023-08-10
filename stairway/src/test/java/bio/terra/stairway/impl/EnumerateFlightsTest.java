@@ -1,8 +1,13 @@
 package bio.terra.stairway.impl;
 
 import static bio.terra.stairway.FlightFilter.makeAnd;
-import static bio.terra.stairway.FlightFilter.makeInputPredicate;
 import static bio.terra.stairway.FlightFilter.makeOr;
+import static bio.terra.stairway.FlightFilter.makePredicateCompletedTime;
+import static bio.terra.stairway.FlightFilter.makePredicateFlightClass;
+import static bio.terra.stairway.FlightFilter.makePredicateFlightIds;
+import static bio.terra.stairway.FlightFilter.makePredicateFlightStatus;
+import static bio.terra.stairway.FlightFilter.makePredicateInput;
+import static bio.terra.stairway.FlightFilter.makePredicateSubmitTime;
 import static org.hamcrest.CoreMatchers.equalTo;
 import static org.hamcrest.MatcherAssert.assertThat;
 import static org.hamcrest.Matchers.contains;
@@ -64,6 +69,8 @@ public class EnumerateFlightsTest {
     Instant minSubmit = flights.get(0).getSubmitted();
     Instant midSubmit = flights.get(2).getSubmitted();
     Instant maxSubmit = flights.get(5).getSubmitted();
+
+    Instant lastCompleted = flights.get(2).getCompleted().get();
 
     // -- Test Cases --
 
@@ -192,8 +199,8 @@ public class EnumerateFlightsTest {
     filter =
         new FlightFilter(
             makeOr(
-                makeInputPredicate("in0", FlightFilterOp.EQUAL, int1),
-                makeInputPredicate("in0", FlightFilterOp.EQUAL, int2)));
+                makePredicateInput("in0", FlightFilterOp.EQUAL, int1),
+                makePredicateInput("in0", FlightFilterOp.EQUAL, int2)));
     flightList = flightDao.getFlights(0, 100, filter);
     checkResults("case 16", flightList, List.of("1", "2", "3", "4"));
 
@@ -201,8 +208,8 @@ public class EnumerateFlightsTest {
     filter =
         new FlightFilter(
             makeAnd(
-                makeInputPredicate("in0", FlightFilterOp.EQUAL, int1),
-                makeInputPredicate("in1", FlightFilterOp.EQUAL, string1)));
+                makePredicateInput("in0", FlightFilterOp.EQUAL, int1),
+                makePredicateInput("in1", FlightFilterOp.EQUAL, string1)));
     flightList = flightDao.getFlights(0, 100, filter);
     checkResults("case 17", flightList, List.of("1"));
 
@@ -211,11 +218,11 @@ public class EnumerateFlightsTest {
         new FlightFilter(
             makeOr(
                 makeAnd(
-                    makeInputPredicate("in0", FlightFilterOp.EQUAL, int1),
-                    makeInputPredicate("in1", FlightFilterOp.EQUAL, string1)),
+                    makePredicateInput("in0", FlightFilterOp.EQUAL, int1),
+                    makePredicateInput("in1", FlightFilterOp.EQUAL, string1)),
                 makeAnd(
-                    makeInputPredicate("in0", FlightFilterOp.EQUAL, int2),
-                    makeInputPredicate("in1", FlightFilterOp.EQUAL, string2))));
+                    makePredicateInput("in0", FlightFilterOp.EQUAL, int2),
+                    makePredicateInput("in1", FlightFilterOp.EQUAL, string2))));
 
     flightList = flightDao.getFlights(0, 100, filter);
     checkResults("case 18", flightList, List.of("1", "2"));
@@ -224,8 +231,8 @@ public class EnumerateFlightsTest {
     filter =
         new FlightFilter(
             makeAnd(
-                makeInputPredicate("in0", FlightFilterOp.EQUAL, int1),
-                makeInputPredicate("in1", FlightFilterOp.IN, List.of(string1, string2))));
+                makePredicateInput("in0", FlightFilterOp.EQUAL, int1),
+                makePredicateInput("in1", FlightFilterOp.IN, List.of(string1, string2))));
 
     flightList = flightDao.getFlights(0, 100, filter);
     checkResults("case 19", flightList, List.of("1", "3"));
@@ -246,19 +253,50 @@ public class EnumerateFlightsTest {
     filter =
         new FlightFilter(
                 makeAnd(
-                    makeInputPredicate("in0", FlightFilterOp.EQUAL, int1),
-                    makeInputPredicate("in1", FlightFilterOp.IN, List.of(string1, string2))))
+                    makePredicateInput("in0", FlightFilterOp.EQUAL, int1),
+                    makePredicateInput("in1", FlightFilterOp.IN, List.of(string1, string2))))
             .addFilterInputParameter("in2", FlightFilterOp.EQUAL, pojo1);
 
     flightList = flightDao.getFlights(0, 100, filter);
     checkResults("case 22", flightList, List.of("1"));
+
+    // Case 23: mix of flight and class input filters
+    filter =
+        new FlightFilter(
+            makeAnd(
+                makePredicateInput("in2", FlightFilterOp.IN, List.of(pojo1, pojo2)),
+                makePredicateFlightClass(FlightFilterOp.EQUAL, class1)));
+
+    flightList = flightDao.getFlights(0, 100, filter);
+    checkResults("case 23", flightList, List.of("2"));
+
+    // Case 24: flight predicates: status and flightid
+    filter =
+        new FlightFilter(
+            makeAnd(
+                makePredicateFlightStatus(FlightFilterOp.EQUAL, FlightStatus.RUNNING),
+                makePredicateFlightIds(List.of("1", "3", "4"))));
+
+    flightList = flightDao.getFlights(0, 100, filter);
+    checkResults("case 24", flightList, List.of("3", "4"));
+
+    // Case 25: flight predicates: submitted and completed time or'ed with flightid
+    filter =
+        new FlightFilter(
+            makeOr(
+                makeAnd(
+                    makePredicateSubmitTime(FlightFilterOp.GREATER_THAN, minSubmit),
+                    makePredicateCompletedTime(FlightFilterOp.LESS_EQUAL, lastCompleted)),
+                makePredicateFlightIds(List.of("5"))));
+
+    flightList = flightDao.getFlights(0, 100, filter);
+    checkResults("case 25", flightList, List.of("1", "2", "5"));
   }
 
   private void checkResults(String name, List<FlightState> resultlList, List<String> expectedIds) {
     List<String> actualIds =
         resultlList.stream().map(FlightState::getFlightId).collect(Collectors.toList());
-    assertThat(
-        name + ": elements match in the correct order", actualIds, contains(expectedIds.toArray()));
+    assertThat(name + ": elements match in the correct order", actualIds, equalTo(expectedIds));
   }
 
   private FlightState makeFlight(
