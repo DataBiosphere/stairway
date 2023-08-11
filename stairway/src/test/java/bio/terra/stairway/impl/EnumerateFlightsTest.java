@@ -1,13 +1,13 @@
 package bio.terra.stairway.impl;
 
-import static bio.terra.stairway.FlightFilter.makeAnd;
-import static bio.terra.stairway.FlightFilter.makeOr;
-import static bio.terra.stairway.FlightFilter.makePredicateCompletedTime;
-import static bio.terra.stairway.FlightFilter.makePredicateFlightClass;
-import static bio.terra.stairway.FlightFilter.makePredicateFlightIds;
-import static bio.terra.stairway.FlightFilter.makePredicateFlightStatus;
-import static bio.terra.stairway.FlightFilter.makePredicateInput;
-import static bio.terra.stairway.FlightFilter.makePredicateSubmitTime;
+import static bio.terra.stairway.FlightFilter.FlightBooleanOperationExpression.makeAnd;
+import static bio.terra.stairway.FlightFilter.FlightBooleanOperationExpression.makeOr;
+import static bio.terra.stairway.FlightFilter.FlightFilterPredicate.makePredicateCompletedTime;
+import static bio.terra.stairway.FlightFilter.FlightFilterPredicate.makePredicateFlightClass;
+import static bio.terra.stairway.FlightFilter.FlightFilterPredicate.makePredicateFlightIds;
+import static bio.terra.stairway.FlightFilter.FlightFilterPredicate.makePredicateFlightStatus;
+import static bio.terra.stairway.FlightFilter.FlightFilterPredicate.makePredicateInput;
+import static bio.terra.stairway.FlightFilter.FlightFilterPredicate.makePredicateSubmitTime;
 import static org.hamcrest.CoreMatchers.equalTo;
 import static org.hamcrest.MatcherAssert.assertThat;
 import static org.hamcrest.Matchers.contains;

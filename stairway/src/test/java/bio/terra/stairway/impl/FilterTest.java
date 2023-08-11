@@ -1,9 +1,9 @@
 package bio.terra.stairway.impl;
 
-import static bio.terra.stairway.FlightFilter.makeAnd;
-import static bio.terra.stairway.FlightFilter.makeOr;
-import static bio.terra.stairway.FlightFilter.makePredicateFlightClass;
-import static bio.terra.stairway.FlightFilter.makePredicateInput;
+import static bio.terra.stairway.FlightFilter.FlightBooleanOperationExpression.makeAnd;
+import static bio.terra.stairway.FlightFilter.FlightBooleanOperationExpression.makeOr;
+import static bio.terra.stairway.FlightFilter.FlightFilterPredicate.makePredicateFlightClass;
+import static bio.terra.stairway.FlightFilter.FlightFilterPredicate.makePredicateInput;
 import static java.time.Instant.now;
 import static org.hamcrest.CoreMatchers.equalTo;
 import static org.hamcrest.MatcherAssert.assertThat;
@@ -38,13 +38,13 @@ public class FilterTest {
   }
 
   private void testPredicate(FlightFilter filter, int index, String operand) {
-    String flightCompareSql = String.format("F.afield %s :ff%d", operand, index + 1);
+    String flightCompareSql = String.format("F.afield %s :ff%d", operand, 1);
     String inputCompareSql =
         String.format(
             "EXISTS (SELECT 0 FROM flightinput I WHERE F.flightid = I.flightid "
                 + "AND I.key = 'afield' "
                 + "AND I.value %s :ff%d)",
-            operand, index + 1);
+            operand, 1);
 
     FlightFilterAccess access = new FlightFilterAccess(filter, 0, 10, null);
 
