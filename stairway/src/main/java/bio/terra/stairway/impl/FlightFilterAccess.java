@@ -6,14 +6,10 @@ import bio.terra.stairway.FlightFilter.FlightFilterPredicate;
 import bio.terra.stairway.FlightFilter.FlightFilterPredicate.Datatype;
 import bio.terra.stairway.FlightFilter.FlightFilterPredicateInterface;
 import bio.terra.stairway.FlightFilterSortDirection;
-import bio.terra.stairway.StairwayMapper;
 import bio.terra.stairway.exception.FlightFilterException;
 import com.fasterxml.jackson.core.JsonProcessingException;
-import com.fasterxml.jackson.databind.ObjectMapper;
 import com.google.common.annotations.VisibleForTesting;
 import java.sql.SQLException;
-import java.time.Instant;
-import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -35,8 +31,6 @@ class FlightFilterAccess {
   private final Integer offset;
   private final Integer limit;
   private final PageToken pageToken;
-  // Mapper should be used to deserialize to generic Postgres JSON
-  private final ObjectMapper pgJsonMapper = new ObjectMapper();
   private final Map<FlightFilterPredicate, String> predicateToParameterName = new HashMap<>();
 
   private int parameterId;
@@ -62,15 +56,12 @@ class FlightFilterAccess {
   void storePredicateValues(NamedParameterPreparedStatement statement)
       throws FlightFilterException {
     try {
-      for (FlightFilterPredicate predicate : filter.getFlightPredicates()) {
-        storeFlightPredicateValue(predicate, statement);
-      }
-      for (FlightFilterPredicate predicate : filter.getInputPredicates()) {
-        storeInputPredicateValue(predicate, statement);
-      }
-
-      if (filter.getInputBooleanOperationExpression() != null) {
-        storeInputPredicateValue(filter.getInputBooleanOperationExpression(), statement);
+      for (FlightFilter.Value value : filter.getValues()) {
+        if (value.string() != null) {
+          statement.setString(getParameterName(value.predicate()), value.string());
+        } else if (value.instant() != null) {
+          statement.setInstant(getParameterName(value.predicate()), value.instant());
+        }
       }
 
       // Add any values for paging controls we have
@@ -213,16 +204,10 @@ class FlightFilterAccess {
   // -- boolean expression methods
   private String makeBooleanExpressionsFilters(FlightFilterPredicateInterface expression) {
     if (expression instanceof FlightFilterPredicate expressionAsPredicate) {
-      switch (expressionAsPredicate.type()) {
-        case INPUT -> {
-          return makeInputPredicateSql(expressionAsPredicate);
-        }
-        case FLIGHT -> {
-          return makeFlightPredicateSql(expressionAsPredicate);
-        }
-        default -> throw new FlightFilterException(
-            "Unrecognized predicate type: %s".formatted(expressionAsPredicate.type()));
-      }
+      return switch (expressionAsPredicate.type()) {
+        case INPUT -> makeInputPredicateSql(expressionAsPredicate);
+        case FLIGHT -> makeFlightPredicateSql(expressionAsPredicate);
+      };
     } else if (expression instanceof FlightBooleanOperationExpression expressionAsBooleanOp) {
       return expressionAsBooleanOp.expressions().stream()
           .map(this::makeBooleanExpressionsFilters)
@@ -262,32 +247,6 @@ class FlightFilterAccess {
   }
 
   /**
-   * Store the parameter value for substitution into the prepared statement.
-   *
-   * @param statement statement being readied for execution
-   * @throws SQLException on errors setting the parameter values
-   */
-  private void storeFlightPredicateValue(
-      FlightFilterPredicate predicate, NamedParameterPreparedStatement statement)
-      throws SQLException, JsonProcessingException {
-    switch (predicate.datatype()) {
-      case STRING:
-        statement.setString(getParameterName(predicate), (String) predicate.value());
-        break;
-      case LIST:
-        statement.setString(
-                getParameterName(predicate), pgJsonMapper.writeValueAsString(predicate.value()));
-        break;
-      case TIMESTAMP:
-        statement.setInstant(getParameterName(predicate), (Instant) predicate.value());
-        break;
-      case NULL:
-        // Ignore the parameter in the null case
-        break;
-    }
-  }
-
-  /**
    * Make a SQL predicate to apply to the flight input table. The predicate looks like: {@code
    * (I.key = 'key name' AND I.value OP [placeholder])}
    *
@@ -322,48 +281,5 @@ class FlightFilterAccess {
         + "' AND "
         + valuePredicate
         + ")";
-  }
-
-  private void storeInputPredicateValue(
-      FlightBooleanOperationExpression booleanExpression, NamedParameterPreparedStatement statement)
-      throws SQLException, JsonProcessingException {
-
-    for (FlightFilterPredicateInterface expression : booleanExpression.expressions()) {
-      if (expression instanceof FlightFilterPredicate expressionAsPredicate) {
-        switch (expressionAsPredicate.type()) {
-          case INPUT -> storeInputPredicateValue(expressionAsPredicate, statement);
-          case FLIGHT -> storeFlightPredicateValue(expressionAsPredicate, statement);
-          default -> throw new FlightFilterException(
-              "Unrecognized predicate type: %s".formatted(expressionAsPredicate.type()));
-        }
-      } else if (expression instanceof FlightBooleanOperationExpression expressionAsBooleanOp) {
-        storeInputPredicateValue(expressionAsBooleanOp, statement);
-      } else {
-        throw new FlightFilterException(
-            "Unrecognized filter class: %s".formatted(expression.getClass().getName()));
-      }
-    }
-  }
-
-  private void storeInputPredicateValue(
-      FlightFilterPredicate predicate, NamedParameterPreparedStatement statement)
-      throws SQLException, JsonProcessingException {
-    if (predicate.datatype() == Datatype.NULL) {
-      return;
-    }
-    String jsonValue;
-    if (predicate.datatype() == Datatype.LIST) {
-      List<String> values = new ArrayList<>();
-      for (Object value : ((List<?>) predicate.value())) {
-        // Need to double encode in order for strings to match
-        values.add(
-            StairwayMapper.getObjectMapper()
-                .writeValueAsString(StairwayMapper.getObjectMapper().writeValueAsString(value)));
-      }
-      jsonValue = "[" + String.join(",", values) + "]";
-    } else {
-      jsonValue = StairwayMapper.getObjectMapper().writeValueAsString(predicate.value());
-    }
-    statement.setString(getParameterName(predicate), jsonValue);
   }
 }
