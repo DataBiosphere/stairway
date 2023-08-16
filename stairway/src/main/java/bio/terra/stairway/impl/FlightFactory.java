@@ -5,12 +5,9 @@ import bio.terra.stairway.FlightMap;
 import bio.terra.stairway.exception.MakeFlightException;
 import java.lang.reflect.Constructor;
 import java.lang.reflect.InvocationTargetException;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 
 /** Methods to construct Flight objects given a Flight class or the name of a Flight class. */
 class FlightFactory {
-  private static final Logger logger = LoggerFactory.getLogger(FlightFactory.class);
 
   /**
    * Construct a Flight object given the class
@@ -20,14 +17,13 @@ class FlightFactory {
    * @param context caller-provided context for the flight
    * @return Constructed flight object with steps array
    */
-  static Flight makeFlight(
-      Class<? extends Flight> flightClass, FlightMap inputParameters, Object context) {
+  static <T extends Flight> T makeFlight(
+      Class<T> flightClass, FlightMap inputParameters, Object context) {
     try {
       // Find the flightClass constructor that takes the input parameter map and
       // use it to make the flight.
-      Constructor constructor = flightClass.getConstructor(FlightMap.class, Object.class);
-      Flight flight = (Flight) constructor.newInstance(inputParameters, context);
-      return flight;
+      Constructor<T> constructor = flightClass.getConstructor(FlightMap.class, Object.class);
+      return constructor.newInstance(inputParameters, context);
     } catch (InvocationTargetException
         | NoSuchMethodException
         | InstantiationException
