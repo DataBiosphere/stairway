@@ -463,25 +463,22 @@ public class FlightFilter {
     }
   }
 
+    /**
+     * A predicate that is a boolean operation of other predicates
+     * @param operation The operation to perform
+     * @param expressions Expression that will have the boolean operator applied to them
+     */
   public record FlightBooleanOperationExpression(
           Operation operation, List<FlightFilterPredicateInterface> expressions) implements FlightFilterPredicateInterface {
     /**
-     * Provide builders for expressions to be ANDed together
-     *
-     * @param expressions Builders for expressions. These are created with static methods on this
-     *     class
-     * @return A newly created expression builder
+     * @param expressions Expressions that will be AND-ed together.
      */
     public static FlightBooleanOperationExpression makeAnd(FlightFilterPredicateInterface... expressions) {
       return new FlightBooleanOperationExpression(Operation.AND, List.of(expressions));
     }
 
     /**
-     * Provide builders for expressions to be ORed together
-     *
-     * @param expressions Builders for expressions. These are created with static methods on this
-     *     class
-     * @return A newly created expression builder
+     * @param expressions Expressions that will be OR-ed together.
      */
     public static FlightBooleanOperationExpression makeOr(FlightFilterPredicateInterface... expressions) {
       return new FlightBooleanOperationExpression(Operation.OR, List.of(expressions));

@@ -90,6 +90,7 @@ class FlightFilterAccess {
    * SELECT *
    * FROM flight
    * WHERE (1=1)
+   * AND F.flightid IN ('flightid1', 'flightid2', ...)
    * AND EXISTS (SELECT 0 FROM flightinput I
    *             WHERE F.flightid=I.flightid
    *             AND I.key = 'key'
