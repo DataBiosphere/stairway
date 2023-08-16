@@ -2,6 +2,9 @@ package bio.terra.stairway;
 
 import bio.terra.stairway.FlightFilter.FlightFilterPredicate.Datatype;
 import bio.terra.stairway.exception.FlightFilterException;
+import com.fasterxml.jackson.core.JsonProcessingException;
+import com.fasterxml.jackson.databind.ObjectMapper;
+
 import java.time.Instant;
 import java.util.ArrayList;
 import java.util.List;
@@ -42,6 +45,9 @@ public class FlightFilter {
   private final List<FlightFilterPredicate> inputPredicates;
   private FlightBooleanOperationExpression inputBooleanOperationExpression;
   private FlightFilterSortDirection submittedTimeSortDirection;
+
+  // Mapper should be used to deserialize to generic Postgres JSON
+  private static final ObjectMapper pgJsonMapper = new ObjectMapper();
 
   public FlightFilter() {
     flightPredicates = new ArrayList<>();
@@ -227,7 +233,38 @@ public class FlightFilter {
     return this;
   }
 
-  public interface FlightFilterPredicateInterface {}
+  public record Value(FlightFilterPredicate predicate, String string, Instant instant) {
+    Value(FlightFilterPredicate predicate, String string) {
+      this(predicate, string, null);
+    }
+
+    Value(FlightFilterPredicate predicate, Instant instant) {
+      this(predicate, null, instant);
+    }
+
+    Value() {
+      this(null, null, null);
+    }
+  }
+
+  public List<Value> getValues() throws JsonProcessingException {
+    List<Value> values = new ArrayList<>();
+    for (FlightFilterPredicate predicate : flightPredicates) {
+      values.addAll(predicate.getValues());
+    }
+    for (FlightFilterPredicate predicate : inputPredicates) {
+      values.addAll(predicate.getValues());
+    }
+
+    if (inputBooleanOperationExpression != null) {
+      values.addAll(inputBooleanOperationExpression.getValues());
+    }
+    return values;
+  }
+
+  public interface FlightFilterPredicateInterface {
+    List<Value> getValues() throws JsonProcessingException;
+  }
 
   /**
    * Predicate comparison constructor
@@ -375,6 +412,44 @@ public class FlightFilter {
       return makePredicateFlight("submit_time", op, timestamp, Datatype.TIMESTAMP);
     }
 
+    @Override
+    public List<Value> getValues() throws JsonProcessingException {
+      return List.of(switch (type) {
+        case INPUT -> getInputValues();
+        case FLIGHT -> getFlightValues();
+      });
+    }
+
+    private Value getInputValues() throws JsonProcessingException {
+      return switch (datatype) {
+      case LIST -> {
+        List<String> values = new ArrayList<>();
+        for (Object obj : ((List<?>) value)) {
+          // Need to double encode in order for strings to match
+          values.add(
+                  StairwayMapper.getObjectMapper()
+                          .writeValueAsString(StairwayMapper.getObjectMapper().writeValueAsString(obj)));
+        }
+        yield new Value(this, "[" + String.join(",", values) + "]");
+      }
+      case NULL -> new Value();
+      default -> new Value(this, StairwayMapper.getObjectMapper().writeValueAsString(value));
+      };
+    }
+
+    /**
+     * Get the parameter value for substitution into the prepared statement.
+     */
+    private Value getFlightValues() throws JsonProcessingException {
+      return switch (datatype) {
+        case STRING -> new Value(this, (String) value);
+        case LIST -> new Value(this, pgJsonMapper.writeValueAsString(value));
+        case TIMESTAMP -> new Value(this, (Instant) value);
+        // Ignore the parameter in the null case
+        case NULL -> new Value();
+      };
+    }
+
     public enum Datatype {
       STRING,
       TIMESTAMP,
@@ -410,6 +485,15 @@ public class FlightFilter {
      */
     public static FlightBooleanOperationExpression makeOr(FlightFilterPredicateInterface... expressions) {
       return new FlightBooleanOperationExpression(Operation.OR, List.of(expressions));
+    }
+
+    @Override
+    public List<Value> getValues() throws JsonProcessingException {
+      List<Value> values = new ArrayList<>();
+      for (FlightFilterPredicateInterface expression : expressions()) {
+        values.addAll(expression.getValues());
+      }
+      return values;
     }
 
     public enum Operation {

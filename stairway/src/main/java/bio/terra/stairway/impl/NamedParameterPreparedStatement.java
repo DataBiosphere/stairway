@@ -25,9 +25,9 @@ import org.apache.commons.lang3.StringUtils;
  * types.
  */
 @SuppressFBWarnings("SQL_PREPARED_STATEMENT_GENERATED_FROM_NONCONSTANT_STRING")
-class NamedParameterPreparedStatement implements AutoCloseable {
-  private PreparedStatement preparedStatement; // prepared statement object
-  private Map<String, Integer> nameIndexMap; // mapping between parameter names and indexes
+public class NamedParameterPreparedStatement implements AutoCloseable {
+  private final PreparedStatement preparedStatement; // prepared statement object
+  private final Map<String, Integer> nameIndexMap; // mapping between parameter names and indexes
 
   /**
    * Construct a prepared statement, extracts named parameters and inserts parameter markers (?
