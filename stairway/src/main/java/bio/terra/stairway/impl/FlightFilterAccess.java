@@ -11,7 +11,6 @@ import com.fasterxml.jackson.core.JsonProcessingException;
 import com.google.common.annotations.VisibleForTesting;
 import java.sql.SQLException;
 import java.util.HashMap;
-import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.stream.Collectors;
@@ -167,9 +166,9 @@ class FlightFilterAccess {
       sb.append(" AND ").append(makeInputPredicateSql(predicate));
     }
 
-    if (filter.getInputBooleanOperationExpression() != null) {
+    if (filter.getBooleanOperationExpression() != null) {
       sb.append(" AND ")
-          .append(makeBooleanExpressionsFilters(filter.getInputBooleanOperationExpression()));
+          .append(makeBooleanExpressionsFilters(filter.getBooleanOperationExpression()));
     }
 
     makeFlightFilter(sb, " AND ");

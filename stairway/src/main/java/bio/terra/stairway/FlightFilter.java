@@ -43,25 +43,25 @@ import javax.annotation.Nullable;
 public class FlightFilter {
   private final List<FlightFilterPredicate> flightPredicates;
   private final List<FlightFilterPredicate> inputPredicates;
-  private FlightBooleanOperationExpression inputBooleanOperationExpression;
+  private FlightBooleanOperationExpression booleanOperationExpression;
   private FlightFilterSortDirection submittedTimeSortDirection;
 
   // Mapper should be used to deserialize to generic Postgres JSON
   private static final ObjectMapper pgJsonMapper = new ObjectMapper();
 
   public FlightFilter() {
-    flightPredicates = new ArrayList<>();
-    inputPredicates = new ArrayList<>();
-    submittedTimeSortDirection = FlightFilterSortDirection.ASC;
+    this(null);
   }
 
   /**
    * Use this constructor to allow for more complex selection criteria. This takes in expression
    * builder methods that are created using static methods on this class.
    */
-  public FlightFilter(FlightBooleanOperationExpression inputBooleanOperationExpression) {
-    this();
-    this.inputBooleanOperationExpression = inputBooleanOperationExpression;
+  public FlightFilter(FlightBooleanOperationExpression booleanOperationExpression) {
+    this.flightPredicates = new ArrayList<>();
+    this.inputPredicates = new ArrayList<>();
+    this.submittedTimeSortDirection = FlightFilterSortDirection.ASC;
+    this.booleanOperationExpression = booleanOperationExpression;
   }
 
   public List<FlightFilterPredicate> getFlightPredicates() {
@@ -72,8 +72,8 @@ public class FlightFilter {
     return inputPredicates;
   }
 
-  public FlightBooleanOperationExpression getInputBooleanOperationExpression() {
-    return inputBooleanOperationExpression;
+  public FlightBooleanOperationExpression getBooleanOperationExpression() {
+    return booleanOperationExpression;
   }
 
   public FlightFilterSortDirection getSubmittedTimeSortDirection() {
@@ -256,8 +256,8 @@ public class FlightFilter {
       values.addAll(predicate.getValues());
     }
 
-    if (inputBooleanOperationExpression != null) {
-      values.addAll(inputBooleanOperationExpression.getValues());
+    if (booleanOperationExpression != null) {
+      values.addAll(booleanOperationExpression.getValues());
     }
     return values;
   }
