@@ -1,16 +1,19 @@
 package bio.terra.stairway.impl;
 
 import bio.terra.stairway.FlightFilter;
+import bio.terra.stairway.FlightFilter.FlightBooleanOperationExpression;
 import bio.terra.stairway.FlightFilter.FlightFilterPredicate;
 import bio.terra.stairway.FlightFilter.FlightFilterPredicate.Datatype;
+import bio.terra.stairway.FlightFilter.FlightFilterPredicateInterface;
 import bio.terra.stairway.FlightFilterSortDirection;
-import bio.terra.stairway.StairwayMapper;
 import bio.terra.stairway.exception.FlightFilterException;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.google.common.annotations.VisibleForTesting;
 import java.sql.SQLException;
-import java.time.Instant;
+import java.util.HashMap;
+import java.util.Map;
 import java.util.Optional;
+import java.util.stream.Collectors;
 import org.apache.commons.lang3.StringUtils;
 
 /**
@@ -27,6 +30,9 @@ class FlightFilterAccess {
   private final Integer offset;
   private final Integer limit;
   private final PageToken pageToken;
+  private final Map<FlightFilterPredicate, String> predicateToParameterName = new HashMap<>();
+
+  private int parameterId;
 
   public FlightFilterAccess(
       FlightFilter filter, Integer offset, Integer limit, String pageTokenString) {
@@ -34,6 +40,10 @@ class FlightFilterAccess {
     this.offset = offset;
     this.limit = limit;
     this.pageToken = Optional.ofNullable(pageTokenString).map(PageToken::new).orElse(null);
+  }
+
+  private String getParameterName(FlightFilterPredicate predicate) {
+    return predicateToParameterName.computeIfAbsent(predicate, p -> "ff" + ++parameterId);
   }
 
   /**
@@ -45,12 +55,14 @@ class FlightFilterAccess {
   void storePredicateValues(NamedParameterPreparedStatement statement)
       throws FlightFilterException {
     try {
-      for (FlightFilterPredicate predicate : filter.getFlightPredicates()) {
-        storeFlightPredicateValue(predicate, statement);
+      for (FlightFilter.Value value : filter.getValues()) {
+        if (value.string() != null) {
+          statement.setString(getParameterName(value.predicate()), value.string());
+        } else if (value.instant() != null) {
+          statement.setInstant(getParameterName(value.predicate()), value.instant());
+        }
       }
-      for (FlightFilterPredicate predicate : filter.getInputPredicates()) {
-        storeInputPredicateValue(predicate, statement);
-      }
+
       // Add any values for paging controls we have
       if (pageToken != null) {
         statement.setInstant("pagetoken", pageToken.getTimestamp());
@@ -70,50 +82,43 @@ class FlightFilterAccess {
    * Generate the enumeration query for flights. The list may be restricted by providing one or more
    * filters. The filters are logically ANDed together.
    *
-   * <p>For performance, there are three forms of the query.
-   *
-   * <p><bold>Form 1: no input parameter filters</bold>
-   *
-   * <p>When there are no input parameter filters, then we can do a single table query on the flight
-   * table like: {@code SELECT flight.* FROM flight WHERE flight-filters ORDER BY } The WHERE and
-   * flight-filters are omitted if there are none to apply.
-   *
-   * <p><bold>Form 2: one input parameter</bold>
-   *
-   * <p>When there is one input filter restriction, we can do a simple join with a restricting join
-   * against the input table like:
+   * <p>Input parameter filters are ANDed together by default or can be organized using
+   * FlightBooleanOperationExpression objects. The generated SQL might look like
    *
    * <pre>{@code
-   * SELECT flight.*
-   * FROM flight JOIN flight_input
-   *   ON flight.flightid = flight_input.flightid
-   * WHERE flight-filters
-   *   AND flight_input.key = 'key' AND flight_input.value = 'json-of-object'
-   * }</pre>
-   *
-   * <bold>Form 3: more than one input parameter</bold>
-   *
-   * <p>This one gets complicated. We do a subquery that filters by the OR of the input filters and
-   * groups by the COUNT of the matches. Only flights where we have inputs that qualify by the
-   * filter will have the right count of matches. The query form is like:
-   *
-   * <pre>{@code
-   * SELECT flight.*
+   * SELECT *
    * FROM flight
-   * JOIN (SELECT flightid, COUNT(*) AS matchCount
-   *       FROM flight_input
-   *       WHERE (flight_input.key = 'key1' AND flight_input.value = 'json-of-object')
-   *          OR (flight_input.key = 'key1' AND flight_input.value = 'json-of-object')
-   *          OR (flight_input.key = 'key1' AND flight_input.value = 'json-of-object')
-   *       GROUP BY flightid) INPUT
-   * ON flight.flightid = INPUT.flightid
-   * WHERE flight-filters
-   *   AND INPUT.matchCount = 3
+   * WHERE (1=1)
+   * AND F.flightid IN ('flightid1', 'flightid2', ...)
+   * AND EXISTS (SELECT 0 FROM flightinput I
+   *             WHERE F.flightid=I.flightid
+   *             AND I.key = 'key'
+   *             AND I.value = 'json-of-object')
    * }</pre>
    *
-   * <p>In all cases, the result is sorted like this: {@code ORDER BY submit_time}. If limit is
-   * present, then the {@code LIMIT :limit} is included. If offset is present, then the {@code
-   * OFFSET :offset} is included.
+   * <p>This format allows for more complex boolean filtering logic such as
+   *
+   * <pre>{@code
+   * SELECT *
+   * FROM flight
+   * WHERE (1=1)
+   * AND (EXISTS (SELECT 0 FROM flightinput I
+   *             WHERE F.flightid=I.flightid
+   *             AND I.key = 'key1'
+   *             AND I.value = 'json-of-object1')
+   *   OR EXISTS (SELECT 0 FROM flightinput I
+   *             WHERE F.flightid=I.flightid
+   *             AND I.key = 'key2'
+   *             AND I.value = 'json-of-object2'))
+   * AND EXISTS (SELECT 0 FROM flightinput I
+   *             WHERE F.flightid=I.flightid
+   *             AND I.key = 'key3'
+   *             AND I.value = 'json-of-object3)
+   * }</pre>
+   *
+   * <p>The result is sorted like this: {@code ORDER BY submit_time ASC|DESC}. If limit is present,
+   * then the {@code LIMIT :limit} is included. If offset is present, then the {@code OFFSET
+   * :offset} is included.
    */
   String makeSql() {
     StringBuilder sb = new StringBuilder();
@@ -123,7 +128,7 @@ class FlightFilterAccess {
         .append(" F.output_parameters, F.status, F.serialized_exception, F.class_name")
         .append(" FROM ");
 
-    makeSqlQueryCommon(sb);
+    makeSqlForm(sb);
 
     // All forms end with the same order by with the variance being ascending or descending order
     sb.append(" ORDER BY submit_time")
@@ -150,52 +155,22 @@ class FlightFilterAccess {
   String makeCountSql() {
     StringBuilder sb = new StringBuilder();
     sb.append("SELECT CURRENT_TIMESTAMP AS currenttime, COUNT(*) AS totalflights FROM ");
-    makeSqlQueryCommon(sb);
+    makeSqlForm(sb);
     return sb.toString();
   }
 
-  // Make the common form of the query string
-  private void makeSqlQueryCommon(StringBuilder sb) {
-    // Decide which form of the query to build.
-    switch (filter.getInputPredicates().size()) {
-      case 0: // Form 1
-        makeSqlForm1(sb);
-        break;
-      case 1: // Form 2
-        makeSqlForm2(sb);
-        break;
-      default: // Form 3
-        makeSqlForm3(sb);
+  private void makeSqlForm(StringBuilder sb) {
+    sb.append(FlightDao.FLIGHT_TABLE).append(" F WHERE (1=1)");
+
+    for (FlightFilterPredicate predicate : filter.getInputPredicates()) {
+      sb.append(" AND ").append(makeInputPredicateSql(predicate));
     }
-  }
 
-  // Form1: only flight table filtering
-  private void makeSqlForm1(StringBuilder sb) {
-    sb.append(FlightDao.FLIGHT_TABLE).append(" F");
-    makeFlightFilter(sb, " WHERE ");
-  }
+    if (filter.getBooleanOperationExpression() != null) {
+      sb.append(" AND ")
+          .append(makeBooleanExpressionsFilters(filter.getBooleanOperationExpression()));
+    }
 
-  // Form2: flight table filtering and a single input parameter filter
-  private void makeSqlForm2(StringBuilder sb) {
-    sb.append(FlightDao.FLIGHT_TABLE)
-        .append(" F INNER JOIN ")
-        .append(FlightDao.FLIGHT_INPUT_TABLE)
-        .append(" I ON F.flightid = I.flightid WHERE ")
-        .append(makeInputPredicateSql(filter.getInputPredicates().get(0)));
-    makeFlightFilter(sb, " AND ");
-  }
-
-  // Form3: flight table filtering and more than one input parameter filter
-  private void makeSqlForm3(StringBuilder sb) {
-    sb.append(FlightDao.FLIGHT_TABLE)
-        .append(" F INNER JOIN (SELECT flightid, COUNT(*) AS matchCount")
-        .append(" FROM ")
-        .append(FlightDao.FLIGHT_INPUT_TABLE)
-        .append(" I WHERE ");
-    makeInputFilter(sb);
-    sb.append(" GROUP BY I.flightid) INPUT ON F.flightid = INPUT.flightid")
-        .append(" WHERE INPUT.matchCount = ")
-        .append(filter.getInputPredicates().size());
     makeFlightFilter(sb, " AND ");
   }
 
@@ -226,17 +201,20 @@ class FlightFilterAccess {
     }
   }
 
-  /**
-   * Generate the filter for the flight input table for Form 3: the case where there is more that
-   * one predicate.
-   */
-  private void makeInputFilter(StringBuilder sb) {
-    String inter = StringUtils.EMPTY;
-
-    for (FlightFilterPredicate predicate : filter.getInputPredicates()) {
-      String sql = makeInputPredicateSql(predicate);
-      sb.append(inter).append(sql);
-      inter = " OR ";
+  // -- boolean expression methods
+  private String makeBooleanExpressionsFilters(FlightFilterPredicateInterface expression) {
+    if (expression instanceof FlightFilterPredicate expressionAsPredicate) {
+      return switch (expressionAsPredicate.type()) {
+        case INPUT -> makeInputPredicateSql(expressionAsPredicate);
+        case FLIGHT -> makeFlightPredicateSql(expressionAsPredicate);
+      };
+    } else if (expression instanceof FlightBooleanOperationExpression expressionAsBooleanOp) {
+      return expressionAsBooleanOp.expressions().stream()
+          .map(this::makeBooleanExpressionsFilters)
+          .collect(Collectors.joining(expressionAsBooleanOp.operation().getSql(), "(", ")"));
+    } else {
+      throw new FlightFilterException(
+          "Unrecognized filter class: %s".formatted(expression.getClass().getName()));
     }
   }
 
@@ -249,36 +227,23 @@ class FlightFilterAccess {
    */
   @VisibleForTesting
   String makeFlightPredicateSql(FlightFilterPredicate predicate) {
-    if (predicate.getDatatype() == Datatype.NULL) {
-      return "F." + predicate.getKey() + " IS NULL";
+    if (predicate.datatype() == Datatype.NULL) {
+      return "F." + predicate.key() + " IS NULL";
+    }
+    if (predicate.datatype() == Datatype.LIST) {
+      return "F."
+          + predicate.key()
+          + " "
+          + predicate.op().getSql()
+          + " (SELECT JSON_ARRAY_ELEMENTS_TEXT(CAST(:"
+          + getParameterName(predicate)
+          + " AS JSON)))";
     }
     return "F."
-        + predicate.getKey()
-        + predicate.getOp().getSql()
+        + predicate.key()
+        + predicate.op().getSql()
         + ":"
-        + predicate.getParameterName();
-  }
-
-  /**
-   * Store the parameter value for substitution into the prepared statement.
-   *
-   * @param statement statement being readied for execution
-   * @throws SQLException on errors setting the parameter values
-   */
-  private void storeFlightPredicateValue(
-      FlightFilterPredicate predicate, NamedParameterPreparedStatement statement)
-      throws SQLException {
-    switch (predicate.getDatatype()) {
-      case STRING:
-        statement.setString(predicate.getParameterName(), (String) predicate.getValue());
-        break;
-      case TIMESTAMP:
-        statement.setInstant(predicate.getParameterName(), (Instant) predicate.getValue());
-        break;
-      case NULL:
-        // Ignore the parameter in the null case
-        break;
-    }
+        + getParameterName(predicate);
   }
 
   /**
@@ -289,19 +254,32 @@ class FlightFilterAccess {
    */
   @VisibleForTesting
   String makeInputPredicateSql(FlightFilterPredicate predicate) {
-    return "(I.key = '"
-        + predicate.getKey()
-        + "' AND I.value"
-        + predicate.getOp().getSql()
-        + ":"
-        + predicate.getParameterName()
-        + ")";
-  }
+    String valuePredicate = "";
+    if (predicate.datatype() == Datatype.NULL) {
+      return "(EXISTS (SELECT 0 FROM flightinput I WHERE F.flightid = I.flightid AND I.key = "
+          + "'"
+          + predicate.key()
+          + "' AND I.value IS NULL) "
+          + "OR NOT EXISTS (SELECT 0 FROM flightinput I WHERE F.flightid = I.flightid AND I.key = "
+          + "'"
+          + predicate.key()
+          + "'))";
+    } else if (predicate.datatype() == Datatype.LIST) {
+      valuePredicate =
+          "I.value "
+              + predicate.op().getSql()
+              + " (SELECT JSON_ARRAY_ELEMENTS_TEXT(CAST(:"
+              + getParameterName(predicate)
+              + " AS JSON)))";
+    } else {
+      valuePredicate = "I.value" + predicate.op().getSql() + ":" + getParameterName(predicate);
+    }
 
-  private void storeInputPredicateValue(
-      FlightFilterPredicate predicate, NamedParameterPreparedStatement statement)
-      throws SQLException, JsonProcessingException {
-    String jsonValue = StairwayMapper.getObjectMapper().writeValueAsString(predicate.getValue());
-    statement.setString(predicate.getParameterName(), jsonValue);
+    return "EXISTS (SELECT 0 FROM flightinput I WHERE F.flightid = I.flightid AND I.key = "
+        + "'"
+        + predicate.key()
+        + "' AND "
+        + valuePredicate
+        + ")";
   }
 }

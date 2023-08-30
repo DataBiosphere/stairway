@@ -6,7 +6,8 @@ public enum FlightFilterOp {
   GREATER_THAN(" > "),
   LESS_THAN(" < "),
   GREATER_EQUAL(" >= "),
-  LESS_EQUAL(" <= ");
+  LESS_EQUAL(" <= "),
+  IN(" IN ");
 
   private final String sql;
 

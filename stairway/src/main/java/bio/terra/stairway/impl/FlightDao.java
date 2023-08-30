@@ -866,49 +866,8 @@ class FlightDao {
    * Get a list of flights and their states. The list may be restricted by providing one or more
    * filters. The filters are logically ANDed together.
    *
-   * <p>For performance, there are three forms of the query.
-   *
-   * <p><bold>Form 1: no input parameter filters</bold>
-   *
-   * <p>When there are no input parameter filters, then we can do a single table query on the flight
-   * table like: {@code SELECT flight.* FROM flight WHERE flight-filters ORDER BY } The WHERE and
-   * flight-filters are omitted if there are none to apply.
-   *
-   * <p><bold>Form 2: one input parameter</bold>
-   *
-   * <p>When there is one input filter restriction, we can do a simple join with a restricting join
-   * against the input table like:
-   *
-   * <pre>{@code
-   * SELECT flight.*
-   * FROM flight JOIN flight_input
-   *   ON flight.flightId = flight_input.flightId
-   * WHERE flight-filters
-   *   AND flight_input.key = 'key' AND flight_input.value = 'json-of-object'
-   * }</pre>
-   *
-   * <bold>Form 3: more than one input parameter</bold>
-   *
-   * <p>This one gets complicated. We do a subquery that filters by the OR of the input filters and
-   * groups by the COUNT of the matches. Only flights where we have inputs that qualify by the
-   * filter will have the right count of matches. The query form is like:
-   *
-   * <pre>{@code
-   * SELECT flight.*
-   * FROM flight
-   * JOIN (SELECT flightId, COUNT(*) AS matchCount
-   *       FROM flight_input
-   *       WHERE (flight_input.key = 'key1' AND flight_input.value = 'json-of-object')
-   *          OR (flight_input.key = 'key1' AND flight_input.value = 'json-of-object')
-   *          OR (flight_input.key = 'key1' AND flight_input.value = 'json-of-object')
-   *       GROUP BY flightId) INPUT
-   * ON flight.flightId = INPUT.flightId
-   * WHERE flight-filters
-   *   AND INPUT.matchCount = 3
-   * }</pre>
-   *
-   * In all cases, the result is sorted and paged like this: (@code ORDER BY submit_time LIMIT
-   * :limit OFFSET :offset}
+   * <p>See {@link bio.terra.stairway.impl.FlightFilterAccess#makeSql()} for more information on the
+   * shape of the sql that gets generated
    *
    * @param offset offset into the result set to start returning
    * @param limit max number of results to return
