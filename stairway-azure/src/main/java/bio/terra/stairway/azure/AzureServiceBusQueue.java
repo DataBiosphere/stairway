@@ -35,7 +35,7 @@ public class AzureServiceBusQueue implements QueueInterface {
    * @param serviceBusReceiverClient the receiver client
    * @param serviceBusSenderClient the sender client
    */
-  public AzureServiceBusQueue(
+  AzureServiceBusQueue(
       ServiceBusReceiverClient serviceBusReceiverClient,
       ServiceBusSenderClient serviceBusSenderClient) {
     this.serviceBusReceiverClient = serviceBusReceiverClient;
@@ -216,7 +216,7 @@ public class AzureServiceBusQueue implements QueueInterface {
       return this;
     }
 
-    public AzureServiceBusQueue build() {
+    public AzureServiceBusQueue build() throws IllegalArgumentException, NullPointerException {
       Validate.notEmpty(subscriptionName, "A subscriptionName is required");
       Validate.notEmpty(topicName, "A topicName is required");
       Validate.inclusiveBetween(

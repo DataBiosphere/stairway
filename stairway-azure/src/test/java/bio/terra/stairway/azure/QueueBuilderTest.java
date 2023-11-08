@@ -2,6 +2,7 @@ package bio.terra.stairway.azure;
 
 import static org.junit.jupiter.api.Assertions.assertThrows;
 
+import edu.umd.cs.findbugs.annotations.SuppressFBWarnings;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
@@ -10,6 +11,9 @@ import org.mockito.junit.jupiter.MockitoExtension;
 
 @Tag("unit")
 @ExtendWith(MockitoExtension.class)
+@SuppressFBWarnings(
+    value = "THROWS_METHOD_THROWS_CLAUSE_THROWABLE",
+    justification = "Includes test-only lambdas that throw exceptions")
 class QueueBuilderTest {
   private AzureServiceBusQueue.Builder builder;
   private static final String SB_NAMESPACE = "foo.servicebus.windows.net";

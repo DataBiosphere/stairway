@@ -8,9 +8,8 @@ import static org.mockito.Mockito.when;
 
 import com.azure.core.util.BinaryData;
 import com.azure.core.util.IterableStream;
-import com.azure.messaging.servicebus.ServiceBusReceivedMessage;
-import com.azure.messaging.servicebus.ServiceBusReceiverClient;
-import com.azure.messaging.servicebus.ServiceBusSenderClient;
+import com.azure.messaging.servicebus.*;
+import edu.umd.cs.findbugs.annotations.SuppressFBWarnings;
 import java.util.List;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Tag;
@@ -21,6 +20,9 @@ import org.mockito.junit.jupiter.MockitoExtension;
 
 @Tag("unit")
 @ExtendWith(MockitoExtension.class)
+@SuppressFBWarnings(
+    value = "THROWS_METHOD_THROWS_CLAUSE_THROWABLE",
+    justification = "Includes test-only lambdas that throw exceptions")
 class AzureServiceBusQueueTest {
 
   private AzureServiceBusQueue azureServiceBusQueue;
@@ -71,7 +73,7 @@ class AzureServiceBusQueueTest {
     azureServiceBusQueue.dispatchMessages(
         1,
         message -> {
-          throw new RuntimeException("test");
+          throw new ServiceBusException(new RuntimeException("test"), new ServiceBusErrorSource());
         });
 
     // verify that the message is set complete
