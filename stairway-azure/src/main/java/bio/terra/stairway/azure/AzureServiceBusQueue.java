@@ -7,11 +7,11 @@ import com.azure.identity.DefaultAzureCredentialBuilder;
 import com.azure.messaging.servicebus.ServiceBusClientBuilder;
 import com.azure.messaging.servicebus.ServiceBusException;
 import com.azure.messaging.servicebus.ServiceBusMessage;
+import com.azure.messaging.servicebus.ServiceBusReceivedMessage;
 import com.azure.messaging.servicebus.ServiceBusReceiverClient;
 import com.azure.messaging.servicebus.ServiceBusSenderClient;
-import com.azure.messaging.servicebus.ServiceBusReceivedMessage;
-import java.util.List;
 import java.time.Duration;
+import java.util.List;
 import org.apache.commons.lang3.NotImplementedException;
 import org.apache.commons.lang3.Validate;
 import org.slf4j.Logger;
@@ -52,7 +52,9 @@ public class AzureServiceBusQueue implements QueueInterface {
 
     if (builder.useManagedIdentity) {
       serviceBusClientBuilder =
-          new ServiceBusClientBuilder().credential(new DefaultAzureCredentialBuilder().build());
+          new ServiceBusClientBuilder()
+              .fullyQualifiedNamespace(builder.namespace)
+              .credential(new DefaultAzureCredentialBuilder().build());
     } else {
       serviceBusClientBuilder =
           new ServiceBusClientBuilder().connectionString(builder.connectionString);
@@ -97,12 +99,11 @@ public class AzureServiceBusQueue implements QueueInterface {
       // toString uses StandardCharsets.UTF_8 by default
       boolean processSucceeded = processFunction.apply(message.getBody().toString());
 
-      if (processSucceeded)
-      {
+      if (processSucceeded) {
         serviceBusReceiverClient.complete(message);
         logger.info("Completed message. ID: {}", message.getMessageId());
         return;
-      };
+      }
 
       logger.info("Failed to process message. ID: {}", message.getMessageId());
       serviceBusReceiverClient.abandon(message);
@@ -112,9 +113,7 @@ public class AzureServiceBusQueue implements QueueInterface {
       serviceBusReceiverClient.abandon(message);
       throw ex;
     } catch (Exception ex) {
-      logger.warn(
-          "Unexpected exception dispatching or processing messages - continuing",
-          ex);
+      logger.warn("Unexpected exception dispatching or processing messages - continuing", ex);
       serviceBusReceiverClient.abandon(message);
     }
   }
@@ -221,9 +220,9 @@ public class AzureServiceBusQueue implements QueueInterface {
       Validate.notEmpty(subscriptionName, "A subscriptionName is required");
       Validate.notEmpty(topicName, "A topicName is required");
       Validate.inclusiveBetween(
-          maxAutoLockRenewDuration,
           Duration.ofSeconds(10),
           Duration.ofMinutes(30),
+          maxAutoLockRenewDuration,
           "maxAutoLockRenewDuration must be between 10 seconds and 30 minutes");
 
       if (useManagedIdentity) {
