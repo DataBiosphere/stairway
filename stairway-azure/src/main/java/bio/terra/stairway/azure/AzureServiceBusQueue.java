@@ -10,6 +10,7 @@ import com.azure.messaging.servicebus.ServiceBusMessage;
 import com.azure.messaging.servicebus.ServiceBusReceivedMessage;
 import com.azure.messaging.servicebus.ServiceBusReceiverClient;
 import com.azure.messaging.servicebus.ServiceBusSenderClient;
+import com.azure.messaging.servicebus.models.ServiceBusReceiveMode;
 import java.time.Duration;
 import java.util.List;
 import org.apache.commons.lang3.NotImplementedException;
@@ -65,6 +66,8 @@ public class AzureServiceBusQueue implements QueueInterface {
             .receiver()
             .topicName(builder.topicName)
             .subscriptionName(builder.subscriptionName)
+            .receiveMode(ServiceBusReceiveMode.PEEK_LOCK)
+            .disableAutoComplete()
             .maxAutoLockRenewDuration(builder.maxAutoLockRenewDuration)
             .buildClient();
 
