@@ -91,11 +91,13 @@ public class AzureServiceBusQueue implements QueueInterface {
         serviceBusReceiverClient.receiveMessages(maxMessages).stream().toList();
 
     for (ServiceBusReceivedMessage message : messages) {
-      ProcessMessage(processFunction, message);
+      processMessage(processFunction, message);
     }
+
+    serviceBusReceiverClient.close();
   }
 
-  private void ProcessMessage(
+  private void processMessage(
       QueueProcessFunction processFunction, ServiceBusReceivedMessage message)
       throws InterruptedException {
     try {
@@ -144,6 +146,17 @@ public class AzureServiceBusQueue implements QueueInterface {
   public void purgeQueueForTesting() {
     throw new NotImplementedException(
         "purgeQueueForTesting is not implemented for Azure Service Bus");
+  }
+
+  /** Closes the receiver and sender clients. */
+  public void shutdown() {
+    try {
+      serviceBusReceiverClient.close();
+      serviceBusSenderClient.close();
+    } catch (Exception ex) {
+      logger.error("Unexpected exception closing the Azure Service Bus clients", ex);
+      throw ex;
+    }
   }
 
   /** Use this builder class to create the AzurePubSubQueue. */
