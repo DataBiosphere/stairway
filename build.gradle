@@ -10,6 +10,7 @@ plugins {
 tasks.named('dependencies') {
     dependsOn(':stairway:dependencies')
     dependsOn(':stairway-gcp:dependencies')
+    dependsOn(':stairway-azure:dependencies')
     dependsOn(':stairctl:dependencies')
 }
 
