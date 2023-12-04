@@ -20,7 +20,8 @@ artifactory {
         defaults {
             publications(
                     'stairway',
-                    'stairway-gcp')
+                    'stairway-gcp',
+                    'stairway-azure')
         }
     }
 }
