@@ -25,5 +25,4 @@ dependencies {
     testImplementation 'org.mockito:mockito-junit-jupiter:5.7.0'
 }
 
-apply from: "$rootDir/gradle/dependency-locking.gradle"
 apply from: "$rootDir/gradle/test.gradle"
