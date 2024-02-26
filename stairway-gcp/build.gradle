@@ -26,5 +26,4 @@ dependencies {
     implementation group: 'com.google.cloud', name: 'google-cloud-pubsub'
 }
 
-apply from: "$rootDir/gradle/dependency-locking.gradle"
 apply from: "$rootDir/gradle/test.gradle"
