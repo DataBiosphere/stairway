@@ -10,7 +10,6 @@ import com.google.protobuf.Duration;
 import com.google.pubsub.v1.ProjectSubscriptionName;
 import com.google.pubsub.v1.Subscription;
 import com.google.pubsub.v1.TopicName;
-import edu.umd.cs.findbugs.annotations.SuppressFBWarnings;
 import java.io.IOException;
 import java.util.Collections;
 import java.util.concurrent.TimeUnit;
@@ -25,9 +24,6 @@ import org.slf4j.LoggerFactory;
  * object in Terraform or similar and not at run time, so that the running instance does not need to
  * hold the enhanced permissions.
  */
-@SuppressFBWarnings(
-    value = "RCN_REDUNDANT_NULLCHECK_WOULD_HAVE_BEEN_A_NPE",
-    justification = "Spotbugs doesn't understand resource try construct")
 public class GcpQueueUtils {
   private static final Logger logger = LoggerFactory.getLogger(GcpQueueUtils.class);
 

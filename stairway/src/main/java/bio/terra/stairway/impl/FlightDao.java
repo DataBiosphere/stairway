@@ -22,7 +22,6 @@ import bio.terra.stairway.exception.FlightNotFoundException;
 import bio.terra.stairway.exception.StairwayException;
 import bio.terra.stairway.exception.StairwayExecutionException;
 import com.fasterxml.jackson.core.JsonProcessingException;
-import edu.umd.cs.findbugs.annotations.SuppressFBWarnings;
 import java.sql.Connection;
 import java.sql.ResultSet;
 import java.sql.SQLException;
@@ -62,9 +61,6 @@ import org.slf4j.LoggerFactory;
  *       complete.
  * </ul>
  */
-@SuppressFBWarnings(
-    value = "RCN_REDUNDANT_NULLCHECK_WOULD_HAVE_BEEN_A_NPE",
-    justification = "Spotbugs doesn't understand resource try construct")
 class FlightDao {
   static final String FLIGHT_TABLE = "flight";
   static final String FLIGHT_LOG_TABLE = "flightlog";

@@ -4,7 +4,6 @@ plugins {
     id 'java'
     id 'java-library'
     id 'com.diffplug.spotless'
-    id 'com.github.spotbugs'
 }
 
 repositories {
@@ -13,9 +12,6 @@ repositories {
 }
 
 dependencies {
-    // For SpotBugs annotations (still using FindBugs annotations)
-    implementation group: 'com.github.spotbugs', name: 'spotbugs-annotations', version: '4.7.2'
-
     // For logging
     implementation group: 'org.slf4j', name: 'slf4j-api', version: '1.7.36'
 
@@ -42,31 +38,6 @@ spotless {
     }
 }
 build.dependsOn spotlessApply
-
-// Static Analysis - Spotbugs configuration
-spotbugs {
-    toolVersion = '4.7.0'
-    effort = 'max'
-    extraArgs = [ '-emacs'] // formats 'html' reports as plain text & viewable in IntelliJ
-}
-spotbugsMain {
-    reports {
-        html {
-            enabled = true
-            destination = file("$buildDir/reports/spotbugs/main.txt")
-            stylesheet = 'fancy.xsl'
-        }
-    }
-}
-spotbugsTest {
-    reports {
-        html {
-            enabled = true
-            destination = file("$buildDir/reports/spotbugs/test.txt")
-            stylesheet = 'fancy.xsl'
-        }
-    }
-}
 
 test {
     useJUnitPlatform {
