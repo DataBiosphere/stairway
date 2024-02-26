@@ -1,11 +1,24 @@
-# To get started with Dependabot version updates, you'll need to specify which
-# package ecosystems to update and where the package manifests are located.
-# Please see the documentation for all configuration options:
-# https://docs.github.com/github/administering-a-repository/configuration-options-for-dependency-updates
-
 version: 2
 updates:
-  - package-ecosystem: "maven"
-    directory: "/" # Location of package manifests
+  - package-ecosystem: "gradle"
+    directory: "/"
+    open-pull-requests-limit: 20
+    groups:
+      minor-patch-dependencies:
+        patterns:
+          - "*"
+        update-types:
+          - "minor"
+          - "patch"
     schedule:
-      interval: "weekly"
+      interval: "monthly"
+      time: "06:00"
+      timezone: "America/New_York"
+    target-branch: "develop"
+    reviewers:
+      - "@DataBiosphere/platform-foundation-codeowners"
+    labels:
+      - "dependency"
+      - "gradle"
+    commit-message:
+      prefix: "[PF-2987]"
