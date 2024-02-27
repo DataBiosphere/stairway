@@ -1,4 +1,4 @@
-name: Run Unit Tests
+name: Build and Test
 
 on:
   push:
@@ -8,7 +8,21 @@ on:
     branches: [ '**' ]
 
 jobs:
-  run-unit-tests:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v3
+      - name: Set up JDK
+        uses: actions/setup-java@v3
+        with:
+          java-version: '17'
+          distribution: 'temurin'
+          cache: 'gradle'
+      - name: Build with Gradle
+        # TODO: Spotbugs references can be removed once
+        # https://github.com/DataBiosphere/stairway/pull/115 is merged
+        run: ./gradlew build -x test -x spotBugsMain -x spotBugsTest
+  unit-tests:
     runs-on: ubuntu-latest
     services:
       postgres:
@@ -30,5 +44,5 @@ jobs:
           distribution: 'temurin'
           cache: 'gradle'
       - name: Run tests
-        run: ./gradlew --build-cache test
+        run: ./gradlew test
     
