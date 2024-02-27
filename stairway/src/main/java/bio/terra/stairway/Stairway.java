@@ -8,9 +8,10 @@ import bio.terra.stairway.exception.MigrateException;
 import bio.terra.stairway.exception.StairwayException;
 import bio.terra.stairway.exception.StairwayExecutionException;
 import bio.terra.stairway.exception.StairwayShutdownException;
+import org.springframework.lang.Nullable;
+
 import java.util.List;
 import java.util.concurrent.TimeUnit;
-import javax.annotation.Nullable;
 import javax.sql.DataSource;
 
 /**
