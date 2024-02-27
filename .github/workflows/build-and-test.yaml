@@ -19,9 +19,7 @@ jobs:
           distribution: 'temurin'
           cache: 'gradle'
       - name: Build with Gradle
-        # TODO: Spotbugs references can be removed once
-        # https://github.com/DataBiosphere/stairway/pull/115 is merged
-        run: ./gradlew build -x test -x spotBugsMain -x spotBugsTest
+        run: ./gradlew build -x test
   unit-tests:
     runs-on: ubuntu-latest
     services:
@@ -50,7 +48,7 @@ jobs:
           cache: 'gradle'
       - name: Run tests
         run: ./gradlew test
-      
+
       # TODO: Work with AppSec to get Sonar scans setup for this repo
       # Run the Sonar scan after `gradle test` to include code coverage data in its report.
 #      - name: Sonar scan
