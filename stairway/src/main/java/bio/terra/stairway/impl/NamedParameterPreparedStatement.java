@@ -1,6 +1,5 @@
 package bio.terra.stairway.impl;
 
-import edu.umd.cs.findbugs.annotations.SuppressFBWarnings;
 import java.sql.Connection;
 import java.sql.PreparedStatement;
 import java.sql.SQLException;
@@ -24,7 +23,6 @@ import org.apache.commons.lang3.StringUtils;
  * statement. It handles only the types needed by Stairway, but can easily be extended for more
  * types.
  */
-@SuppressFBWarnings("SQL_PREPARED_STATEMENT_GENERATED_FROM_NONCONSTANT_STRING")
 public class NamedParameterPreparedStatement implements AutoCloseable {
   private final PreparedStatement preparedStatement; // prepared statement object
   private final Map<String, Integer> nameIndexMap; // mapping between parameter names and indexes

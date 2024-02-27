@@ -9,7 +9,6 @@ import static org.mockito.Mockito.when;
 import com.azure.core.util.BinaryData;
 import com.azure.core.util.IterableStream;
 import com.azure.messaging.servicebus.*;
-import edu.umd.cs.findbugs.annotations.SuppressFBWarnings;
 import java.util.List;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Tag;
@@ -20,9 +19,6 @@ import org.mockito.junit.jupiter.MockitoExtension;
 
 @Tag("unit")
 @ExtendWith(MockitoExtension.class)
-@SuppressFBWarnings(
-    value = "THROWS_METHOD_THROWS_CLAUSE_THROWABLE",
-    justification = "Includes test-only lambdas that throw exceptions")
 class AzureServiceBusQueueTest {
 
   private AzureServiceBusQueue azureServiceBusQueue;
