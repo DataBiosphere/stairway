@@ -1,0 +1,34 @@
+name: Run Unit Tests
+
+on:
+  push:
+    branches: [ develop ]
+    paths-ignore: [ '*.md' ]
+  pull_request:
+    branches: [ '**' ]
+
+jobs:
+  run-unit-tests:
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:13
+        env:
+            # Default values stairway expects based on DEVELOPMENT.md
+            POSTGRES_PASSWORD: stairwaypw
+            POSTGRES_USER: stairwayuser
+            POSTGRES_DB: stairwaylib
+        ports: [ "5432:5432" ]
+    steps:
+      - uses: actions/checkout@v3
+        with:
+          fetch-depth: 0
+      - name: Set up JDK
+        uses: actions/setup-java@v3
+        with:
+          java-version: '17'
+          distribution: 'temurin'
+          cache: 'gradle'
+      - name: Run tests
+        run: ./gradlew --build-cache test
+    
