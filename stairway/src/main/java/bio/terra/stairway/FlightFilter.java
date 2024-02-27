@@ -4,11 +4,11 @@ import bio.terra.stairway.FlightFilter.FlightFilterPredicate.Datatype;
 import bio.terra.stairway.exception.FlightFilterException;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import org.springframework.lang.Nullable;
 
 import java.time.Instant;
 import java.util.ArrayList;
 import java.util.List;
-import javax.annotation.Nullable;
 
 /**
  * A FlightFilter is used to filter the flights on a flight enumeration. You can build a filter with
