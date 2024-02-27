@@ -45,4 +45,3 @@ jobs:
           cache: 'gradle'
       - name: Run tests
         run: ./gradlew test
-    
