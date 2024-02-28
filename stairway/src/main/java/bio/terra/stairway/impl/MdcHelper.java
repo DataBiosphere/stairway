@@ -32,7 +32,9 @@ public class MdcHelper {
         // Save the calling thread's context
         Map<String, String> contextMap = MDC.getCopyOfContextMap();
         return () -> {
-            MDC.setContextMap(contextMap);
+            if (contextMap != null) {
+                MDC.setContextMap(contextMap);
+            }
             // If the calling thread's context contains flight and step context from a parent flight, this will
             // be overridden below:
             addFlightContextToMdc(flightContext);
