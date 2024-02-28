@@ -636,7 +636,7 @@ public class StairwayImpl implements Stairway {
 
   /*
    * Build the FlightRunner object that will execute the flight
-   * and hand it to the threadPool to run.
+   * and hand it to the threadPool to run, with MDC populated from the calling thread and flight context.
    */
   private void launchFlight(FlightContextImpl flightContext) {
     FlightRunner runner = new FlightRunner(flightContext);
@@ -649,7 +649,7 @@ public class StairwayImpl implements Stairway {
               + threadPool.getPoolSize());
     }
     logger.info("Launching flight " + flightContext.flightDesc());
-    threadPool.submit(runner);
+    threadPool.submit(MdcHelper.withMdcAndFlightContext(runner, flightContext));
   }
 
   HookWrapper getHookWrapper() {
