@@ -4,6 +4,7 @@ import bio.terra.stairway.FlightContext;
 import org.slf4j.MDC;
 
 import java.util.Map;
+import java.util.Optional;
 
 public class MdcHelper {
 
@@ -32,9 +33,10 @@ public class MdcHelper {
         // Save the calling thread's context
         Map<String, String> contextMap = MDC.getCopyOfContextMap();
         return () -> {
-            MDC.setContextMap(contextMap);
+            // Any leftover context on the thread will be fully overwritten:
+            MDC.setContextMap(Optional.ofNullable(contextMap).orElse(Map.of()));
             // If the calling thread's context contains flight and step context from a parent flight, this will
-            // be overridden below:
+            // be overwritten below:
             addFlightContextToMdc(flightContext);
             removeStepContextFromMdc(flightContext);
             try {
