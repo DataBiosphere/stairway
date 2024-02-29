@@ -93,6 +93,16 @@ Stairway is designed to provide atomic operations for one instance of one servic
 global or cross-service state. Therefore, it is up to the application or service to implement concurrency control on 
 its objects.
 
+### Context Awareness and Logs
+Stairway leverages the underlying logging system's mapped diagnostic context (MDC) if available.
+
+MDC manages contextual information on a per-thread basis: as Stairway submits a Flight for processing,
+it **passes along the MDC of the calling thread** so that context isn't lost.  It also further populates
+the MDC with **flight-specific context** for the duration of the flight's execution on the thread,
+and **step-specific context** for the duration of each step's execution.
+
+For more information on MDC, please see [Logback's MDC manual](https://logback.qos.ch/manual/mdc.html).
+
 # TODOs
 * Add a section on clusters, queuing, failure, and recovery
 * Add a section - perhaps in DEVELOPMENT.md describing the schema

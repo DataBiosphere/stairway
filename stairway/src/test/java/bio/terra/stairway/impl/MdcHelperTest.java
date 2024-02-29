@@ -97,9 +97,8 @@ public class MdcHelperTest {
               MDC.getCopyOfContextMap(),
               equalTo(expectedParentFlightMdc));
           // If a child flight is launched within a step in a parent flight, the calling thread's
-          // context would also
-          // contain step-specific context that should be cleared for logs emitted by the child
-          // flight.
+          // context would also contain step-specific context that should be cleared for logs
+          // emitted by the child flight.
           MdcHelper.addStepContextToMdc(flightContext);
           Runnable childFlight =
               () ->

@@ -5,6 +5,9 @@ import java.util.Map;
 import java.util.Optional;
 import org.slf4j.MDC;
 
+/**
+ * Utility methods to make Stairway flight runnables context-aware, using mapped diagnostic context (MDC).
+ */
 public class MdcHelper {
 
   /** ID of the flight */
@@ -34,8 +37,7 @@ public class MdcHelper {
       // Any leftover context on the thread will be fully overwritten:
       MDC.setContextMap(Optional.ofNullable(contextMap).orElse(Map.of()));
       // If the calling thread's context contains flight and step context from a parent flight, this
-      // will
-      // be overwritten below:
+      // will be overwritten below:
       addFlightContextToMdc(flightContext);
       removeStepContextFromMdc(flightContext);
       try {
