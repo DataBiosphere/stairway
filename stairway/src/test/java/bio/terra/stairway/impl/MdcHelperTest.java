@@ -16,7 +16,7 @@ import org.junit.jupiter.params.provider.MethodSource;
 import org.slf4j.MDC;
 
 @Tag("unit")
-public class MdcHelperTest {
+class MdcHelperTest {
   private static final Map<String, String> FOO_BAR = Map.of("foo", "bar");
   private static final String FLIGHT_ID = "flightId" + UUID.randomUUID();
   private static final String FLIGHT_CLASS = "flightClass" + UUID.randomUUID();

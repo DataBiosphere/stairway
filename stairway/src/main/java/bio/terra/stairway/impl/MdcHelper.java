@@ -6,31 +6,31 @@ import java.util.Optional;
 import org.slf4j.MDC;
 
 /**
- * Utility methods to make Stairway flight runnables context-aware, using mapped diagnostic context (MDC).
+ * Utility methods to make Stairway flight runnables context-aware, using mapped diagnostic context
+ * (MDC).
  */
-public class MdcHelper {
+class MdcHelper {
 
   /** ID of the flight */
-  public static final String FLIGHT_ID_KEY = "flightId";
+  static final String FLIGHT_ID_KEY = "flightId";
 
   /** Class of the flight */
-  public static final String FLIGHT_CLASS_KEY = "flightClass";
+  static final String FLIGHT_CLASS_KEY = "flightClass";
 
   /** Class of the flight step */
-  public static final String FLIGHT_STEP_CLASS_KEY = "flightStepClass";
+  static final String FLIGHT_STEP_CLASS_KEY = "flightStepClass";
 
   /** Direction of the step (START, DO, SWITCH, or UNDO) */
-  public static final String FLIGHT_STEP_DIRECTION_KEY = "flightStepDirection";
+  static final String FLIGHT_STEP_DIRECTION_KEY = "flightStepDirection";
 
   /** The step's execution order */
-  public static final String FLIGHT_STEP_NUMBER_KEY = "flightStepNumber";
+  static final String FLIGHT_STEP_NUMBER_KEY = "flightStepNumber";
 
   /**
    * @return the flightRunner modified to propagate the MDC from the calling thread and
    *     flight-specific context to the child thread spawned to run the flight.
    */
-  public static Runnable withMdcAndFlightContext(
-      Runnable flightRunner, FlightContext flightContext) {
+  static Runnable withMdcAndFlightContext(Runnable flightRunner, FlightContext flightContext) {
     // Save the calling thread's context
     Map<String, String> contextMap = MDC.getCopyOfContextMap();
     return () -> {
@@ -66,11 +66,11 @@ public class MdcHelper {
         FLIGHT_STEP_NUMBER_KEY, Integer.toString(context.getStepIndex()));
   }
 
-  public static void addStepContextToMdc(FlightContext context) {
+  static void addStepContextToMdc(FlightContext context) {
     stepContextForMdc(context).forEach(MDC::put);
   }
 
-  public static void removeStepContextFromMdc(FlightContext context) {
+  static void removeStepContextFromMdc(FlightContext context) {
     stepContextForMdc(context).keySet().forEach(MDC::remove);
   }
 }
