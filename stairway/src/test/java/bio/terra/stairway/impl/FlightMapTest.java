@@ -6,7 +6,6 @@ import bio.terra.stairway.exception.JsonConversionException;
 import bio.terra.stairway.fixtures.FlightsTestPojo;
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.google.common.collect.ImmutableList;
-import edu.umd.cs.findbugs.annotations.SuppressFBWarnings;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
@@ -234,9 +233,5 @@ public class FlightMapTest {
     BAZ,
   }
 
-  @SuppressFBWarnings(
-      value = "SIC_INNER_SHOULD_BE_STATIC",
-      justification =
-          "Intentionally non-static internal class, so that attempting to serialize an instance fails.")
   private class NonStaticClass {}
 }

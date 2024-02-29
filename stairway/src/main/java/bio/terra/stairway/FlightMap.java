@@ -5,11 +5,12 @@ import static bio.terra.stairway.StairwayMapper.getObjectMapper;
 import bio.terra.stairway.exception.JsonConversionException;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.core.type.TypeReference;
+import org.springframework.lang.Nullable;
+
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.stream.Collectors;
-import javax.annotation.Nullable;
 
 /**
  * FlightMap wraps a {@code HashMap<String, String>} It provides a map-like interface. It localizes

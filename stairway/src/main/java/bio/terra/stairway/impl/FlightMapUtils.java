@@ -6,11 +6,12 @@ import bio.terra.stairway.FlightInput;
 import bio.terra.stairway.FlightMap;
 import bio.terra.stairway.exception.JsonConversionException;
 import com.fasterxml.jackson.core.type.TypeReference;
+import org.springframework.lang.Nullable;
+
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
-import javax.annotation.Nullable;
 
 /**
  * FlightMapUtils provides methods to create a flight map from data pulled from the database and

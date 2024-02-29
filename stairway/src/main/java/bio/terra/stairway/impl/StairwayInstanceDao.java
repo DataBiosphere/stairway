@@ -6,7 +6,6 @@ import static bio.terra.stairway.impl.DbUtils.startTransaction;
 
 import bio.terra.stairway.exception.DatabaseOperationException;
 import bio.terra.stairway.exception.StairwayException;
-import edu.umd.cs.findbugs.annotations.SuppressFBWarnings;
 import java.sql.Connection;
 import java.sql.ResultSet;
 import java.sql.SQLException;
@@ -17,9 +16,6 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 /** Database operations on the Stairway instance table */
-@SuppressFBWarnings(
-    value = "RCN_REDUNDANT_NULLCHECK_WOULD_HAVE_BEEN_A_NPE",
-    justification = "Spotbugs doesn't understand resource try construct")
 class StairwayInstanceDao {
   private static final Logger logger = LoggerFactory.getLogger(StairwayInstanceDao.class);
   private static final String STAIRWAY_INSTANCE_TABLE = "stairwayinstance";

@@ -30,5 +30,3 @@ dependencies {
     // Database
     runtimeOnly group: 'org.postgresql', name: 'postgresql'
 }
-
-apply from: "$rootDir/gradle/dependency-locking.gradle"

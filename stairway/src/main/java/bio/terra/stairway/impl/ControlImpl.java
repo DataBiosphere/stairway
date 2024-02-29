@@ -5,7 +5,6 @@ import static bio.terra.stairway.impl.DbUtils.commitTransaction;
 import bio.terra.stairway.Control;
 import bio.terra.stairway.Direction;
 import bio.terra.stairway.FlightStatus;
-import edu.umd.cs.findbugs.annotations.SuppressFBWarnings;
 import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.util.ArrayList;
@@ -14,9 +13,6 @@ import java.util.UUID;
 import javax.sql.DataSource;
 
 /** This class provides the implementation of {@link Control}. */
-@SuppressFBWarnings(
-    value = "RCN_REDUNDANT_NULLCHECK_WOULD_HAVE_BEEN_A_NPE",
-    justification = "Spotbugs doesn't understand resource try construct")
 public class ControlImpl implements Control {
   private final DataSource dataSource;
   private final FlightDao flightDao;
