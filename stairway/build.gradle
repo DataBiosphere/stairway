@@ -3,40 +3,40 @@ plugins {
 }
 
 dependencies {
-    implementation group: 'org.apache.commons', name: 'commons-dbcp2', version: '2.9.0'
-    implementation group: 'org.apache.commons', name: 'commons-pool2', version: '2.11.1'
-    implementation group: 'org.apache.commons', name: 'commons-lang3', version: '3.12.0'
+    implementation group: 'org.apache.commons', name: 'commons-dbcp2', version: '2.11.0'
+    implementation group: 'org.apache.commons', name: 'commons-pool2', version: '2.12.0'
+    implementation group: 'org.apache.commons', name: 'commons-lang3', version: '3.14.0'
     implementation group: 'org.apache.commons', name: 'commons-collections4', version: '4.4'
 
     // JSON processing
     ext {
-        jackson = '2.13.4'
+        jackson = '2.16.1'
     }
     implementation group: 'com.fasterxml.jackson.core', name: 'jackson-databind', version: "${jackson}"
     implementation group: 'com.fasterxml.jackson.datatype', name: 'jackson-datatype-guava', version: "${jackson}"
     implementation group: 'com.fasterxml.jackson.datatype', name: 'jackson-datatype-jdk8', version: "${jackson}"
     implementation group: 'com.fasterxml.jackson.datatype', name: 'jackson-datatype-jsr310', version: "${jackson}"
     implementation group: 'com.fasterxml.jackson.module', name: 'jackson-module-parameter-names', version: "${jackson}"
-    implementation group: 'org.openapitools', name: 'jackson-databind-nullable', version: '0.2.3'
+    implementation group: 'org.openapitools', name: 'jackson-databind-nullable', version: '0.2.6'
 
     // Spring
     implementation group: 'org.springframework', name: 'spring-web', version: '5.3.23'
 
     // Database
-    implementation group: 'org.liquibase', name: 'liquibase-core', version: '4.8.0'
+    implementation group: 'org.liquibase', name: 'liquibase-core', version: '4.26.0'
     implementation group: 'org.yaml', name: 'snakeyaml', version: '1.27'
 
-    runtimeOnly group: 'org.postgresql', name: 'postgresql', version: '42.5.0'
+    runtimeOnly group: 'org.postgresql', name: 'postgresql', version: '42.7.2'
 
     // Google dependencies
     constraints {
         implementation group: 'com.google.guava', name: 'guava', version: '33.0.0-jre' // "-jre" for Java 8 or higher
     }
-    implementation platform('com.google.cloud:libraries-bom:26.0.0') // use common bom
+    implementation platform('com.google.cloud:libraries-bom:26.33.0') // use common bom
     implementation group: 'com.google.cloud', name: 'google-cloud-pubsub'
 
     // File handling during testing
-    testImplementation group: 'commons-io', name: 'commons-io', version: '2.11.0'
+    testImplementation group: 'commons-io', name: 'commons-io', version: '2.15.1'
 }
 
 apply from: "$rootDir/gradle/test.gradle"
