@@ -2,7 +2,7 @@ plugins {
     id 'idea'
     id 'maven-publish'
 
-    id 'com.jfrog.artifactory' version '4.29.0'
+    id 'com.jfrog.artifactory' version '5.2.0'
 }
 
 // task dependencies is NOT recursively executed on subprojects
