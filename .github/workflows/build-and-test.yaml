@@ -49,13 +49,12 @@ jobs:
       - name: Run tests
         run: ./gradlew test
 
-      # TODO: Work with AppSec to get Sonar scans setup for this repo
       # Run the Sonar scan after `gradle test` to include code coverage data in its report.
-#      - name: Sonar scan
-#        run: ./gradlew --build-cache sonar
-#        env:
-#          SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
-#          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      - name: Sonar scan
+        run: ./gradlew --build-cache sonar --info
+        env:
+          SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
 # TODO: Once Terraform PR is setup, uncomment the following block
 # to enable workflow reporting to slack

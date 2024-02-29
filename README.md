@@ -1,3 +1,4 @@
+[![Quality Gate Status](https://sonarcloud.io/api/project_badges/measure?project=DataBiosphere_stairway&metric=alert_status)](https://sonarcloud.io/summary/new_code?id=DataBiosphere_stairway)
 # Stairway
 Stairway is a library that provides a framework for running _saga transactions_. Saga
 transactions, introduced by Hector Garcia-Molina in 1987, use _compensating operations_ to
