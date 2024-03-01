@@ -25,7 +25,6 @@ import bio.terra.stairway.queue.WorkQueueManager;
 import java.time.Duration;
 import java.util.List;
 import java.util.UUID;
-import java.util.concurrent.LinkedBlockingQueue;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.ScheduledThreadPoolExecutor;
 import java.util.concurrent.ThreadPoolExecutor;
@@ -211,13 +210,7 @@ public class StairwayImpl implements Stairway {
   }
 
   private void configureThreadPools() {
-    threadPool =
-        new StairwayThreadPool(
-            maxParallelFlights,
-            maxParallelFlights,
-            0L,
-            TimeUnit.MILLISECONDS,
-            new LinkedBlockingQueue<Runnable>());
+    threadPool = new StairwayThreadPool(maxParallelFlights);
 
     scheduledPool = new ScheduledThreadPoolExecutor(SCHEDULED_POOL_CORE_THREADS);
     // If we have retention settings then set up the regular flight cleaner
@@ -649,7 +642,7 @@ public class StairwayImpl implements Stairway {
               + threadPool.getPoolSize());
     }
     logger.info("Launching flight " + flightContext.flightDesc());
-    threadPool.submit(MdcHelper.withMdcAndFlightContext(runner, flightContext));
+    threadPool.submitWithMdcAndFlightContext(runner, flightContext);
   }
 
   HookWrapper getHookWrapper() {

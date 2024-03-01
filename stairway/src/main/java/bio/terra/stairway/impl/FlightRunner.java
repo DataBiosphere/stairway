@@ -240,7 +240,7 @@ public class FlightRunner implements Runnable {
     // Retry loop
     do {
       try {
-        MdcHelper.addStepContextToMdc(flightContext);
+        MdcUtils.addStepContextToMdc(flightContext);
         // Do or undo based on direction we are headed
         hookWrapper.startStep(flightContext);
 
@@ -270,7 +270,7 @@ public class FlightRunner implements Runnable {
         result = new StepResult(stepStatus, ex);
       } finally {
         hookWrapper.endStep(flightContext);
-        MdcHelper.removeStepContextFromMdc(flightContext);
+        MdcUtils.removeStepContextFromMdc(flightContext);
       }
 
       switch (result.getStepStatus()) {
