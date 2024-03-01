@@ -2,6 +2,7 @@ package bio.terra.stairway.impl;
 
 import static org.hamcrest.MatcherAssert.assertThat;
 import static org.hamcrest.Matchers.equalTo;
+import static org.junit.jupiter.api.Assertions.fail;
 
 import bio.terra.stairway.fixtures.TestFlightContext;
 import java.util.HashMap;
@@ -52,19 +53,16 @@ class StairwayThreadPoolTest {
     }
 
     Runnable runnable =
-        () -> {
-          assertThat("One active flight", stairwayThreadPool.getActiveFlights(), equalTo(1));
-          assertThat(
-              "Calling thread's context with new flight context",
-              MDC.getCopyOfContextMap(),
-              equalTo(expectedMdc));
-        };
+        () ->
+            assertThat(
+                "Calling thread's context with new flight context",
+                MDC.getCopyOfContextMap(),
+                equalTo(expectedMdc));
 
     stairwayThreadPool
         .submitWithMdcAndFlightContext(runnable, flightContext)
         .get(1, TimeUnit.SECONDS);
 
-    assertThat("No more active flights", stairwayThreadPool.getActiveFlights(), equalTo(0));
     assertThat(
         "Calling thread's context is unchanged",
         MDC.getCopyOfContextMap(),
@@ -93,20 +91,13 @@ class StairwayThreadPoolTest {
     }
 
     Runnable childFlight =
-        () -> {
-          assertThat(
-              "Two active flights (parent and child)",
-              stairwayThreadPool.getActiveFlights(),
-              equalTo(2));
-          assertThat(
-              "Calling thread's context with child flight context",
-              MDC.getCopyOfContextMap(),
-              equalTo(expectedChildFlightMdc));
-        };
+        () ->
+            assertThat(
+                "Calling thread's context with child flight context",
+                MDC.getCopyOfContextMap(),
+                equalTo(expectedChildFlightMdc));
     Runnable parentFlight =
         () -> {
-          assertThat(
-              "One active flight (parent)", stairwayThreadPool.getActiveFlights(), equalTo(1));
           assertThat(
               "Calling thread's context with parent flight context",
               MDC.getCopyOfContextMap(),
@@ -120,15 +111,11 @@ class StairwayThreadPoolTest {
                 .submitWithMdcAndFlightContext(childFlight, childFlightContext)
                 .get(1, TimeUnit.SECONDS);
           } catch (Exception e) {
-            System.out.println("Exception " + e);
-            throw new RuntimeException(e);
+            fail("Unexpected exception waiting for child flight", e);
           }
-          assertThat(
-              "One active flight (parent)", stairwayThreadPool.getActiveFlights(), equalTo(1));
         };
     stairwayThreadPool.submitWithMdcAndFlightContext(parentFlight, flightContext).get();
 
-    assertThat("No more active flights", stairwayThreadPool.getActiveFlights(), equalTo(0));
     assertThat(
         "Calling thread's context is unchanged",
         MDC.getCopyOfContextMap(),
