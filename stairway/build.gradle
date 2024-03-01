@@ -26,7 +26,7 @@ dependencies {
     implementation group: 'org.liquibase', name: 'liquibase-core', version: '4.8.0'
     implementation group: 'org.yaml', name: 'snakeyaml', version: '1.27'
 
-    runtimeOnly group: 'org.postgresql', name: 'postgresql', version: '42.5.0'
+    runtimeOnly group: 'org.postgresql', name: 'postgresql', version: '42.7.2'
 
     // Google dependencies
     constraints {

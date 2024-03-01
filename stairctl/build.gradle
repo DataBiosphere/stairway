@@ -28,5 +28,5 @@ dependencies {
     implementation group: 'org.springframework.shell', name: 'spring-shell-starter', version: '2.1.1'
 
     // Database
-    runtimeOnly group: 'org.postgresql', name: 'postgresql'
+    runtimeOnly group: 'org.postgresql', name: 'postgresql', version: '42.7.2'
 }
