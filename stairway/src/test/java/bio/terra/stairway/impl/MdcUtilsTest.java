@@ -70,7 +70,7 @@ class MdcUtilsTest {
     }
     expectedMdc.putAll(FLIGHT_MDC);
 
-    MdcUtils.addStepContextToMdc(flightContext);
+    MdcUtils.addFlightContextToMdc(flightContext);
     assertThat(
         "Initial context with flight context", MDC.getCopyOfContextMap(), equalTo(expectedMdc));
   }
