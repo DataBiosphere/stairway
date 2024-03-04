@@ -25,5 +25,5 @@ dependencies {
 
     // Spring
     implementation group: 'org.springframework.boot', name: 'spring-boot-starter' // version from spring-boot-plugin
-    implementation group: 'org.springframework.shell', name: 'spring-shell-starter', version: '2.1.1'
+    implementation group: 'org.springframework.shell', name: 'spring-shell-starter', version: '3.2.2'
 }
