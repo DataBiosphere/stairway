@@ -47,7 +47,7 @@ jobs:
           distribution: 'temurin'
           cache: 'gradle'
       - name: Run tests
-        run: ./gradlew test
+        run: ./gradlew test --scan
 
       # Run the Sonar scan after `gradle test` to include code coverage data in its report.
       - name: Sonar scan

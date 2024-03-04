@@ -144,11 +144,9 @@ public class FlightRunner implements Runnable {
       // the UNDO in the first place.
       flightDao.step(flightContext);
       logger.error(
-          "DISMAL FAILURE: non-retry-able error during undo. Flight: {}({}) Step: {}({})",
-          flightContext.getFlightId(),
-          flightContext.getFlightClassName(),
-          flightContext.getStepIndex(),
-          flightContext.getStepClassName());
+          "{} (index {}) experienced DISMAL FAILURE: non-retryable error on undo",
+          flightContext.getStepClassName(),
+          flightContext.getStepIndex());
 
     } catch (InterruptedException ex) {
       // Interrupted exception - we assume this means that the thread pool is shutting down and
@@ -242,6 +240,7 @@ public class FlightRunner implements Runnable {
     // Retry loop
     do {
       try {
+        MdcUtils.addStepContextToMdc(flightContext);
         // Do or undo based on direction we are headed
         hookWrapper.startStep(flightContext);
 
@@ -271,6 +270,7 @@ public class FlightRunner implements Runnable {
         result = new StepResult(stepStatus, ex);
       } finally {
         hookWrapper.endStep(flightContext);
+        MdcUtils.removeStepContextFromMdc(flightContext);
       }
 
       switch (result.getStepStatus()) {
