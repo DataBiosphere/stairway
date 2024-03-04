@@ -31,9 +31,8 @@ class MdcUtils {
    * @param context to set as MDC, if null then MDC will be cleared.
    */
   static void overwriteContext(Map<String, String> context) {
-    if (context == null) {
-      MDC.clear();
-    } else {
+    MDC.clear();
+    if (context != null) {
       MDC.setContextMap(context);
     }
   }

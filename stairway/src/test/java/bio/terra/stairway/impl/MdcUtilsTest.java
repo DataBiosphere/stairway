@@ -48,20 +48,20 @@ class MdcUtilsTest {
             .stepClassName(STEP_CLASS);
   }
 
-  static Stream<Map<String, String>> initialContext() {
+  static Stream<Map<String, String>> contextMap() {
     return Stream.of(null, Map.of(), FOO_BAR);
   }
 
   @ParameterizedTest
-  @MethodSource("initialContext")
-  void overwriteContext(Map<String, String> initialContext) {
+  @MethodSource("contextMap")
+  void overwriteContext(Map<String, String> newContext) {
     MDC.setContextMap(FOO_BAR);
-    MdcUtils.overwriteContext(initialContext);
-    assertThat("", MDC.getCopyOfContextMap(), equalTo(initialContext));
+    MdcUtils.overwriteContext(newContext);
+    assertThat("MDC overwritten by new context", MDC.getCopyOfContextMap(), equalTo(newContext));
   }
 
   @ParameterizedTest
-  @MethodSource("initialContext")
+  @MethodSource("contextMap")
   void addFlightContextToMdc(Map<String, String> initialContext) {
     var expectedMdc = new HashMap<>();
     if (initialContext != null) {
@@ -76,7 +76,7 @@ class MdcUtilsTest {
   }
 
   @ParameterizedTest
-  @MethodSource("initialContext")
+  @MethodSource("contextMap")
   void addAndRemoveStepContextFromMdc(Map<String, String> initialContext) {
     var expectedAddStepMdc = new HashMap<>();
     var expectedRemoveStepMdc = new HashMap<>();
