@@ -15,6 +15,9 @@ dependencies {
     // For logging
     implementation group: 'org.slf4j', name: 'slf4j-api', version: '1.7.36'
 
+    // Database
+    runtimeOnly group: 'org.postgresql', name: 'postgresql', version: '42.7.2'
+
     // For testing
     testImplementation group: 'org.junit.jupiter', name: 'junit-jupiter-api', version: '5.9.0'
     testImplementation group: 'org.junit.jupiter', name: 'junit-jupiter-engine', version: '5.9.0'
