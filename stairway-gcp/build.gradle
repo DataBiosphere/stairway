@@ -10,13 +10,13 @@ dependencies {
 
     // JSON processing
     ext {
-        jackson = '2.13.4'
+        jackson = '2.16.1'
     }
     implementation group: 'com.fasterxml.jackson.core', name: 'jackson-databind', version: "${jackson}"
     implementation group: 'com.fasterxml.jackson.datatype', name: 'jackson-datatype-jdk8', version: "${jackson}"
     implementation group: 'com.fasterxml.jackson.datatype', name: 'jackson-datatype-jsr310', version: "${jackson}"
     implementation group: 'com.fasterxml.jackson.module', name: 'jackson-module-parameter-names', version: "${jackson}"
-    implementation group: 'org.openapitools', name: 'jackson-databind-nullable', version: '0.2.3'
+    implementation group: 'org.openapitools', name: 'jackson-databind-nullable', version: '0.2.6'
 
     // Google dependencies
     constraints {
