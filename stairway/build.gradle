@@ -20,7 +20,7 @@ dependencies {
     implementation group: 'org.openapitools', name: 'jackson-databind-nullable', version: '0.2.3'
 
     // Spring
-    implementation group: 'org.springframework', name: 'spring-web', version: '5.3.23'
+    implementation group: 'org.springframework', name: 'spring-web', version: '6.1.4'
 
     // Database
     implementation group: 'org.liquibase', name: 'liquibase-core', version: '4.8.0'
