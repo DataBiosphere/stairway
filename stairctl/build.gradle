@@ -12,9 +12,9 @@ mainClassName = 'bio.terra.stairctl.Application'
 dependencies {
     implementation project(":stairway")
 
-    implementation group: 'org.apache.commons', name: 'commons-dbcp2', version: '2.9.0'
-    implementation group: 'org.apache.commons', name: 'commons-pool2', version: '2.11.1'
-    implementation group: 'org.apache.commons', name: 'commons-lang3', version: '3.12.0'
+    implementation group: 'org.apache.commons', name: 'commons-dbcp2', version: '2.12.0'
+    implementation group: 'org.apache.commons', name: 'commons-pool2', version: '2.12.0'
+    implementation group: 'org.apache.commons', name: 'commons-lang3', version: '3.14.0'
 
     // JSON processing
     ext {
