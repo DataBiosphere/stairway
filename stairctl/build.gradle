@@ -2,7 +2,7 @@ plugins {
     id 'application'
     id 'stairway.java-conventions'
 
-    id 'io.spring.dependency-management' version '1.0.13.RELEASE'
+    id 'io.spring.dependency-management' version '1.1.4'
     id 'org.springframework.boot' version '2.7.3'
 }
 
@@ -18,7 +18,7 @@ dependencies {
 
     // JSON processing
     ext {
-        jackson = '2.16.1'
+        jackson = '2.16.2'
     }
     implementation group: 'com.fasterxml.jackson.core', name: 'jackson-core', version: "${jackson}"
     implementation group: 'com.fasterxml.jackson.datatype', name: 'jackson-datatype-jsr310', version: "${jackson}"

@@ -10,7 +10,7 @@ dependencies {
 
     // JSON processing
     ext {
-        jackson = '2.16.1'
+        jackson = '2.16.2'
     }
     implementation group: 'com.fasterxml.jackson.core', name: 'jackson-databind', version: "${jackson}"
     implementation group: 'com.fasterxml.jackson.datatype', name: 'jackson-datatype-jdk8', version: "${jackson}"
@@ -19,8 +19,8 @@ dependencies {
     implementation group: 'org.openapitools', name: 'jackson-databind-nullable', version: '0.2.6'
 
     //Azure service bus dependencies
-    implementation 'com.azure:azure-messaging-servicebus:7.14.0-beta.1'
-    implementation 'com.azure:azure-identity:1.10.4'
+    implementation 'com.azure:azure-messaging-servicebus:7.15.2'
+    implementation 'com.azure:azure-identity:1.11.3'
 
     testImplementation 'org.mockito:mockito-junit-jupiter:5.11.0'
 }
