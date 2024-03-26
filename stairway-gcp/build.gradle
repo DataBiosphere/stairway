@@ -10,7 +10,7 @@ dependencies {
 
     // JSON processing
     ext {
-        jackson = '2.16.2'
+        jackson = '2.17.0'
     }
     implementation group: 'com.fasterxml.jackson.core', name: 'jackson-databind', version: "${jackson}"
     implementation group: 'com.fasterxml.jackson.datatype', name: 'jackson-datatype-jdk8', version: "${jackson}"
@@ -20,9 +20,9 @@ dependencies {
 
     // Google dependencies
     constraints {
-        implementation group: 'com.google.guava', name: 'guava', version: '33.0.0-jre' // "-jre" for Java 8 or higher
+        implementation group: 'com.google.guava', name: 'guava', version: '33.1.0-jre' // "-jre" for Java 8 or higher
     }
-    implementation platform('com.google.cloud:libraries-bom:26.0.0') // use common bom
+    implementation platform('com.google.cloud:libraries-bom:26.34.0') // use common bom
     implementation group: 'com.google.cloud', name: 'google-cloud-pubsub'
 }
 
