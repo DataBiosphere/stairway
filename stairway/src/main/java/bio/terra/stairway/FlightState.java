@@ -107,7 +107,7 @@ public class FlightState {
   /** Returns true if the flight is not in a terminal state. */
   public boolean isActive() {
     boolean complete =
-        (flightStatus == FlightStatus.RUNNING
+        (flightStatus == FlightStatus.ERROR
             || flightStatus == FlightStatus.FATAL
             || flightStatus == FlightStatus.SUCCESS);
     return !complete;
