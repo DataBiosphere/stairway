@@ -497,6 +497,7 @@ public class StairwayImpl implements Stairway {
    * @throws FlightNotFoundException flight id does not exist
    * @throws FlightWaitTimedOutException if interrupted or polling interval expired
    * @throws InterruptedException on shutdown while waiting for flight completion
+   * @deprecated
    */
   public FlightState waitForFlight(String flightId, Integer pollSeconds, Integer pollCycles)
       throws StairwayException,
