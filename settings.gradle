@@ -4,6 +4,6 @@ include 'stairway-gcp'
 include 'stairctl'
 include 'stairway-azure'
 
-gradle.ext.version = "1.0.5-SNAPSHOT"
+gradle.ext.version = "1.0.6-SNAPSHOT"
 
 
