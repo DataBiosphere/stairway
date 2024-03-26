@@ -13,10 +13,14 @@ import static org.hamcrest.MatcherAssert.assertThat;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import java.time.Instant;
+import java.util.Map;
+import java.util.stream.Stream;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.MethodSource;
 
 @Tag("unit")
 public class FlightStateClassTest {
@@ -86,5 +90,28 @@ public class FlightStateClassTest {
         () -> {
           result.getInputParameters().put(BAD, BAD);
         });
+  }
+
+  static Stream<Map<FlightStatus, Boolean>> activeStatuses() {
+    return Stream.of(
+        Map.of(FlightStatus.RUNNING, true),
+        Map.of(FlightStatus.SUCCESS, false),
+        Map.of(FlightStatus.ERROR, false),
+        Map.of(FlightStatus.FATAL, false),
+        Map.of(FlightStatus.WAITING, true),
+        Map.of(FlightStatus.READY, true),
+        Map.of(FlightStatus.QUEUED, true),
+        Map.of(FlightStatus.READY_TO_RESTART, true));
+  }
+
+  @ParameterizedTest
+  @MethodSource("activeStatuses")
+  void testActiveFlightStatuses(Map<FlightStatus, Boolean> activeStates) {
+    for (Map.Entry<FlightStatus, Boolean> entry : activeStates.entrySet()) {
+      FlightState flightState = new FlightState();
+      flightState.setFlightStatus(entry.getKey());
+      boolean isActive = entry.getValue();
+      assertThat(flightState.isActive(), is(isActive));
+    }
   }
 }
