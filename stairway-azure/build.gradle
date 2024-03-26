@@ -10,7 +10,7 @@ dependencies {
 
     // JSON processing
     ext {
-        jackson = '2.16.1'
+        jackson = '2.16.2'
     }
     implementation group: 'com.fasterxml.jackson.core', name: 'jackson-databind', version: "${jackson}"
     implementation group: 'com.fasterxml.jackson.datatype', name: 'jackson-datatype-jdk8', version: "${jackson}"
