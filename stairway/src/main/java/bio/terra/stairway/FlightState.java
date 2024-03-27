@@ -104,7 +104,12 @@ public class FlightState {
     return progressMeters;
   }
 
+  /** Returns true if the flight is not in a terminal state. */
   public boolean isActive() {
-    return (flightStatus == FlightStatus.RUNNING);
+    boolean complete =
+        (flightStatus == FlightStatus.ERROR
+            || flightStatus == FlightStatus.FATAL
+            || flightStatus == FlightStatus.SUCCESS);
+    return !complete;
   }
 }

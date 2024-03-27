@@ -133,8 +133,11 @@ public class StairwayImpl implements Stairway {
    */
   public List<String> initialize(
       DataSource dataSource, boolean forceCleanStart, boolean migrateUpgrade)
-      throws StairwayShutdownException, DatabaseOperationException, MigrateException,
-          StairwayException, InterruptedException {
+      throws StairwayShutdownException,
+          DatabaseOperationException,
+          MigrateException,
+          StairwayException,
+          InterruptedException {
 
     // If we have been shut down, do not restart.
     if (isQuietingDown()) {
@@ -176,7 +179,9 @@ public class StairwayImpl implements Stairway {
    * @throws InterruptedException interruption during recovery/startup
    */
   public void recoverAndStart(List<String> obsoleteStairways)
-      throws StairwayException, DatabaseOperationException, InterruptedException,
+      throws StairwayException,
+          DatabaseOperationException,
+          InterruptedException,
           StairwayExecutionException {
 
     if (obsoleteStairways != null) {
@@ -320,8 +325,11 @@ public class StairwayImpl implements Stairway {
       FlightMap inputParameters,
       boolean shouldQueue,
       FlightDebugInfo debugInfo)
-      throws StairwayException, StairwayExecutionException, InterruptedException,
-          DuplicateFlightIdException, MakeFlightException {
+      throws StairwayException,
+          StairwayExecutionException,
+          InterruptedException,
+          DuplicateFlightIdException,
+          MakeFlightException {
     if (flightClass == null || inputParameters == null) {
       throw new MakeFlightException(
           "Must supply non-null flightClass and inputParameters to submit");
@@ -379,8 +387,11 @@ public class StairwayImpl implements Stairway {
       FlightMap inputParameters,
       boolean shouldQueue,
       FlightDebugInfo debugInfo)
-      throws StairwayException, DatabaseOperationException, StairwayExecutionException,
-          InterruptedException, DuplicateFlightIdException {
+      throws StairwayException,
+          DatabaseOperationException,
+          StairwayExecutionException,
+          InterruptedException,
+          DuplicateFlightIdException {
     submit(flightId, flightClass, inputParameters, shouldQueue, debugInfo);
   }
 
@@ -419,7 +430,9 @@ public class StairwayImpl implements Stairway {
    * @throws InterruptedException on shutdown during resume
    */
   public boolean resume(String flightId)
-      throws StairwayException, StairwayShutdownException, DatabaseOperationException,
+      throws StairwayException,
+          StairwayShutdownException,
+          DatabaseOperationException,
           InterruptedException {
     if (isQuietingDown()) {
       throw new StairwayShutdownException("Stairway is shutting down and cannot resume a flight");
@@ -470,10 +483,10 @@ public class StairwayImpl implements Stairway {
   }
 
   /**
-   * Wait for a flight to complete
+   * WARNING: Example implementation of "wait for a flight to complete".
    *
-   * <p>This is a very simple polling method to help you get started with Stairway. It is probably
-   * not what you want for production code.
+   * <p>This is a very simple polling method to help you get started with Stairway. It is not
+   * recommended for production code.
    *
    * @param flightId the flight to wait for
    * @param pollSeconds sleep time for each poll cycle; if null, defaults to 10 seconds
@@ -484,10 +497,14 @@ public class StairwayImpl implements Stairway {
    * @throws FlightNotFoundException flight id does not exist
    * @throws FlightWaitTimedOutException if interrupted or polling interval expired
    * @throws InterruptedException on shutdown while waiting for flight completion
+   * @deprecated
    */
   public FlightState waitForFlight(String flightId, Integer pollSeconds, Integer pollCycles)
-      throws StairwayException, DatabaseOperationException, FlightNotFoundException,
-          FlightWaitTimedOutException, InterruptedException {
+      throws StairwayException,
+          DatabaseOperationException,
+          FlightNotFoundException,
+          FlightWaitTimedOutException,
+          InterruptedException {
     int sleepSeconds = (pollSeconds == null) ? 10 : pollSeconds;
     int pollCount = 0;
 
@@ -518,7 +535,9 @@ public class StairwayImpl implements Stairway {
    * @throws InterruptedException on shutdown
    */
   public FlightState getFlightState(String flightId)
-      throws StairwayException, FlightNotFoundException, DatabaseOperationException,
+      throws StairwayException,
+          FlightNotFoundException,
+          DatabaseOperationException,
           InterruptedException {
     return flightDao.getFlightState(flightId);
   }
@@ -565,7 +584,9 @@ public class StairwayImpl implements Stairway {
   }
 
   void exitFlight(FlightContextImpl context)
-      throws StairwayException, DatabaseOperationException, StairwayExecutionException,
+      throws StairwayException,
+          DatabaseOperationException,
+          StairwayExecutionException,
           InterruptedException {
     // save the flight state in the database
     flightDao.exit(context);
@@ -583,7 +604,9 @@ public class StairwayImpl implements Stairway {
   }
 
   private void queueFlight(FlightContextImpl flightContext)
-      throws StairwayException, DatabaseOperationException, StairwayExecutionException,
+      throws StairwayException,
+          DatabaseOperationException,
+          StairwayExecutionException,
           InterruptedException {
     // If the flight state is READY, then we put the flight on the queue and mark it queued in the
     // database. We cannot go directly from RUNNING to QUEUED. Suppose we put the flight in
