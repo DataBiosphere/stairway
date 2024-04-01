@@ -10,7 +10,7 @@ dependencies {
 
     // JSON processing
     ext {
-        jackson = '2.16.2'
+        jackson = '2.17.0'
     }
     implementation group: 'com.fasterxml.jackson.core', name: 'jackson-databind', version: "${jackson}"
     implementation group: 'com.fasterxml.jackson.datatype', name: 'jackson-datatype-guava', version: "${jackson}"
@@ -20,21 +20,21 @@ dependencies {
     implementation group: 'org.openapitools', name: 'jackson-databind-nullable', version: '0.2.6'
 
     // Spring
-    implementation group: 'org.springframework', name: 'spring-web', version: '6.1.4'
+    implementation group: 'org.springframework', name: 'spring-web', version: '6.1.5'
 
     // Database
-    implementation group: 'org.liquibase', name: 'liquibase-core', version: '4.8.0'
+    implementation group: 'org.liquibase', name: 'liquibase-core', version: '4.27.0'
     implementation group: 'org.yaml', name: 'snakeyaml', version: '1.27'
 
     // Google dependencies
     constraints {
-        implementation group: 'com.google.guava', name: 'guava', version: '33.0.0-jre' // "-jre" for Java 8 or higher
+        implementation group: 'com.google.guava', name: 'guava', version: '33.1.0-jre' // "-jre" for Java 8 or higher
     }
-    implementation platform('com.google.cloud:libraries-bom:26.0.0') // use common bom
+    implementation platform('com.google.cloud:libraries-bom:26.35.0') // use common bom
     implementation group: 'com.google.cloud', name: 'google-cloud-pubsub'
 
     // File handling during testing
-    testImplementation group: 'commons-io', name: 'commons-io', version: '2.15.1'
+    testImplementation group: 'commons-io', name: 'commons-io', version: '2.16.0'
 }
 
 apply from: "$rootDir/gradle/test.gradle"
