@@ -92,7 +92,7 @@ You can create your own derivation of the `RetryRule` class and implement your o
 ### Concurrency
 Stairway is designed to provide atomic operations for one instance of one service. It does not coordinate any
 global or cross-service state. Therefore, it is up to the application or service to implement concurrency control on 
-its objects.
+its objects. 
 
 ### Context Awareness and Logs
 Stairway leverages the underlying logging system's mapped diagnostic context (MDC) if available.
