@@ -1,4 +1,4 @@
-plugins {
+plugins { 
     id 'application'
     id 'stairway.java-conventions'
 
