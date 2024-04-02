@@ -18,7 +18,7 @@ tasks.named('dependencies') {
 apply from: "$rootDir/gradle/artifactory.gradle"
 
 sonar {
-    properties {
+    properties { 
         property "sonar.projectKey", "DataBiosphere_stairway"
         property "sonar.organization", "broad-databiosphere"
         property "sonar.host.url", "https://sonarcloud.io"
