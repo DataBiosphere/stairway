@@ -9,14 +9,12 @@ dependencies {
     implementation group: 'org.apache.commons', name: 'commons-collections4', version: '4.4'
 
     // JSON processing
-    ext {
-        jackson = '2.17.0'
-    }
-    implementation group: 'com.fasterxml.jackson.core', name: 'jackson-databind', version: "${jackson}"
-    implementation group: 'com.fasterxml.jackson.datatype', name: 'jackson-datatype-guava', version: "${jackson}"
-    implementation group: 'com.fasterxml.jackson.datatype', name: 'jackson-datatype-jdk8', version: "${jackson}"
-    implementation group: 'com.fasterxml.jackson.datatype', name: 'jackson-datatype-jsr310', version: "${jackson}"
-    implementation group: 'com.fasterxml.jackson.module', name: 'jackson-module-parameter-names', version: "${jackson}"
+    implementation platform('com.fasterxml.jackson:jackson-bom:2.17.0')
+    implementation group: 'com.fasterxml.jackson.core', name: 'jackson-databind'
+    implementation group: 'com.fasterxml.jackson.datatype', name: 'jackson-datatype-guava'
+    implementation group: 'com.fasterxml.jackson.datatype', name: 'jackson-datatype-jdk8'
+    implementation group: 'com.fasterxml.jackson.datatype', name: 'jackson-datatype-jsr310'
+    implementation group: 'com.fasterxml.jackson.module', name: 'jackson-module-parameter-names'
     implementation group: 'org.openapitools', name: 'jackson-databind-nullable', version: '0.2.6'
 
     // Spring

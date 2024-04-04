@@ -1,4 +1,4 @@
-plugins { 
+plugins {
     id 'application'
     id 'stairway.java-conventions'
 
@@ -17,11 +17,7 @@ dependencies {
     implementation group: 'org.apache.commons', name: 'commons-pool2'
     implementation group: 'org.apache.commons', name: 'commons-lang3'
 
-    // JSON processing
-    implementation group: 'com.fasterxml.jackson.core', name: 'jackson-core'
-    implementation group: 'com.fasterxml.jackson.datatype', name: 'jackson-datatype-jsr310'
-
     // Spring
-    implementation group: 'org.springframework.boot', name: 'spring-boot-starter' // version from spring-boot-plugin
+    implementation group: 'org.springframework.boot', name: 'spring-boot-starter'
     implementation group: 'org.springframework.shell', name: 'spring-shell-starter', version: '3.2.3'
 }
