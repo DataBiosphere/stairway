@@ -6,8 +6,7 @@ import bio.terra.stairway.FlightInput;
 import bio.terra.stairway.FlightMap;
 import bio.terra.stairway.exception.JsonConversionException;
 import com.fasterxml.jackson.core.type.TypeReference;
-import org.springframework.lang.Nullable;
-
+import jakarta.annotation.Nullable;
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.List;

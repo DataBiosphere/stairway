@@ -22,6 +22,7 @@ import bio.terra.stairway.exception.FlightNotFoundException;
 import bio.terra.stairway.exception.StairwayException;
 import bio.terra.stairway.exception.StairwayExecutionException;
 import com.fasterxml.jackson.core.JsonProcessingException;
+import jakarta.annotation.Nullable;
 import java.sql.Connection;
 import java.sql.ResultSet;
 import java.sql.SQLException;
@@ -33,7 +34,6 @@ import javax.sql.DataSource;
 import org.apache.commons.lang3.StringUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import org.springframework.lang.Nullable;
 
 /**
  * The general layout of the stairway database tables is:
@@ -99,7 +99,9 @@ class FlightDao {
    * @throws InterruptedException thread shutdown
    */
   void create(FlightContextImpl flightContext)
-      throws StairwayException, DatabaseOperationException, DuplicateFlightIdException,
+      throws StairwayException,
+          DatabaseOperationException,
+          DuplicateFlightIdException,
           InterruptedException {
     DbRetry.retryVoid("flight.submit", () -> createInner(flightContext));
   }
@@ -212,7 +214,9 @@ class FlightDao {
    * @throws InterruptedException thread shutdown
    */
   void exit(FlightContextImpl flightContext)
-      throws StairwayException, StairwayExecutionException, DatabaseOperationException,
+      throws StairwayException,
+          StairwayExecutionException,
+          DatabaseOperationException,
           InterruptedException {
     switch (flightContext.getFlightStatus()) {
       case SUCCESS:
@@ -822,7 +826,9 @@ class FlightDao {
    * @throws InterruptedException - interrupt
    */
   FlightState getFlightState(String flightId)
-      throws StairwayException, DatabaseOperationException, FlightNotFoundException,
+      throws StairwayException,
+          DatabaseOperationException,
+          FlightNotFoundException,
           InterruptedException {
     return DbRetry.retry("flight.getFlightState", () -> getFlightStateInner(flightId));
   }

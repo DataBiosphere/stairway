@@ -7,9 +7,9 @@ import bio.terra.stairway.fixtures.FileQueue;
 import bio.terra.stairway.fixtures.TestStairwayBuilder;
 import java.util.List;
 import java.util.concurrent.TimeUnit;
+import org.junit.jupiter.api.Disabled;
 import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
-import org.junit.jupiter.api.Disabled;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -17,7 +17,8 @@ import org.slf4j.LoggerFactory;
 public class SleepQueueTest {
   private final Logger logger = LoggerFactory.getLogger(SleepQueueTest.class);
 
-  @Disabled("This test is flaky and consistently fails when running on a fresh environment for the first time")
+  @Disabled(
+      "This test is flaky and consistently fails when running on a fresh environment for the first time")
   @Test
   public void clusterSuccessTest() throws Exception {
     QueueInterface workQueue = FileQueue.makeFileQueue("clusterSuccessTest");

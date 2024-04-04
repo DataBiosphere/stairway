@@ -239,11 +239,7 @@ class FlightFilterAccess {
           + getParameterName(predicate)
           + " AS JSON)))";
     }
-    return "F."
-        + predicate.key()
-        + predicate.op().getSql()
-        + ":"
-        + getParameterName(predicate);
+    return "F." + predicate.key() + predicate.op().getSql() + ":" + getParameterName(predicate);
   }
 
   /**

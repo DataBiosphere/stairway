@@ -4,8 +4,7 @@ import bio.terra.stairway.FlightFilter.FlightFilterPredicate.Datatype;
 import bio.terra.stairway.exception.FlightFilterException;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
-import org.springframework.lang.Nullable;
-
+import jakarta.annotation.Nullable;
 import java.time.Instant;
 import java.util.ArrayList;
 import java.util.List;
@@ -147,11 +146,7 @@ public class FlightFilter {
     }
     FlightFilterPredicate predicate =
         new FlightFilterPredicate(
-            FlightFilterPredicate.FilterType.FLIGHT,
-            "class_name",
-            op,
-            className,
-            Datatype.STRING);
+            FlightFilterPredicate.FilterType.FLIGHT, "class_name", op, className, Datatype.STRING);
     flightPredicates.add(predicate);
     return this;
   }
@@ -169,11 +164,7 @@ public class FlightFilter {
     }
     FlightFilterPredicate predicate =
         new FlightFilterPredicate(
-            FlightFilterPredicate.FilterType.FLIGHT,
-            "status",
-            op,
-            status.name(),
-            Datatype.STRING);
+            FlightFilterPredicate.FilterType.FLIGHT, "status", op, status.name(), Datatype.STRING);
     flightPredicates.add(predicate);
     return this;
   }
@@ -276,11 +267,12 @@ public class FlightFilter {
    * @param datatype comparison datatype for the value
    */
   public record FlightFilterPredicate(
-          FilterType type,
-          String key,
-          FlightFilterOp op,
-          Object value,
-          FlightFilterPredicate.Datatype datatype) implements FlightFilterPredicateInterface {
+      FilterType type,
+      String key,
+      FlightFilterOp op,
+      Object value,
+      FlightFilterPredicate.Datatype datatype)
+      implements FlightFilterPredicateInterface {
 
     /**
      * Create a predicate object.
@@ -293,11 +285,7 @@ public class FlightFilter {
      * @return A newly created FlightFilterPredicate object
      */
     private static FlightFilterPredicate makePredicate(
-            FilterType type,
-            String key,
-            FlightFilterOp op,
-            Object value,
-            Datatype datatype) {
+        FilterType type, String key, FlightFilterOp op, Object value, Datatype datatype) {
       if (key == null) {
         throw new FlightFilterException("Key must be specified in an input filter");
       }
@@ -316,9 +304,9 @@ public class FlightFilter {
     }
 
     /**
-     * Create an input parameter filter object. This is processed by converting the {@code value} into
-     * JSON and doing a string comparison against the input parameter stored in the database. The
-     * {@code value} object must be <b>exactly</b> the same class as the input parameter.
+     * Create an input parameter filter object. This is processed by converting the {@code value}
+     * into JSON and doing a string comparison against the input parameter stored in the database.
+     * The {@code value} object must be <b>exactly</b> the same class as the input parameter.
      *
      * @param key name of the parameter to compare
      * @param op a {@link FlightFilterOp}
@@ -326,7 +314,8 @@ public class FlightFilter {
      * @return A newly created FlightFilterPredicate object
      * @throws FlightFilterException if predicate is not supplied
      */
-    public static FlightFilterPredicate makePredicateInput(String key, FlightFilterOp op, Object value) {
+    public static FlightFilterPredicate makePredicateInput(
+        String key, FlightFilterOp op, Object value) {
       return makePredicate(FilterType.INPUT, key, op, value, Datatype.STRING);
     }
 
@@ -337,7 +326,8 @@ public class FlightFilter {
      * @param status the flights' status
      * @return A newly created FlightFilterPredicate object
      */
-    public static FlightFilterPredicate makePredicateFlightStatus(FlightFilterOp op, FlightStatus status) {
+    public static FlightFilterPredicate makePredicateFlightStatus(
+        FlightFilterOp op, FlightStatus status) {
       return makePredicateFlight("status", op, status.name(), Datatype.STRING);
     }
 
@@ -348,7 +338,8 @@ public class FlightFilter {
      * @param className the name of the flights' class
      * @return A newly created FlightFilterPredicate object
      */
-    public static FlightFilterPredicate makePredicateFlightClass(FlightFilterOp op, String className) {
+    public static FlightFilterPredicate makePredicateFlightClass(
+        FlightFilterOp op, String className) {
       return makePredicateFlight("class_name", op, className, Datatype.STRING);
     }
 
@@ -372,7 +363,7 @@ public class FlightFilter {
      * @return A newly created FlightFilterPredicate object
      */
     private static FlightFilterPredicate makePredicateFlight(
-            String key, FlightFilterOp op, Object value, Datatype datatype) {
+        String key, FlightFilterOp op, Object value, Datatype datatype) {
       return makePredicate(FilterType.FLIGHT, key, op, value, datatype);
     }
 
@@ -384,7 +375,7 @@ public class FlightFilter {
      * @return A newly created FlightFilterPredicate object
      */
     public static FlightFilterPredicate makePredicateFlightClass(
-            FlightFilterOp op, Class<? extends Flight> clazz) {
+        FlightFilterOp op, Class<? extends Flight> clazz) {
       return makePredicateFlightClass(op, clazz.getName());
     }
 
@@ -396,7 +387,7 @@ public class FlightFilter {
      * @return A newly created FlightFilterPredicate object
      */
     public static FlightFilterPredicate makePredicateCompletedTime(
-            FlightFilterOp op, @Nullable Instant timestamp) {
+        FlightFilterOp op, @Nullable Instant timestamp) {
       return makePredicateFlight("completed_time", op, timestamp, Datatype.TIMESTAMP);
     }
 
@@ -408,44 +399,43 @@ public class FlightFilter {
      * @return A newly created FlightFilterPredicate object
      */
     public static FlightFilterPredicate makePredicateSubmitTime(
-            FlightFilterOp op, @Nullable Instant timestamp) {
+        FlightFilterOp op, @Nullable Instant timestamp) {
       return makePredicateFlight("submit_time", op, timestamp, Datatype.TIMESTAMP);
     }
 
     @Override
     public List<Value> getValues() throws JsonProcessingException {
-      return List.of(switch (type) {
-        case INPUT -> getInputValues();
-        case FLIGHT -> getFlightValues();
-      });
+      return List.of(
+          switch (type) {
+            case INPUT -> getInputValues();
+            case FLIGHT -> getFlightValues();
+          });
     }
 
     private Value getInputValues() throws JsonProcessingException {
       return switch (datatype) {
-      case LIST -> {
-        List<String> values = new ArrayList<>();
-        for (Object obj : ((List<?>) value)) {
-          // Need to double encode in order for strings to match
-          values.add(
-                  StairwayMapper.getObjectMapper()
-                          .writeValueAsString(StairwayMapper.getObjectMapper().writeValueAsString(obj)));
+        case LIST -> {
+          List<String> values = new ArrayList<>();
+          for (Object obj : ((List<?>) value)) {
+            // Need to double encode in order for strings to match
+            values.add(
+                StairwayMapper.getObjectMapper()
+                    .writeValueAsString(StairwayMapper.getObjectMapper().writeValueAsString(obj)));
+          }
+          yield new Value(this, "[" + String.join(",", values) + "]");
         }
-        yield new Value(this, "[" + String.join(",", values) + "]");
-      }
-      case NULL -> new Value();
-      default -> new Value(this, StairwayMapper.getObjectMapper().writeValueAsString(value));
+        case NULL -> new Value();
+        default -> new Value(this, StairwayMapper.getObjectMapper().writeValueAsString(value));
       };
     }
 
-    /**
-     * Get the parameter value for substitution into the prepared statement.
-     */
+    /** Get the parameter value for substitution into the prepared statement. */
     private Value getFlightValues() throws JsonProcessingException {
       return switch (datatype) {
         case STRING -> new Value(this, (String) value);
         case LIST -> new Value(this, pgJsonMapper.writeValueAsString(value));
         case TIMESTAMP -> new Value(this, (Instant) value);
-        // Ignore the parameter in the null case
+          // Ignore the parameter in the null case
         case NULL -> new Value();
       };
     }
@@ -463,24 +453,28 @@ public class FlightFilter {
     }
   }
 
-    /**
-     * A predicate that is a boolean operation of other predicates
-     * @param operation The operation to perform
-     * @param expressions Expression that will have the boolean operator applied to them
-     */
+  /**
+   * A predicate that is a boolean operation of other predicates
+   *
+   * @param operation The operation to perform
+   * @param expressions Expression that will have the boolean operator applied to them
+   */
   public record FlightBooleanOperationExpression(
-          Operation operation, List<FlightFilterPredicateInterface> expressions) implements FlightFilterPredicateInterface {
+      Operation operation, List<FlightFilterPredicateInterface> expressions)
+      implements FlightFilterPredicateInterface {
     /**
      * @param expressions Expressions that will be AND-ed together.
      */
-    public static FlightBooleanOperationExpression makeAnd(FlightFilterPredicateInterface... expressions) {
+    public static FlightBooleanOperationExpression makeAnd(
+        FlightFilterPredicateInterface... expressions) {
       return new FlightBooleanOperationExpression(Operation.AND, List.of(expressions));
     }
 
     /**
      * @param expressions Expressions that will be OR-ed together.
      */
-    public static FlightBooleanOperationExpression makeOr(FlightFilterPredicateInterface... expressions) {
+    public static FlightBooleanOperationExpression makeOr(
+        FlightFilterPredicateInterface... expressions) {
       return new FlightBooleanOperationExpression(Operation.OR, List.of(expressions));
     }
 

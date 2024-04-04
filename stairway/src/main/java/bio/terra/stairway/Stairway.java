@@ -8,8 +8,7 @@ import bio.terra.stairway.exception.MigrateException;
 import bio.terra.stairway.exception.StairwayException;
 import bio.terra.stairway.exception.StairwayExecutionException;
 import bio.terra.stairway.exception.StairwayShutdownException;
-import org.springframework.lang.Nullable;
-
+import jakarta.annotation.Nullable;
 import java.util.List;
 import java.util.concurrent.TimeUnit;
 import javax.sql.DataSource;
@@ -51,8 +50,11 @@ public interface Stairway {
    * @return list of Stairway instances recorded in the database
    */
   List<String> initialize(DataSource dataSource, boolean forceCleanStart, boolean migrateUpgrade)
-      throws StairwayShutdownException, DatabaseOperationException, MigrateException,
-          StairwayException, InterruptedException;
+      throws StairwayShutdownException,
+          DatabaseOperationException,
+          MigrateException,
+          StairwayException,
+          InterruptedException;
 
   /**
    * Third step of initialization
@@ -69,7 +71,9 @@ public interface Stairway {
    * @throws InterruptedException interruption during recovery/startup
    */
   void recoverAndStart(List<String> obsoleteStairways)
-      throws StairwayException, DatabaseOperationException, InterruptedException,
+      throws StairwayException,
+          DatabaseOperationException,
+          InterruptedException,
           StairwayExecutionException;
 
   /**
@@ -131,8 +135,11 @@ public interface Stairway {
    * @throws InterruptedException this thread was interrupted
    */
   void submit(String flightId, Class<? extends Flight> flightClass, FlightMap inputParameters)
-      throws StairwayException, DatabaseOperationException, StairwayExecutionException,
-          InterruptedException, DuplicateFlightIdException;
+      throws StairwayException,
+          DatabaseOperationException,
+          StairwayExecutionException,
+          InterruptedException,
+          DuplicateFlightIdException;
 
   /**
    * Submit a flight to queue for execution.
@@ -152,8 +159,11 @@ public interface Stairway {
    */
   void submitToQueue(
       String flightId, Class<? extends Flight> flightClass, FlightMap inputParameters)
-      throws StairwayException, DatabaseOperationException, StairwayExecutionException,
-          InterruptedException, DuplicateFlightIdException;
+      throws StairwayException,
+          DatabaseOperationException,
+          StairwayExecutionException,
+          InterruptedException,
+          DuplicateFlightIdException;
 
   /**
    * Submit a flight with debug information. This is intended for testing, and not for production.
@@ -180,8 +190,11 @@ public interface Stairway {
       FlightMap inputParameters,
       boolean shouldQueue,
       FlightDebugInfo debugInfo)
-      throws StairwayException, DatabaseOperationException, StairwayExecutionException,
-          InterruptedException, DuplicateFlightIdException;
+      throws StairwayException,
+          DatabaseOperationException,
+          StairwayExecutionException,
+          InterruptedException,
+          DuplicateFlightIdException;
 
   /**
    * Wait for a flight to complete
@@ -200,8 +213,11 @@ public interface Stairway {
    * @throws InterruptedException on shutdown while waiting for flight completion
    */
   FlightState waitForFlight(String flightId, Integer pollSeconds, Integer pollCycles)
-      throws StairwayException, DatabaseOperationException, FlightNotFoundException,
-          FlightWaitTimedOutException, InterruptedException;
+      throws StairwayException,
+          DatabaseOperationException,
+          FlightNotFoundException,
+          FlightWaitTimedOutException,
+          InterruptedException;
 
   /**
    * Try to resume a flight. If the flight is unowned and either in QUEUED, WAITING or READY state,
@@ -218,7 +234,9 @@ public interface Stairway {
    * @throws InterruptedException on shutdown during resume
    */
   boolean resume(String flightId)
-      throws StairwayException, StairwayShutdownException, DatabaseOperationException,
+      throws StairwayException,
+          StairwayShutdownException,
+          DatabaseOperationException,
           InterruptedException;
 
   /**
@@ -242,7 +260,9 @@ public interface Stairway {
    * @throws InterruptedException on shutdown
    */
   public FlightState getFlightState(String flightId)
-      throws StairwayException, FlightNotFoundException, DatabaseOperationException,
+      throws StairwayException,
+          FlightNotFoundException,
+          DatabaseOperationException,
           InterruptedException;
 
   /**
