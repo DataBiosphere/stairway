@@ -17,33 +17,33 @@ jobs:
   development-tag-publish:
     runs-on: ubuntu-latest
     steps:
-      - name: Set part of semantic version to bump
-        id: semver
-        run: |
-          SEMVER_PART=""
-          CHECKOUT_BRANCH="$GITHUB_REF"
-          if ${{github.event_name == 'push' }}; then
-            SEMVER_PART="patch"
-          elif ${{github.event_name == 'workflow_dispatch' }}; then
-            SEMVER_PART=${{ github.event.inputs.bump }}
-            CHECKOUT_BRANCH=${{ github.event.inputs.branch }}
-          fi
-          echo semver-part=$SEMVER_PART >> $GITHUB_OUTPUT
-          echo checkout-branch=$CHECKOUT_BRANCH >> $GITHUB_OUTPUT
+#      - name: Set part of semantic version to bump
+#        id: semver
+#        run: |
+#          SEMVER_PART=""
+#          CHECKOUT_BRANCH="$GITHUB_REF"
+#          if ${{github.event_name == 'push' }}; then
+#            SEMVER_PART="patch"
+#          elif ${{github.event_name == 'workflow_dispatch' }}; then
+#            SEMVER_PART=${{ github.event.inputs.bump }}
+#            CHECKOUT_BRANCH=${{ github.event.inputs.branch }}
+#          fi
+#          echo semver-part=$SEMVER_PART >> $GITHUB_OUTPUT
+#          echo checkout-branch=$CHECKOUT_BRANCH >> $GITHUB_OUTPUT
       - name: Checkout
         uses: actions/checkout@v3
         with:
           ref: ${{ steps.controls.outputs.checkout-branch }}
           token: ${{ secrets.BROADBOT_TOKEN }}
-      - name: "Bump the tag to a new version"
-        uses: databiosphere/github-actions/actions/bumper@bumper-0.1.0
-        env:
-          GITHUB_TOKEN: ${{ secrets.BROADBOT_TOKEN }}
-          DEFAULT_BUMP: patch
-          RELEASE_BRANCHES: master,develop
-          VERSION_FILE_PATH: settings.gradle
-          VERSION_LINE_MATCH: "^gradle.ext.version\\s*=\\s*\".*\""
-          VERSION_SUFFIX: SNAPSHOT
+#      - name: "Bump the tag to a new version"
+#        uses: databiosphere/github-actions/actions/bumper@bumper-0.1.0
+#        env:
+#          GITHUB_TOKEN: ${{ secrets.BROADBOT_TOKEN }}
+#          DEFAULT_BUMP: patch
+#          RELEASE_BRANCHES: master,develop
+#          VERSION_FILE_PATH: settings.gradle
+#          VERSION_LINE_MATCH: "^gradle.ext.version\\s*=\\s*\".*\""
+#          VERSION_SUFFIX: SNAPSHOT
       - name: "Set up JDK"
         uses: actions/setup-java@v4
         with:
