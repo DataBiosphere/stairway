@@ -4,7 +4,6 @@ plugins {
     id 'java'
     id 'java-library'
     id 'com.diffplug.spotless'
-    id 'com.srcclr.gradle'
 }
 
 repositories {
@@ -54,8 +53,4 @@ if (hasProperty("buildScan")) {
         termsOfServiceUrl = "https://gradle.com/terms-of-service"
         termsOfServiceAgree = "yes"
     }
-}
-
-srcclr {
-    scope = "runtimeClasspath"
 }

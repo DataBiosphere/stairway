@@ -4,6 +4,7 @@ plugins {
     id 'maven-publish'
     id 'com.jfrog.artifactory'
     id 'stairway.java-conventions'
+    id 'com.srcclr.gradle'
 }
 
 java {
@@ -27,4 +28,8 @@ publishing {
             from components.java
         }
     }
+}
+
+srcclr {
+    scope = "runtimeClasspath"
 }
