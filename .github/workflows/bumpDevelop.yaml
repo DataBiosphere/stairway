@@ -44,11 +44,14 @@ jobs:
           VERSION_FILE_PATH: settings.gradle
           VERSION_LINE_MATCH: "^gradle.ext.version\\s*=\\s*\".*\""
           VERSION_SUFFIX: SNAPSHOT
-      - name: "Publish to Artifactory"
-        uses: broadinstitute/gradle-command-action@v1
+      - name: "Set up JDK"
+        uses: actions/setup-java@v4
         with:
-          arguments: "artifactoryPublish"
+          java-version: '17'
+          distribution: 'temurin'
+      - name: "Publish to Artifactory"
         env:
           ARTIFACTORY_USERNAME: ${{ secrets.ARTIFACTORY_USERNAME }}
           ARTIFACTORY_PASSWORD: ${{ secrets.ARTIFACTORY_PASSWORD }}
           ARTIFACTORY_REPO_KEY: "libs-snapshot-local"
+        run: ./gradlew artifactoryPublish --scan
