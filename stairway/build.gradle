@@ -22,14 +22,13 @@ dependencies {
     // Spring
     implementation group: 'org.springframework', name: 'spring-web', version: '6.1.5'
 
+    // Annotations
+    implementation group: 'jakarta.annotation', name: 'jakarta.annotation-api', version: '2.1.1'
+
     // Database
     implementation group: 'org.liquibase', name: 'liquibase-core', version: '4.27.0'
-    implementation group: 'org.yaml', name: 'snakeyaml', version: '1.27'
 
     // Google dependencies
-    constraints {
-        implementation group: 'com.google.guava', name: 'guava', version: '33.1.0-jre' // "-jre" for Java 8 or higher
-    }
     implementation platform('com.google.cloud:libraries-bom:26.35.0') // use common bom
     implementation group: 'com.google.cloud', name: 'google-cloud-pubsub'
 
