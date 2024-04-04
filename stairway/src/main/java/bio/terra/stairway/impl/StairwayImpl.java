@@ -22,6 +22,7 @@ import bio.terra.stairway.exception.StairwayException;
 import bio.terra.stairway.exception.StairwayExecutionException;
 import bio.terra.stairway.exception.StairwayShutdownException;
 import bio.terra.stairway.queue.WorkQueueManager;
+import jakarta.annotation.Nullable;
 import java.time.Duration;
 import java.util.List;
 import java.util.UUID;
@@ -33,7 +34,6 @@ import java.util.concurrent.atomic.AtomicBoolean;
 import javax.sql.DataSource;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import org.springframework.lang.Nullable;
 
 /**
  * StairwayImpl holds the implementation of the Stairway library. This class is not intended for
@@ -499,6 +499,7 @@ public class StairwayImpl implements Stairway {
    * @throws InterruptedException on shutdown while waiting for flight completion
    * @deprecated
    */
+  @Deprecated
   public FlightState waitForFlight(String flightId, Integer pollSeconds, Integer pollCycles)
       throws StairwayException,
           DatabaseOperationException,

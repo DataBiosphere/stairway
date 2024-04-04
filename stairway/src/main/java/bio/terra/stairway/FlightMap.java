@@ -5,8 +5,7 @@ import static bio.terra.stairway.StairwayMapper.getObjectMapper;
 import bio.terra.stairway.exception.JsonConversionException;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.core.type.TypeReference;
-import org.springframework.lang.Nullable;
-
+import jakarta.annotation.Nullable;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.Map;

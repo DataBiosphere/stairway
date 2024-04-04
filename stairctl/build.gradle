@@ -2,28 +2,22 @@ plugins {
     id 'application'
     id 'stairway.java-conventions'
 
-    id 'io.spring.dependency-management' version '1.0.13.RELEASE'
-    id 'org.springframework.boot' version '2.7.3'
+    id 'io.spring.dependency-management' version '1.1.4'
+    id 'org.springframework.boot' version '3.2.4'
 }
 
 version = gradle.version
 mainClassName = 'bio.terra.stairctl.Application'
 
 dependencies {
+    // Unversioned dependencies may be derived from Spring dependency manager
     implementation project(":stairway")
 
-    implementation group: 'org.apache.commons', name: 'commons-dbcp2', version: '2.12.0'
-    implementation group: 'org.apache.commons', name: 'commons-pool2', version: '2.12.0'
-    implementation group: 'org.apache.commons', name: 'commons-lang3', version: '3.14.0'
-
-    // JSON processing
-    ext {
-        jackson = '2.16.2'
-    }
-    implementation group: 'com.fasterxml.jackson.core', name: 'jackson-core', version: "${jackson}"
-    implementation group: 'com.fasterxml.jackson.datatype', name: 'jackson-datatype-jsr310', version: "${jackson}"
+    implementation group: 'org.apache.commons', name: 'commons-dbcp2'
+    implementation group: 'org.apache.commons', name: 'commons-pool2'
+    implementation group: 'org.apache.commons', name: 'commons-lang3'
 
     // Spring
-    implementation group: 'org.springframework.boot', name: 'spring-boot-starter' // version from spring-boot-plugin
-    implementation group: 'org.springframework.shell', name: 'spring-shell-starter', version: '2.1.1'
+    implementation group: 'org.springframework.boot', name: 'spring-boot-starter'
+    implementation group: 'org.springframework.shell', name: 'spring-shell-starter', version: '3.2.3'
 }
