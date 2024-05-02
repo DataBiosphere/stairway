@@ -8,7 +8,7 @@ dependencies {
     implementation group: 'org.apache.commons', name: 'commons-lang3', version: '3.14.0'
 
     //Azure service bus dependencies
-    implementation 'com.azure:azure-messaging-servicebus:7.16.0-beta.1'
+    implementation 'com.azure:azure-messaging-servicebus:7.16.0'
     implementation 'com.azure:azure-identity:1.12.0'
     // Azure dependencies pull in out-of-date, vulnerable io.netty dependencies.
     // If they update them in a future release, this may be removed:
