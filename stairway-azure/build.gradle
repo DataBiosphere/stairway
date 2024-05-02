@@ -9,10 +9,10 @@ dependencies {
 
     //Azure service bus dependencies
     implementation 'com.azure:azure-messaging-servicebus:7.16.0-beta.1'
-    implementation 'com.azure:azure-identity:1.11.4'
+    implementation 'com.azure:azure-identity:1.12.0'
     // Azure dependencies pull in out-of-date, vulnerable io.netty dependencies.
     // If they update them in a future release, this may be removed:
-    implementation platform('io.netty:netty-bom:4.1.108.Final')
+    implementation platform('io.netty:netty-bom:4.1.109.Final')
 
     testImplementation 'org.mockito:mockito-junit-jupiter:5.11.0'
 }
