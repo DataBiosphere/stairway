@@ -3,7 +3,8 @@ plugins {
     id 'stairway.java-conventions'
 
     id 'io.spring.dependency-management' version '1.1.5'
-    id 'org.springframework.boot' version '3.3.0'
+    // Spring Boot and Spring Shell versions should stay in sync
+    id 'org.springframework.boot' version '3.2.5'
 }
 
 version = gradle.version
@@ -19,5 +20,6 @@ dependencies {
 
     // Spring
     implementation group: 'org.springframework.boot', name: 'spring-boot-starter'
+    // Spring Boot and Spring Shell versions should stay in sync
     implementation group: 'org.springframework.shell', name: 'spring-shell-starter', version: '3.2.5'
 }
