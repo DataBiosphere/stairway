@@ -4,6 +4,7 @@ import static org.hamcrest.MatcherAssert.assertThat;
 import static org.hamcrest.Matchers.equalTo;
 import static org.junit.jupiter.api.Assertions.fail;
 
+import bio.terra.stairway.DefaultThreadPoolTaskExecutor;
 import bio.terra.stairway.fixtures.TestFlightContext;
 import java.util.HashMap;
 import java.util.Map;
@@ -34,7 +35,8 @@ class StairwayThreadPoolTest {
   @BeforeEach
   void beforeEach() {
     MDC.clear();
-    stairwayThreadPool = new StairwayThreadPool(MAX_PARALLEL_FLIGHTS);
+    stairwayThreadPool =
+        new StairwayThreadPool(new DefaultThreadPoolTaskExecutor(MAX_PARALLEL_FLIGHTS));
     flightContext = new TestFlightContext().flightId(FLIGHT_ID).flightClassName(FLIGHT_CLASS);
   }
 

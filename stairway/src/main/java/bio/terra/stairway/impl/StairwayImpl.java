@@ -1,6 +1,7 @@
 package bio.terra.stairway.impl;
 
 import bio.terra.stairway.Control;
+import bio.terra.stairway.DefaultThreadPoolTaskExecutor;
 import bio.terra.stairway.ExceptionSerializer;
 import bio.terra.stairway.Flight;
 import bio.terra.stairway.FlightDebugInfo;
@@ -25,6 +26,7 @@ import bio.terra.stairway.queue.WorkQueueManager;
 import jakarta.annotation.Nullable;
 import java.time.Duration;
 import java.util.List;
+import java.util.Optional;
 import java.util.UUID;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.ScheduledThreadPoolExecutor;
@@ -34,6 +36,7 @@ import java.util.concurrent.atomic.AtomicBoolean;
 import javax.sql.DataSource;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.scheduling.concurrent.ThreadPoolTaskExecutor;
 
 /**
  * StairwayImpl holds the implementation of the Stairway library. This class is not intended for
@@ -41,7 +44,6 @@ import org.slf4j.LoggerFactory;
  */
 public class StairwayImpl implements Stairway {
   private static final Logger logger = LoggerFactory.getLogger(StairwayImpl.class);
-  private static final int DEFAULT_MAX_PARALLEL_FLIGHTS = 20;
   private static final int DEFAULT_MAX_QUEUED_FLIGHTS = 2;
   private static final int MIN_QUEUED_FLIGHTS = 0;
   private static final int SCHEDULED_POOL_CORE_THREADS = 5;
@@ -50,8 +52,8 @@ public class StairwayImpl implements Stairway {
   private final Object applicationContext;
   private final ExceptionSerializer exceptionSerializer;
   private final String stairwayName; // always identical to stairwayId
-  private final int maxParallelFlights;
   private final int maxQueuedFlights;
+  private final ThreadPoolTaskExecutor executor;
   private final WorkQueueManager queueManager;
   private final HookWrapper hookWrapper;
   private final Duration retentionCheckInterval;
@@ -83,11 +85,6 @@ public class StairwayImpl implements Stairway {
    * @throws StairwayExecutionException on invalid input
    */
   public StairwayImpl(StairwayBuilder builder) throws StairwayExecutionException {
-    this.maxParallelFlights =
-        (builder.getMaxParallelFlights() == null)
-            ? DEFAULT_MAX_PARALLEL_FLIGHTS
-            : builder.getMaxParallelFlights();
-
     this.maxQueuedFlights =
         (builder.getMaxQueuedFlights() == null)
             ? DEFAULT_MAX_QUEUED_FLIGHTS
@@ -104,6 +101,10 @@ public class StairwayImpl implements Stairway {
         (builder.getStairwayName() == null)
             ? "stairway" + UUID.randomUUID().toString()
             : builder.getStairwayName();
+
+    this.executor =
+        Optional.ofNullable(builder.getExecutor())
+            .orElse(new DefaultThreadPoolTaskExecutor(builder.getMaxParallelFlights()));
 
     this.queueManager = new WorkQueueManager(this, builder.getWorkQueue());
 
@@ -215,7 +216,7 @@ public class StairwayImpl implements Stairway {
   }
 
   private void configureThreadPools() {
-    threadPool = new StairwayThreadPool(maxParallelFlights);
+    threadPool = new StairwayThreadPool(executor);
 
     scheduledPool = new ScheduledThreadPoolExecutor(SCHEDULED_POOL_CORE_THREADS);
     // If we have retention settings then set up the regular flight cleaner
@@ -250,9 +251,11 @@ public class StairwayImpl implements Stairway {
 
     quietingDown.set(true);
     queueManager.shutdown(workQueueWaitSeconds);
-    threadPool.shutdown();
+
+    ThreadPoolExecutor threadPoolExecutor = executor.getThreadPoolExecutor();
+    threadPoolExecutor.shutdown();
     try {
-      return threadPool.awaitTermination(threadPoolWaitSeconds, unit);
+      return threadPoolExecutor.awaitTermination(threadPoolWaitSeconds, unit);
     } catch (InterruptedException ex) {
       return false;
     }
@@ -272,7 +275,8 @@ public class StairwayImpl implements Stairway {
       throws StairwayException, InterruptedException {
     quietingDown.set(true);
     queueManager.shutdownNow();
-    List<Runnable> neverStartedFlights = threadPool.shutdownNow();
+    ThreadPoolExecutor threadPoolExecutor = executor.getThreadPoolExecutor();
+    List<Runnable> neverStartedFlights = threadPoolExecutor.shutdownNow();
     for (Runnable flightRunnable : neverStartedFlights) {
       FlightRunner flightRunner = (FlightRunner) flightRunnable;
       FlightContextImpl flightContext = flightRunner.getFlightContext();
@@ -286,7 +290,7 @@ public class StairwayImpl implements Stairway {
         logger.warn("Unable to requeue never-started flight: " + flightDesc, ex);
       }
     }
-    return threadPool.awaitTermination(waitTimeout, unit);
+    return threadPoolExecutor.awaitTermination(waitTimeout, unit);
   }
 
   /**
@@ -404,15 +408,15 @@ public class StairwayImpl implements Stairway {
   public boolean spaceAvailable() {
     logger.debug(
         "Space available? active: "
-            + threadPool.getActiveFlights()
+            + executor.getActiveCount()
             + " of max: "
-            + maxParallelFlights
+            + executor.getMaxPoolSize()
             + " queueSize: "
-            + threadPool.getQueuedFlights()
+            + executor.getQueueSize()
             + " of max: "
             + maxQueuedFlights);
-    return ((threadPool.getActiveFlights() < maxParallelFlights)
-        || (threadPool.getQueuedFlights() < maxQueuedFlights));
+    return ((executor.getActiveCount() < executor.getMaxPoolSize())
+        || (executor.getQueueSize() < maxQueuedFlights));
   }
 
   /**
@@ -579,11 +583,6 @@ public class StairwayImpl implements Stairway {
     return flightDao;
   }
 
-  // Exposed for work queue listener
-  ThreadPoolExecutor getThreadPool() {
-    return threadPool;
-  }
-
   void exitFlight(FlightContextImpl context)
       throws StairwayException,
           DatabaseOperationException,
@@ -661,9 +660,9 @@ public class StairwayImpl implements Stairway {
     if (logger.isDebugEnabled()) {
       logger.debug(
           "Stairway thread pool: "
-              + threadPool.getActiveCount()
+              + executor.getActiveCount()
               + " active from pool of "
-              + threadPool.getPoolSize());
+              + executor.getPoolSize());
     }
     logger.info("Launching flight " + flightContext.flightDesc());
     threadPool.submitWithMdcAndFlightContext(runner, flightContext);

@@ -35,6 +35,36 @@ match the values in the sql file above:
 For folks working on Terra, the Stairway configuration is embedded within the component
 configuration, so these steps are included in component developer setup.
 
+## Local Publishing
+When working on this library, it is often helpful to be able to quickly test out changes
+in the context of a service repo (e.g. `terra-workspace-manager` or `terra-resource-buffer`)
+running a local server.
+
+Gradle makes this easy with a `mavenLocal` target for publishing and loading packages:
+
+1. Publish from Stairway to your machine's local Maven cache.
+
+   ```
+   ./gradlew publishToMavenLocal
+   ```
+
+   Your package will be in `~/.m2/repository`.
+2. From the service repo, add `mavenLocal()` to the _first_ repository location
+   build.gradle file (e.g. before `mavenCentral()`).
+
+   ```
+   # terra-workspace-manager/build.gradle
+   
+   repositories {
+     mavenLocal()
+     mavenCentral()
+     ...
+   }
+   ```
+
+That's it! Your service should pick up locally-published changes. If your changes involved bumping
+this library's version, be careful to update version numbers accordingly.
+
 ## SourceClear
 
 [SourceClear](https://srcclr.github.io) is a static analysis tool that scans a project's Java

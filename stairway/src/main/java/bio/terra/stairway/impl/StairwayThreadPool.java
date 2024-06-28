@@ -3,34 +3,15 @@ package bio.terra.stairway.impl;
 import bio.terra.stairway.FlightContext;
 import java.util.Map;
 import java.util.concurrent.Future;
-import java.util.concurrent.LinkedBlockingQueue;
-import java.util.concurrent.ThreadPoolExecutor;
-import java.util.concurrent.TimeUnit;
-import java.util.concurrent.atomic.AtomicInteger;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 import org.slf4j.MDC;
+import org.springframework.scheduling.concurrent.ThreadPoolTaskExecutor;
 
-class StairwayThreadPool extends ThreadPoolExecutor {
-  private static final Logger logger = LoggerFactory.getLogger(StairwayThreadPool.class);
-  AtomicInteger activeTasks;
+class StairwayThreadPool {
 
-  StairwayThreadPool(int maxParallelFlights) {
-    super(
-        maxParallelFlights,
-        maxParallelFlights,
-        0L,
-        TimeUnit.MILLISECONDS,
-        new LinkedBlockingQueue<>());
-    activeTasks = new AtomicInteger();
-  }
+  private final ThreadPoolTaskExecutor executor;
 
-  int getActiveFlights() {
-    return activeTasks.get();
-  }
-
-  int getQueuedFlights() {
-    return getQueue().size();
+  StairwayThreadPool(ThreadPoolTaskExecutor executor) {
+    this.executor = executor;
   }
 
   /**
@@ -55,7 +36,7 @@ class StairwayThreadPool extends ThreadPoolExecutor {
             MdcUtils.overwriteContext(initialContext);
           }
         };
-    return super.submit(flightRunnerWithMdc);
+    return executor.submit(flightRunnerWithMdc);
   }
 
   private void initializeFlightMdc(
@@ -66,17 +47,5 @@ class StairwayThreadPool extends ThreadPoolExecutor {
     // will be overwritten below:
     MdcUtils.addFlightContextToMdc(flightContext);
     MdcUtils.removeStepContextFromMdc(flightContext);
-  }
-
-  protected void beforeExecute(Thread t, Runnable r) {
-    int active = activeTasks.incrementAndGet();
-    logger.debug("before: " + active);
-    super.beforeExecute(t, r);
-  }
-
-  protected void afterExecute(Runnable r, Throwable t) {
-    super.afterExecute(r, t);
-    int active = activeTasks.decrementAndGet();
-    logger.debug("after: " + active);
   }
 }
