@@ -2,6 +2,7 @@ package bio.terra.stairway;
 
 import static org.hamcrest.MatcherAssert.assertThat;
 import static org.hamcrest.Matchers.equalTo;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import java.util.stream.Stream;
 import org.junit.jupiter.api.Tag;
@@ -29,5 +30,6 @@ class DefaultThreadPoolTaskExecutorTest {
     assertThat(executor.getMaxPoolSize(), equalTo(expectedPoolSize));
     assertThat(executor.getKeepAliveSeconds(), equalTo(0));
     assertThat(executor.getThreadNamePrefix(), equalTo("stairway-thread-"));
+    assertTrue(executor.isRunning());
   }
 }
