@@ -103,8 +103,9 @@ public class StairwayImpl implements Stairway {
             : builder.getStairwayName();
 
     this.executor =
-        Optional.ofNullable(builder.getExecutor())
-            .orElse(new DefaultThreadPoolTaskExecutor(builder.getMaxParallelFlights()));
+        (builder.getExecutor() == null)
+            ? new DefaultThreadPoolTaskExecutor(builder.getMaxParallelFlights())
+            : builder.getExecutor();
 
     this.queueManager = new WorkQueueManager(this, builder.getWorkQueue());
 
