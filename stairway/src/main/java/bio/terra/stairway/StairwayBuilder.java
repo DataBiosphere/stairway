@@ -5,6 +5,7 @@ import bio.terra.stairway.impl.StairwayImpl;
 import java.time.Duration;
 import java.util.ArrayList;
 import java.util.List;
+import org.springframework.scheduling.concurrent.ThreadPoolTaskExecutor;
 
 /**
  * This builder class is the way to constructing a Stairway instance. For example,
@@ -21,6 +22,7 @@ public class StairwayBuilder {
   private final List<StairwayHook> stairwayHooks = new ArrayList<>();
   private Integer maxParallelFlights;
   private Integer maxQueuedFlights;
+  private ThreadPoolTaskExecutor executor;
   private Object applicationContext;
   private ExceptionSerializer exceptionSerializer;
   private String stairwayName;
@@ -29,8 +31,8 @@ public class StairwayBuilder {
   private Duration completedFlightRetention;
 
   /**
-   * Determines the size of the thread pool used for running Stairway flights. Default is
-   * DEFAULT_MAX_PARALLEL_FLIGHTS (20 at this moment)
+   * Determines the size of the thread pool used for running Stairway flights. Default is {@value
+   * DefaultThreadPoolTaskExecutor#DEFAULT_MAX_PARALLEL_FLIGHTS}.
    *
    * @param maxParallelFlights maximum parallel flights to run
    * @return this
@@ -64,6 +66,24 @@ public class StairwayBuilder {
 
   public Integer getMaxQueuedFlights() {
     return maxQueuedFlights;
+  }
+
+  /**
+   * Allow a caller to provide their own {@link ThreadPoolTaskExecutor} to use as this Stairway's
+   * threadpool, e.g. as to supply an instrumented executor with custom metrics collection. Default
+   * is a new instance of {@link DefaultThreadPoolTaskExecutor}.
+   *
+   * @param executor to use as this Stairway's threadpool. If not supplied, one will be constructed
+   *     to honor maxParallelFlights.
+   * @return this
+   */
+  public StairwayBuilder executor(ThreadPoolTaskExecutor executor) {
+    this.executor = executor;
+    return this;
+  }
+
+  public ThreadPoolTaskExecutor getExecutor() {
+    return executor;
   }
 
   /**
