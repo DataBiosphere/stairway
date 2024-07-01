@@ -54,12 +54,15 @@ Gradle makes this easy with a `mavenLocal` target for publishing and loading pac
 
    ```
    # terra-workspace-manager/build.gradle
-   
+
+   // If true, search local repository (~/.m2/repository/) first for dependencies.
+   def useMavenLocal = true
    repositories {
-     mavenLocal()
-     mavenCentral()
-     ...
-   }
+      if (useMavenLocal) {
+          mavenLocal() // must be listed first to take effect
+      }
+      mavenCentral()
+      ...
    ```
 
 That's it! Your service should pick up locally-published changes. If your changes involved bumping
