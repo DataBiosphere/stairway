@@ -18,7 +18,7 @@ dependencies {
     implementation group: 'org.openapitools', name: 'jackson-databind-nullable', version: '0.2.6'
 
     // Spring
-    implementation group: 'org.springframework', name: 'spring-web', version: '6.1.8'
+    implementation group: 'org.springframework', name: 'spring-web', version: '6.1.10'
 
     // Annotations
     implementation group: 'jakarta.annotation', name: 'jakarta.annotation-api', version: '3.0.0'
@@ -27,7 +27,7 @@ dependencies {
     implementation group: 'org.liquibase', name: 'liquibase-core', version: '4.28.0'
 
     // Google dependencies
-    implementation platform('com.google.cloud:libraries-bom:26.40.0') // use common bom
+    implementation platform('com.google.cloud:libraries-bom:26.42.0') // use common bom
     implementation group: 'com.google.cloud', name: 'google-cloud-pubsub'
 
     // File handling during testing
