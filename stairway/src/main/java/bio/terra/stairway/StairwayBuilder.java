@@ -31,8 +31,8 @@ public class StairwayBuilder {
   private Duration completedFlightRetention;
 
   /**
-   * Determines the size of the thread pool used for running Stairway flights. Default is
-   * established in {@link DefaultThreadPoolTaskExecutor} (20 at this moment).
+   * Determines the size of the thread pool used for running Stairway flights. Default is {@value
+   * DefaultThreadPoolTaskExecutor#DEFAULT_MAX_PARALLEL_FLIGHTS}.
    *
    * @param maxParallelFlights maximum parallel flights to run
    * @return this
