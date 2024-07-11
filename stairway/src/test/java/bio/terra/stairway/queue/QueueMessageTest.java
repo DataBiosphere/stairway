@@ -25,7 +25,7 @@ import org.slf4j.MDC;
 
 @Tag("unit")
 @ExtendWith(MockitoExtension.class)
-public class QueueMessageTest {
+class QueueMessageTest {
 
   @Mock private StairwayImpl stairway;
   private static final String FLIGHT_ID = "flight-abc";
@@ -43,7 +43,7 @@ public class QueueMessageTest {
 
   @ParameterizedTest
   @MethodSource
-  public void message_serde(Map<String, String> expectedMdc) {
+  void message_serde(Map<String, String> expectedMdc) {
     MdcUtils.overwriteContext(expectedMdc);
     QueueMessageReady messageReady = new QueueMessageReady(FLIGHT_ID);
     WorkQueueProcessor workQueueProcessor = new WorkQueueProcessor(stairway);
@@ -68,7 +68,7 @@ public class QueueMessageTest {
 
   @ParameterizedTest
   @ValueSource(booleans = {true, false})
-  public void process(boolean resumeAnswer) throws InterruptedException {
+  void process(boolean resumeAnswer) throws InterruptedException {
     QueueMessageReady messageReady = new QueueMessageReady(FLIGHT_ID);
     messageReady.setCallingThreadContext(CALLING_THREAD_CONTEXT);
 
@@ -91,7 +91,7 @@ public class QueueMessageTest {
   }
 
   @Test
-  public void process_DatabaseOperationException() throws InterruptedException {
+  void process_DatabaseOperationException() throws InterruptedException {
     QueueMessageReady messageReady = new QueueMessageReady(FLIGHT_ID);
     messageReady.setCallingThreadContext(CALLING_THREAD_CONTEXT);
 
