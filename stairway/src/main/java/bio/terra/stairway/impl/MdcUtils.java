@@ -8,7 +8,7 @@ import org.slf4j.MDC;
  * Utility methods to make Stairway flight runnables context-aware, using mapped diagnostic context
  * (MDC).
  */
-class MdcUtils {
+public class MdcUtils {
 
   /** ID of the flight */
   static final String FLIGHT_ID_KEY = "flightId";
@@ -30,7 +30,7 @@ class MdcUtils {
    *
    * @param context to set as MDC, if null then MDC will be cleared.
    */
-  static void overwriteContext(Map<String, String> context) {
+  public static void overwriteContext(Map<String, String> context) {
     MDC.clear();
     if (context != null) {
       MDC.setContextMap(context);
