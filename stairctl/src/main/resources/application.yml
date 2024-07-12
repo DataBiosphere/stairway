@@ -7,3 +7,10 @@ stairctl:
   host: ${STAIRCTL_HOST:127.0.0.1}
   port: ${STAIRCTL_PORT:5432}
   dbname: ${STAIRCTL_DBNAME:stairwaylib}
+
+spring:
+  shell:
+    interactive:
+      enabled: true
+    script:
+      enabled: true

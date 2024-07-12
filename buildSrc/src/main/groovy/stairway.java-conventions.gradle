@@ -3,7 +3,6 @@ plugins {
     id 'idea'
     id 'jacoco'
     id 'java'
-    id 'java-library'
     id 'com.diffplug.spotless'
 }
 

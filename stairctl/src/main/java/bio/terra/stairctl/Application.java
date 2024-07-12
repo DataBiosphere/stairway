@@ -4,11 +4,9 @@ import org.jline.utils.AttributedString;
 import org.springframework.boot.SpringApplication;
 import org.springframework.boot.autoconfigure.SpringBootApplication;
 import org.springframework.context.annotation.Bean;
-import org.springframework.context.annotation.ComponentScan;
 import org.springframework.shell.jline.PromptProvider;
 
 @SpringBootApplication
-@ComponentScan(basePackages = {"bio.terra.stairctl"})
 public class Application {
 
   public static void main(String[] args) {
