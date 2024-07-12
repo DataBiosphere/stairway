@@ -22,5 +22,9 @@ sonar {
         property "sonar.projectKey", "DataBiosphere_stairway"
         property "sonar.organization", "broad-databiosphere"
         property "sonar.host.url", "https://sonarcloud.io"
+        property 'sonar.coverage.jacoco.xmlReportPaths',
+                "$rootDir/stairway/build/reports/jacoco/test/jacocoTestReport.xml," +
+                "$rootDir/stairway-gcp/build/reports/jacoco/test/jacocoTestReport.xml," +
+                "$rootDir/stairway-azure/build/reports/jacoco/test/jacocoTestReport.xml"
     }
 }
