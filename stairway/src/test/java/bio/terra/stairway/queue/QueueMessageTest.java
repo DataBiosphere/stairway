@@ -37,15 +37,19 @@ class QueueMessageTest {
     MDC.clear();
   }
 
+  private QueueMessageReady createQueueMessageWithContext(Map<String, String> expectedMdc)
+      throws InterruptedException {
+    return MdcUtils.callWithContext(expectedMdc, () -> new QueueMessageReady(FLIGHT_ID));
+  }
+
   private static Stream<Map<String, String>> message_serde() {
     return Stream.of(null, CALLING_THREAD_CONTEXT);
   }
 
   @ParameterizedTest
   @MethodSource
-  void message_serde(Map<String, String> expectedMdc) {
-    MdcUtils.overwriteContext(expectedMdc);
-    QueueMessageReady messageReady = new QueueMessageReady(FLIGHT_ID);
+  void message_serde(Map<String, String> expectedMdc) throws InterruptedException {
+    QueueMessageReady messageReady = createQueueMessageWithContext(expectedMdc);
     WorkQueueProcessor workQueueProcessor = new WorkQueueProcessor(stairway);
 
     // Now we add something else to the MDC, but it won't show up in our deserialized queue message.
@@ -69,8 +73,7 @@ class QueueMessageTest {
   @ParameterizedTest
   @ValueSource(booleans = {true, false})
   void process(boolean resumeAnswer) throws InterruptedException {
-    QueueMessageReady messageReady = new QueueMessageReady(FLIGHT_ID);
-    messageReady.setCallingThreadContext(CALLING_THREAD_CONTEXT);
+    QueueMessageReady messageReady = createQueueMessageWithContext(CALLING_THREAD_CONTEXT);
 
     when(stairway.resume(FLIGHT_ID))
         .thenAnswer(
@@ -92,8 +95,7 @@ class QueueMessageTest {
 
   @Test
   void process_DatabaseOperationException() throws InterruptedException {
-    QueueMessageReady messageReady = new QueueMessageReady(FLIGHT_ID);
-    messageReady.setCallingThreadContext(CALLING_THREAD_CONTEXT);
+    QueueMessageReady messageReady = createQueueMessageWithContext(CALLING_THREAD_CONTEXT);
 
     doThrow(DatabaseOperationException.class).when(stairway).resume(FLIGHT_ID);
 

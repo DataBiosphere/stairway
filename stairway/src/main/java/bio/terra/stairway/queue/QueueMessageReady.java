@@ -32,27 +32,26 @@ class QueueMessageReady extends QueueMessage {
 
   @Override
   public boolean process(StairwayImpl stairwayImpl) throws InterruptedException {
-    boolean processed = false;
-    // Save the initial thread context so that it can be restored
-    Map<String, String> initialContext = MDC.getCopyOfContextMap();
-    try {
-      MdcUtils.overwriteContext(callingThreadContext);
-      // Resumed is false if the flight is not found in the Ready state. We still call that
-      // a complete processing of the message and return true. We assume that some this is a
-      // duplicate message or that some other Stairway found the ready flight on recovery.
-      boolean resumed = stairwayImpl.resume(flightId);
-      logger.info(
-          "Stairway "
-              + stairwayImpl.getStairwayName()
-              + (resumed ? " resumed flight: " : " did not find flight to resume: ")
-              + flightId);
-      processed = true;
-    } catch (DatabaseOperationException ex) {
-      logger.error("Unexpected stairway error, leaving %s on the queue".formatted(flightId), ex);
-    } finally {
-      MdcUtils.overwriteContext(initialContext);
-    }
-    return processed;
+    return MdcUtils.callWithContext(
+        callingThreadContext,
+        () -> {
+          try {
+            // Resumed is false if the flight is not found in the Ready state. We still call that
+            // a complete processing of the message and return true. We assume that some this is a
+            // duplicate message or that some other Stairway found the ready flight on recovery.
+            boolean resumed = stairwayImpl.resume(flightId);
+            logger.info(
+                "Stairway "
+                    + stairwayImpl.getStairwayName()
+                    + (resumed ? " resumed flight: " : " did not find flight to resume: ")
+                    + flightId);
+            return true;
+          } catch (DatabaseOperationException ex) {
+            logger.error(
+                "Unexpected stairway error, leaving %s on the queue".formatted(flightId), ex);
+            return false;
+          }
+        });
   }
 
   public QueueMessageType getType() {
@@ -73,9 +72,5 @@ class QueueMessageReady extends QueueMessage {
 
   public Map<String, String> getCallingThreadContext() {
     return callingThreadContext;
-  }
-
-  public void setCallingThreadContext(Map<String, String> callingThreadContext) {
-    this.callingThreadContext = callingThreadContext;
   }
 }
