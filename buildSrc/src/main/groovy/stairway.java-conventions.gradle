@@ -1,6 +1,7 @@
 // Java conventions common for all of the code
 plugins {
     id 'idea'
+    id 'jacoco'
     id 'java'
     id 'java-library'
     id 'com.diffplug.spotless'
@@ -52,5 +53,12 @@ if (hasProperty("buildScan")) {
     buildScan {
         termsOfServiceUrl = "https://gradle.com/terms-of-service"
         termsOfServiceAgree = "yes"
+    }
+}
+
+jacocoTestReport {
+    reports {
+        // sonar requires XML coverage output to upload coverage data
+        xml.required = true
     }
 }
