@@ -39,7 +39,6 @@ public class MdcUtils {
     Map<String, String> initialContext = MDC.getCopyOfContextMap();
     try {
       MdcUtils.overwriteContext(context);
-      System.out.println(MDC.getCopyOfContextMap());
       return callable.call();
     } catch (InterruptedException ex) {
       throw ex;
