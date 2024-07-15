@@ -1,15 +1,16 @@
 package bio.terra.stairway.impl;
 
 import bio.terra.stairway.FlightContext;
+import bio.terra.stairway.exception.StairwayExecutionException;
 import java.util.Map;
+import java.util.concurrent.Callable;
 import org.slf4j.MDC;
 
 /**
  * Utility methods to make Stairway flight runnables context-aware, using mapped diagnostic context
  * (MDC).
  */
-class MdcUtils {
-
+public class MdcUtils {
   /** ID of the flight */
   static final String FLIGHT_ID_KEY = "flightId";
 
@@ -24,6 +25,29 @@ class MdcUtils {
 
   /** The step's execution order */
   static final String FLIGHT_STEP_NUMBER_KEY = "flightStepNumber";
+
+  /**
+   * Run and return the result of the callable with MDC's context map temporarily overwritten during
+   * computation. The initial context map is then restored after computation.
+   *
+   * @param context to override MDC's context map
+   * @param callable to call and return
+   */
+  public static <T> T callWithContext(Map<String, String> context, Callable<T> callable)
+      throws InterruptedException {
+    // Save the initial thread context so that it can be restored
+    Map<String, String> initialContext = MDC.getCopyOfContextMap();
+    try {
+      MdcUtils.overwriteContext(context);
+      return callable.call();
+    } catch (InterruptedException ex) {
+      throw ex;
+    } catch (Exception ex) {
+      throw new StairwayExecutionException("Unexpected exception " + ex.getMessage(), ex);
+    } finally {
+      MdcUtils.overwriteContext(initialContext);
+    }
+  }
 
   /**
    * Null-safe utility method for overwriting the current thread's MDC.
