@@ -56,11 +56,6 @@ public class StairwayConfiguration {
   }
 
   public ConnectParams makeConnectParams() {
-    return new ConnectParams()
-        .username(username)
-        .password(password)
-        .dbname(dbname)
-        .host(host)
-        .port(port);
+    return new ConnectParams(username, password, host, port, dbname);
   }
 }

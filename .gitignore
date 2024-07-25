@@ -44,3 +44,6 @@ pom.xml
 
 ### Jenv directory-local version setting
 .java-version
+
+### Spring Shell
+spring-shell.log
