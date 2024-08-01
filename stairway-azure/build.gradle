@@ -5,14 +5,14 @@ plugins {
 dependencies {
     api project(':stairway')
 
-    implementation group: 'org.apache.commons', name: 'commons-lang3', version: '3.14.0'
+    implementation group: 'org.apache.commons', name: 'commons-lang3', version: '3.15.0'
 
     //Azure service bus dependencies
-    implementation 'com.azure:azure-messaging-servicebus:7.17.1'
-    implementation 'com.azure:azure-identity:1.13.0'
+    implementation 'com.azure:azure-messaging-servicebus:7.17.2'
+    implementation 'com.azure:azure-identity:1.13.1'
     // Azure dependencies pull in out-of-date, vulnerable io.netty dependencies.
     // If they update them in a future release, this may be removed:
-    implementation platform('io.netty:netty-bom:4.1.111.Final')
+    implementation platform('io.netty:netty-bom:4.1.112.Final')
 
     testImplementation 'org.mockito:mockito-junit-jupiter:5.12.0'
 }
