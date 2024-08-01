@@ -12,16 +12,12 @@ import java.util.OptionalInt;
 import org.apache.commons.lang3.ClassUtils;
 import org.apache.commons.lang3.StringUtils;
 import org.jline.terminal.Terminal;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Component;
 
 @Component
 public class Output {
 
   private final Terminal terminal;
-
-  private static final Logger logger = LoggerFactory.getLogger(Output.class);
 
   private static final int CLASS_DISPLAY_LENGTH = 36;
   private static final String FLIGHT_LIST_FORMAT =
@@ -243,7 +239,6 @@ public class Output {
 
   public void error(String userMessage, Exception ex) {
     println(userMessage + ": " + ex.getMessage());
-    logger.error("{}: ", userMessage, ex);
   }
 
   private static String shortenClassName(String in) {

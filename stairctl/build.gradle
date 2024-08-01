@@ -21,9 +21,5 @@ dependencies {
     // Spring
     implementation group: 'org.springframework.boot', name: 'spring-boot'
     // Spring Boot and Spring Shell versions should stay in sync
-    implementation('org.springframework.shell:spring-shell-starter:3.3.1') {
-        exclude module: 'spring-boot-starter-logging'
-    }
-
-    implementation 'org.slf4j:slf4j-simple:1.7.36'
+    implementation group: 'org.springframework.shell', name: 'spring-shell-starter', version: '3.3.1'
 }

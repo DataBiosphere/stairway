@@ -14,3 +14,8 @@ spring:
       enabled: true
     script:
       enabled: true
+
+# Disable logging
+logging:
+  pattern:
+    console:
