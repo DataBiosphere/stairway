@@ -17,8 +17,7 @@ In the short-term, you can:
 - run StairCtl: `java -jar stairctl/build/libs/stairctl-VERSION.jar`
 
 ## Command Summary
-StairCtl will be getting new capabilities frequently, so this document may not be an up-to-date
-reference of the available commands. You can use the `help` command to get a list of the
+You can use the `help` command to get a list of the
 commands and use `help "<command>"` to get more detailed help.
 
 ```
@@ -49,6 +48,11 @@ Stairway Commands
         list stairways: List stairway instances
 ```
 
+### Using Spring Shell
+StairCtl is built using [Spring Shell](https://docs.spring.io/spring-shell/reference/index.html), 
+so it can be used as an interactive shell or to run a single command.
+As an interactive shell, it supports history operations and tab completion.
+
 ## Connecting to a Stairway
 The most complex part of using StairCtl is connecting to a Stairway; that is, providing the
 information for connecting to a Stairway database.
@@ -60,15 +64,16 @@ connect [--username string]  [--password string]  [--dbname string]  [--host str
 ```
 
 This table shows the precedence and defaults for each part of the input. Switches override
-environment variables, which override the default. 
+environment variables, which override the default. If you've run the stairway tests locally,
+the default settings will connect to the local stairway database used by these tests.
 
-| **Option** | **Environment Variable** | **Default** |
-|:---|:---|:---|
-| `-u, -U, --username`| STAIRCTL_USERNAME | stairwayuser |
-| `-w, --password` | STAIRCTL_PASSWORD | starwaypw |
-| `-h, --host` | STAIRCTL_HOST | 127.0.0.1 |
-| `-p, --port` | STAIRCTL_PORT | 5432 |
-| `-d, --dbname` | STAIRCTL_DBNAME | stairwaylib |
+| **Option**           | **Environment Variable** | **Default** |
+|:---------------------|:---|:---|
+| `-u, -U, --username` | STAIRCTL_USERNAME | stairwayuser |
+| `-w, --password`     | STAIRCTL_PASSWORD | starwaypw |
+| `-H, --host`         | STAIRCTL_HOST | 127.0.0.1 |
+| `-p, --port`         | STAIRCTL_PORT | 5432 |
+| `-d, --dbname`       | STAIRCTL_DBNAME | stairwaylib |
 
 ### `disconnect` command
 You can disconnect from a Stairway with the `disconnect` command. It takes no options.
@@ -276,7 +281,7 @@ This section provides a few capabilities of StairCtl.
 ### Unrecoverable Flight
 We have had cases where a service is unable to start, because a Stairway
 flight is not recoverable. The Stairway `recoverAndStart` call fails and
-the service is unable start.
+the service is unable to start.
 
 This problem can be addressed by locating the stuck flight, perhaps using the `list flights` and
 `get flight` commands. Then forcing the flight into the "dismal failure" state, so that it will

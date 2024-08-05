@@ -1,0 +1,35 @@
+<!--
+LogBack Configuration File
+This file controls how, where, and what gets logged.
+-->
+
+<!-- Frequency of checking this file for changes and altering the logging. -->
+<configuration scan="true" scanPeriod="30 seconds">
+    <!-- Where the logs will go -->
+    <property name="LOG_PATH" value="logs" />
+
+    <!-- Appender that sends to the console -->
+    <appender name="Console-Appender" class="ch.qos.logback.core.ConsoleAppender">
+        <encoder>
+            <pattern>%date %-5level [%thread] %logger{36}: %message%n</pattern>
+        </encoder>
+    </appender>
+
+    <!-- Appender that sends to a file -->
+    <appender name="File-Appender" class="ch.qos.logback.core.FileAppender">
+        <file>${LOG_PATH}/stairway.log</file>
+        <encoder>
+            <pattern>%date %-5level [%thread]: %message%n</pattern>
+            <outputPatternAsHeader>true</outputPatternAsHeader>
+        </encoder>
+    </appender>
+
+    <logger name="bio.terra.stairway" level="DEBUG" />
+    <logger name="liquibase" level="WARN" />
+
+    <!-- root sets the default logging level and appenders -->
+    <root level="INFO">
+        <appender-ref ref="Console-Appender" />
+        <appender-ref ref="File-Appender" />
+    </root>
+</configuration>

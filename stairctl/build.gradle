@@ -19,7 +19,7 @@ dependencies {
     implementation group: 'org.apache.commons', name: 'commons-lang3'
 
     // Spring
-    implementation group: 'org.springframework.boot', name: 'spring-boot-starter'
+    implementation group: 'org.springframework.boot', name: 'spring-boot'
     // Spring Boot and Spring Shell versions should stay in sync
     implementation group: 'org.springframework.shell', name: 'spring-shell-starter', version: '3.3.1'
 }

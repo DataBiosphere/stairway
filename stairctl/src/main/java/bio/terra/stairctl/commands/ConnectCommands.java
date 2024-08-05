@@ -10,10 +10,12 @@ import org.springframework.shell.standard.ShellOption;
 @ShellComponent
 public class ConnectCommands {
   private final StairwayService stairwayService;
+  private final Output output;
 
   @Autowired
-  public ConnectCommands(StairwayService stairwayService) {
+  public ConnectCommands(StairwayService stairwayService, Output output) {
     this.stairwayService = stairwayService;
+    this.output = output;
   }
 
   @ShellMethod(value = "Connect to a Stairway database", key = "connect")
@@ -31,47 +33,41 @@ public class ConnectCommands {
               defaultValue = ShellOption.NULL)
           String dbname,
       @ShellOption(
-              value = {"-h", "--host"},
+              value = {"-H", "--host"},
               defaultValue = ShellOption.NULL)
           String host,
       @ShellOption(
               value = {"-p", "--port"},
               defaultValue = ShellOption.NULL)
-          String port)
-      throws Exception {
+          String port) {
 
-    ConnectParams connectParams =
-        new ConnectParams()
-            .username(username)
-            .password(password)
-            .dbname(dbname)
-            .host(host)
-            .port(port);
+    ConnectParams connectParams = new ConnectParams(username, password, host, port, dbname);
 
     disconnectIfConnected();
     stairwayService.connectStairway(connectParams);
-    System.out.println("Connected to Stairway on database " + connectParams.getDbname());
+    output.println(
+        "Connected to Stairway on database " + stairwayService.getCurrentConnectParams().dbname());
   }
 
   @ShellMethod(value = "Disconnect from a Stairway database", key = "disconnect")
-  public void disconnect() throws Exception {
+  public void disconnect() {
     disconnectIfConnected();
   }
 
   @ShellMethod(value = "Show the current connection", key = "show connection")
-  public void showConnection() throws Exception {
+  public void showConnection() {
     if (!stairwayService.isConnected()) {
-      System.out.println("Not connected to a Stairway");
+      output.println("Not connected to a Stairway");
     } else {
-      Output.showConnection(stairwayService.getCurrentConnectParams());
+      output.showConnection(stairwayService.getCurrentConnectParams());
     }
   }
 
   private void disconnectIfConnected() {
     if (stairwayService.isConnected()) {
-      System.out.println(
+      output.println(
           "Disconnecting from Stairway on database "
-              + stairwayService.getCurrentConnectParams().getDbname());
+              + stairwayService.getCurrentConnectParams().dbname());
       stairwayService.disconnectStairway();
     }
   }

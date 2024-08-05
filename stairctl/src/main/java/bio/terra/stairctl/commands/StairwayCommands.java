@@ -11,10 +11,12 @@ import org.springframework.shell.standard.ShellMethodAvailability;
 @ShellComponent
 public class StairwayCommands {
   private final StairwayService stairwayService;
+  private final Output output;
 
   @Autowired
-  public StairwayCommands(StairwayService stairwayService) {
+  public StairwayCommands(StairwayService stairwayService, Output output) {
     this.stairwayService = stairwayService;
+    this.output = output;
   }
 
   // None of the stairway command work if we are not connected, so list all commands here
@@ -27,13 +29,12 @@ public class StairwayCommands {
   }
 
   @ShellMethod(value = "List stairway instances", key = "list stairways")
-  public void listStairways() throws Exception {
+  public void listStairways() {
     try {
       List<String> stairwayList = stairwayService.getControl().listStairways();
-      Output.stairwayList(stairwayList);
+      output.stairwayList(stairwayList);
     } catch (Exception ex) {
-      System.err.println("List flights failed: " + ex.getMessage());
-      ex.printStackTrace();
+      output.error("List stairways failed: ", ex);
     }
   }
 }

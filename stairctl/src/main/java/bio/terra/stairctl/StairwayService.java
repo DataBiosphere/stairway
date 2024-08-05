@@ -1,5 +1,6 @@
 package bio.terra.stairctl;
 
+import bio.terra.stairctl.commands.Output;
 import bio.terra.stairctl.configuration.StairwayConfiguration;
 import bio.terra.stairway.Control;
 import bio.terra.stairway.Stairway;
@@ -13,28 +14,26 @@ import org.apache.commons.dbcp2.PoolableConnectionFactory;
 import org.apache.commons.dbcp2.PoolingDataSource;
 import org.apache.commons.pool2.ObjectPool;
 import org.apache.commons.pool2.impl.GenericObjectPool;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Component;
 
 @Component
 public class StairwayService {
-  private static final Logger logger = LoggerFactory.getLogger(StairwayService.class);
-
   private final StairwayConfiguration stairwayConfiguration;
+  private final Output output;
   private Stairway stairway;
   private Control control;
   private ConnectParams currentConnectParams;
 
   @Autowired
-  public StairwayService(StairwayConfiguration stairwayConfiguration) {
+  public StairwayService(StairwayConfiguration stairwayConfiguration, Output output) {
     this.stairwayConfiguration = stairwayConfiguration;
+    this.output = output;
   }
 
   public void connectStairway(ConnectParams connectParams) {
     // Fill in the defaults from the configuration
-    connectParams.applyDefaults(stairwayConfiguration.makeConnectParams());
+    connectParams = connectParams.withDefaults(stairwayConfiguration.makeConnectParams());
     DataSource dataSource = configureDataSource(connectParams);
 
     try {
@@ -53,10 +52,10 @@ public class StairwayService {
 
       control = stairway.getControl();
       currentConnectParams = connectParams;
-      System.out.println("Connected to Stairway");
+      output.println("Connected to Stairway");
     } catch (Exception ex) {
-      System.err.println("Failed to connect to Stairway or database: " + ex.getMessage());
-      logger.error("Failed to connect to Stairway", ex);
+      output.error(
+          "Failed to connect to Stairway or database using connection: " + connectParams, ex);
     }
   }
 
@@ -84,8 +83,8 @@ public class StairwayService {
 
   private DataSource configureDataSource(ConnectParams connectParams) {
     Properties props = new Properties();
-    props.setProperty("user", connectParams.getUsername());
-    props.setProperty("password", connectParams.getPassword());
+    props.setProperty("user", connectParams.username());
+    props.setProperty("password", connectParams.password());
     ConnectionFactory connectionFactory =
         new DriverManagerConnectionFactory(connectParams.makeUri(), props);
     PoolableConnectionFactory poolableConnectionFactory =
