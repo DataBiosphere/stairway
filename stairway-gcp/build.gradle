@@ -5,10 +5,10 @@ plugins {
 dependencies {
     api project(':stairway')
 
-    implementation group: 'org.apache.commons', name: 'commons-lang3', version: '3.14.0'
+    implementation group: 'org.apache.commons', name: 'commons-lang3', version: '3.15.0'
 
     // Google dependencies
-    implementation platform('com.google.cloud:libraries-bom:26.42.0') // use common bom
+    implementation platform('com.google.cloud:libraries-bom:26.43.0') // use common bom
     implementation group: 'com.google.cloud', name: 'google-cloud-pubsub'
 }
 
