@@ -8,13 +8,13 @@ dependencies {
     implementation group: 'org.apache.commons', name: 'commons-lang3', version: '3.17.0'
 
     //Azure service bus dependencies
-    implementation 'com.azure:azure-messaging-servicebus:7.17.3'
-    implementation 'com.azure:azure-identity:1.13.2'
+    implementation 'com.azure:azure-messaging-servicebus:7.17.4'
+    implementation 'com.azure:azure-identity:1.13.3'
     // Azure dependencies pull in out-of-date, vulnerable io.netty dependencies.
     // If they update them in a future release, this may be removed:
-    implementation platform('io.netty:netty-bom:4.1.112.Final')
+    implementation platform('io.netty:netty-bom:4.1.113.Final')
 
-    testImplementation 'org.mockito:mockito-junit-jupiter:5.13.0'
+    testImplementation 'org.mockito:mockito-junit-jupiter:5.14.1'
 }
 
 apply from: "$rootDir/gradle/test.gradle"
