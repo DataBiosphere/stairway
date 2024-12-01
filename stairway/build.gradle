@@ -9,7 +9,7 @@ dependencies {
     implementation group: 'org.apache.commons', name: 'commons-collections4', version: '4.4'
 
     // JSON processing
-    implementation platform('com.fasterxml.jackson:jackson-bom:2.18.1')
+    implementation platform('com.fasterxml.jackson:jackson-bom:2.18.2')
     implementation group: 'com.fasterxml.jackson.core', name: 'jackson-databind'
     implementation group: 'com.fasterxml.jackson.datatype', name: 'jackson-datatype-guava'
     implementation group: 'com.fasterxml.jackson.datatype', name: 'jackson-datatype-jdk8'
@@ -18,21 +18,21 @@ dependencies {
     implementation group: 'org.openapitools', name: 'jackson-databind-nullable', version: '0.2.6'
 
     // Spring
-    implementation group: 'org.springframework', name: 'spring-context', version: '6.1.14'
-    implementation group: 'org.springframework', name: 'spring-web', version: '6.1.14'
+    implementation group: 'org.springframework', name: 'spring-context', version: '6.2.0'
+    implementation group: 'org.springframework', name: 'spring-web', version: '6.2.0'
 
     // Annotations
     implementation group: 'jakarta.annotation', name: 'jakarta.annotation-api', version: '3.0.0'
 
     // Database
-    implementation group: 'org.liquibase', name: 'liquibase-core', version: '4.29.2'
+    implementation group: 'org.liquibase', name: 'liquibase-core', version: '4.30.0'
 
     // Google dependencies
     implementation platform('com.google.cloud:libraries-bom:26.50.0') // use common bom
     implementation group: 'com.google.cloud', name: 'google-cloud-pubsub'
 
     // File handling during testing
-    testImplementation group: 'commons-io', name: 'commons-io', version: '2.17.0'
+    testImplementation group: 'commons-io', name: 'commons-io', version: '2.18.0'
 
     // Mocks during testing
     testImplementation group: 'org.mockito', name: 'mockito-junit-jupiter', version: '5.14.2'
