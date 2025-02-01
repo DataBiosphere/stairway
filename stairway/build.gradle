@@ -4,7 +4,7 @@ plugins {
 
 dependencies {
     implementation group: 'org.apache.commons', name: 'commons-dbcp2', version: '2.13.0'
-    implementation group: 'org.apache.commons', name: 'commons-pool2', version: '2.12.0'
+    implementation group: 'org.apache.commons', name: 'commons-pool2', version: '2.12.1'
     implementation group: 'org.apache.commons', name: 'commons-lang3', version: '3.17.0'
     implementation group: 'org.apache.commons', name: 'commons-collections4', version: '4.4'
 
@@ -18,24 +18,24 @@ dependencies {
     implementation group: 'org.openapitools', name: 'jackson-databind-nullable', version: '0.2.6'
 
     // Spring
-    implementation group: 'org.springframework', name: 'spring-context', version: '6.2.1'
-    implementation group: 'org.springframework', name: 'spring-web', version: '6.2.1'
+    implementation group: 'org.springframework', name: 'spring-context', version: '6.2.2'
+    implementation group: 'org.springframework', name: 'spring-web', version: '6.2.2'
 
     // Annotations
     implementation group: 'jakarta.annotation', name: 'jakarta.annotation-api', version: '3.0.0'
 
     // Database
-    implementation group: 'org.liquibase', name: 'liquibase-core', version: '4.30.0'
+    implementation group: 'org.liquibase', name: 'liquibase-core', version: '4.31.0'
 
     // Google dependencies
-    implementation platform('com.google.cloud:libraries-bom:26.52.0') // use common bom
+    implementation platform('com.google.cloud:libraries-bom:26.53.0') // use common bom
     implementation group: 'com.google.cloud', name: 'google-cloud-pubsub'
 
     // File handling during testing
     testImplementation group: 'commons-io', name: 'commons-io', version: '2.18.0'
 
     // Mocks during testing
-    testImplementation group: 'org.mockito', name: 'mockito-junit-jupiter', version: '5.14.2'
+    testImplementation group: 'org.mockito', name: 'mockito-junit-jupiter', version: '5.15.2'
 }
 
 apply from: "$rootDir/gradle/test.gradle"
