@@ -9,7 +9,7 @@ dependencies {
     implementation group: 'org.apache.commons', name: 'commons-collections4', version: '4.4'
 
     // JSON processing
-    implementation platform('com.fasterxml.jackson:jackson-bom:2.18.2')
+    implementation platform('com.fasterxml.jackson:jackson-bom:2.18.3')
     implementation group: 'com.fasterxml.jackson.core', name: 'jackson-databind'
     implementation group: 'com.fasterxml.jackson.datatype', name: 'jackson-datatype-guava'
     implementation group: 'com.fasterxml.jackson.datatype', name: 'jackson-datatype-jdk8'
@@ -18,17 +18,17 @@ dependencies {
     implementation group: 'org.openapitools', name: 'jackson-databind-nullable', version: '0.2.6'
 
     // Spring
-    implementation group: 'org.springframework', name: 'spring-context', version: '6.2.2'
-    implementation group: 'org.springframework', name: 'spring-web', version: '6.2.2'
+    implementation group: 'org.springframework', name: 'spring-context', version: '6.2.3'
+    implementation group: 'org.springframework', name: 'spring-web', version: '6.2.3'
 
     // Annotations
     implementation group: 'jakarta.annotation', name: 'jakarta.annotation-api', version: '3.0.0'
 
     // Database
-    implementation group: 'org.liquibase', name: 'liquibase-core', version: '4.31.0'
+    implementation group: 'org.liquibase', name: 'liquibase-core', version: '4.31.1'
 
     // Google dependencies
-    implementation platform('com.google.cloud:libraries-bom:26.53.0') // use common bom
+    implementation platform('com.google.cloud:libraries-bom:26.55.0') // use common bom
     implementation group: 'com.google.cloud', name: 'google-cloud-pubsub'
 
     // File handling during testing
