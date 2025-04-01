@@ -18,8 +18,8 @@ dependencies {
     implementation group: 'org.openapitools', name: 'jackson-databind-nullable', version: '0.2.6'
 
     // Spring
-    implementation group: 'org.springframework', name: 'spring-context', version: '6.2.3'
-    implementation group: 'org.springframework', name: 'spring-web', version: '6.2.3'
+    implementation group: 'org.springframework', name: 'spring-context', version: '6.2.5'
+    implementation group: 'org.springframework', name: 'spring-web', version: '6.2.5'
 
     // Annotations
     implementation group: 'jakarta.annotation', name: 'jakarta.annotation-api', version: '3.0.0'
@@ -28,14 +28,14 @@ dependencies {
     implementation group: 'org.liquibase', name: 'liquibase-core', version: '4.31.1'
 
     // Google dependencies
-    implementation platform('com.google.cloud:libraries-bom:26.55.0') // use common bom
+    implementation platform('com.google.cloud:libraries-bom:26.59.0') // use common bom
     implementation group: 'com.google.cloud', name: 'google-cloud-pubsub'
 
     // File handling during testing
     testImplementation group: 'commons-io', name: 'commons-io', version: '2.18.0'
 
     // Mocks during testing
-    testImplementation group: 'org.mockito', name: 'mockito-junit-jupiter', version: '5.15.2'
+    testImplementation group: 'org.mockito', name: 'mockito-junit-jupiter', version: '5.16.1'
 }
 
 apply from: "$rootDir/gradle/test.gradle"
