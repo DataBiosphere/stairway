@@ -8,11 +8,11 @@ dependencies {
     implementation group: 'org.apache.commons', name: 'commons-lang3', version: '3.17.0'
 
     //Azure service bus dependencies
-    implementation 'com.azure:azure-messaging-servicebus:7.17.11'
-    implementation 'com.azure:azure-identity:1.16.1'
+    implementation 'com.azure:azure-messaging-servicebus:7.17.12'
+    implementation 'com.azure:azure-identity:1.16.2'
     // Azure dependencies pull in out-of-date, vulnerable io.netty dependencies.
     // If they update them in a future release, this may be removed:
-    implementation platform('io.netty:netty-bom:4.2.1.Final')
+    implementation platform('io.netty:netty-bom:4.2.2.Final')
 
     testImplementation 'org.mockito:mockito-junit-jupiter:5.18.0'
 }
