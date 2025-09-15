@@ -9,7 +9,7 @@ dependencies {
     implementation group: 'org.apache.commons', name: 'commons-collections4', version: '4.5.0'
 
     // JSON processing
-    implementation platform('com.fasterxml.jackson:jackson-bom:2.19.2')
+    implementation platform('com.fasterxml.jackson:jackson-bom:2.20.0')
     implementation group: 'com.fasterxml.jackson.core', name: 'jackson-databind'
     implementation group: 'com.fasterxml.jackson.datatype', name: 'jackson-datatype-guava'
     implementation group: 'com.fasterxml.jackson.datatype', name: 'jackson-datatype-jdk8'
@@ -28,14 +28,14 @@ dependencies {
     implementation group: 'org.liquibase', name: 'liquibase-core', version: '4.33.0'
 
     // Google dependencies
-    implementation platform('com.google.cloud:libraries-bom:26.65.0') // use common bom
+    implementation platform('com.google.cloud:libraries-bom:26.68.0') // use common bom
     implementation group: 'com.google.cloud', name: 'google-cloud-pubsub'
 
     // File handling during testing
     testImplementation group: 'commons-io', name: 'commons-io', version: '2.20.0'
 
     // Mocks during testing
-    testImplementation group: 'org.mockito', name: 'mockito-junit-jupiter', version: '5.18.0'
+    testImplementation group: 'org.mockito', name: 'mockito-junit-jupiter', version: '5.19.0'
 }
 
 apply from: "$rootDir/gradle/test.gradle"
