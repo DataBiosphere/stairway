@@ -6,9 +6,8 @@ apply plugin: 'java'
 
 publishing {
     publications {
-        wdsClient(MavenPublication) {
+        stairwayLibrary(MavenPublication) {
             from components.java
-            artifactId = "workspacedataservice-client-okhttp-jakarta"
         }
     }
     repositories {
