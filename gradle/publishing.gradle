@@ -6,7 +6,7 @@ apply plugin: 'java'
 
 publishing {
     publications {
-        stairwayLibrary(MavenPublication) {
+        stairway(MavenPublication) {
             from components.java
         }
     }
