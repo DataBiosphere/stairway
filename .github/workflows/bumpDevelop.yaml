@@ -15,6 +15,11 @@ on:
         description: 'Branch to run the workflow on'
         required: false
         default: 'develop'
+
+permissions:
+  contents: read
+  id-token: write
+
 jobs:
   development-tag-publish:
     runs-on: ubuntu-latest
@@ -35,7 +40,7 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
         with:
-          ref: ${{ steps.controls.outputs.checkout-branch }}
+          ref: ${{ steps.semver.outputs.checkout-branch }}
           token: ${{ secrets.BROADBOT_TOKEN }}
       - name: "Bump the tag to a new version"
         uses: databiosphere/github-actions/actions/bumper@bumper-0.1.0
