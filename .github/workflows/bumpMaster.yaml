@@ -65,4 +65,4 @@ jobs:
         env:
           GOOGLE_CLOUD_PROJECT: dsp-artifact-registry
           GAR_LOCATION: us-central1
-          GAR_REPOSITORY_ID: libs-snapshot-standard
+          GAR_REPOSITORY_ID: libs-release-standard
