@@ -40,7 +40,7 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
         with:
-          ref: ${{ steps.controls.outputs.checkout-branch }}
+          ref: ${{ steps.semver.outputs.checkout-branch }}
       - name: "Bump the tag to a new version"
         uses: databiosphere/github-actions/actions/bumper@bumper-0.1.0
         env:
