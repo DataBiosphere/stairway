@@ -1,7 +1,5 @@
 name: development version bump
 on:
-  pull_request:
-    branches: [ develop ]
   push:
     branches: [ develop ]
     paths-ignore: [ '**.md' ]
