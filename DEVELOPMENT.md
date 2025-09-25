@@ -4,12 +4,12 @@
 The initial design of Stairway branches was that we would use two main branches in github.
 
 The **master** branch is intended to be used for distributing code
-for other components to consume for alpha, staging, and production. It is published to the `libs-release-local`
-repository inside of artifactory. It always has simple semantic version numbers: _major_._minor_._patch_
+for other components to consume for alpha, staging, and production. It is published to the `libs-release-standard` in GAR. 
+It always has simple semantic version numbers: _major_._minor_._patch_
 
 The **develop** branch is used for developing code. The results need to be published in order to properly test
-Stairway, should not be used for any production purposes. Is published to the `libs-snapshot-local` repository 
-inside of artifactory. It has a semantic version number and the word snapshot:  _major_._minor_._patch_-SNAPSHOT
+Stairway, should not be used for any production purposes. Is published to the `libs-snapshot-local` repository inside of GAR.
+ It has a semantic version number and the word snapshot:  _major_._minor_._patch_-SNAPSHOT
 
 The current practice is that we are releasing from the **develop** branch and that is
 being consumed by other components. As things stabilize, we will have to decide if we want
@@ -103,10 +103,11 @@ You can request a Veracode account to view full results from #dsp-infosec-champi
 
 ## Deploying to Artifactory
 
-For Broad-Verily development, you can publish the stairway library to Broad's Artifactory instance
-using the artifactoryPublish task. For that to work, define the following environment variables:
-- ARTIFACTORY_USER
-- ARTIFACTORY_PASSWORD
+For Broad-Verily development, you can publish the stairway library to Broad's GAR instance
+using the publish task. For that to work, define the following environment variables:
+- GOOGLE_CLOUD_PROJECT: dsp-artifact-registry
+- GAR_LOCATION: us-central1
+- GAR_REPOSITORY_ID: libs-snapshot-standard
 
 ## Future Enhancements
 

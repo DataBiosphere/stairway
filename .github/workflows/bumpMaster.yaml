@@ -13,6 +13,11 @@ on:
         description: 'Branch to run the workflow on'
         required: false
         default: 'master'
+
+permissions:
+  contents: read
+  id-token: write
+
 jobs:
   master-tag-publish:
     runs-on: ubuntu-latest
@@ -31,9 +36,9 @@ jobs:
           echo semver-part=$SEMVER_PART >> $GITHUB_OUTPUT
           echo checkout-branch=$CHECKOUT_BRANCH >> $GITHUB_OUTPUT
       - name: Checkout
-        uses: actions/checkout@v3
+        uses: actions/checkout@v4
         with:
-          ref: ${{ steps.controls.outputs.checkout-branch }}
+          ref: ${{ steps.semver.outputs.checkout-branch }}
       - name: "Bump the tag to a new version"
         uses: databiosphere/github-actions/actions/bumper@bumper-0.1.0
         env:
@@ -47,9 +52,15 @@ jobs:
         with:
           java-version: '17'
           distribution: 'temurin'
-      - name: "Publish to Artifactory"
+      - name: Authenticate to GCP
+        uses: google-github-actions/auth@v3
+        with:
+          token_format: access_token
+          workload_identity_provider: 'projects/1038484894585/locations/global/workloadIdentityPools/github-wi-pool/providers/github-wi-provider'
+          service_account: 'dsp-artifact-registry-push@dsp-artifact-registry.iam.gserviceaccount.com'
+      - name: Publish client to GAR
+        run: ./gradlew publish
         env:
-          ARTIFACTORY_USERNAME: ${{ secrets.ARTIFACTORY_USERNAME }}
-          ARTIFACTORY_PASSWORD: ${{ secrets.ARTIFACTORY_PASSWORD }}
-          ARTIFACTORY_REPO_KEY: "libs-release-local"
-        run: ./gradlew artifactoryPublish --scan
+          GOOGLE_CLOUD_PROJECT: dsp-artifact-registry
+          GAR_LOCATION: us-central1
+          GAR_REPOSITORY_ID: libs-release-standard

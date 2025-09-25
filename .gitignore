@@ -47,3 +47,6 @@ pom.xml
 
 ### Spring Shell
 spring-shell.log
+
+### Credentials
+gha-creds-*.json
