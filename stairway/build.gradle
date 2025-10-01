@@ -25,7 +25,7 @@ dependencies {
     implementation group: 'jakarta.annotation', name: 'jakarta.annotation-api', version: '3.0.0'
 
     // Database
-    implementation group: 'org.liquibase', name: 'liquibase-core', version: '4.33.0'
+    implementation group: 'org.liquibase', name: 'liquibase-core', version: '5.0.0'
 
     // Google dependencies
     implementation platform('com.google.cloud:libraries-bom:26.68.0') // use common bom
