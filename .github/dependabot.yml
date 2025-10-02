@@ -22,3 +22,6 @@ updates:
       - "gradle"
     commit-message:
       prefix: "[DT-400-gradle]"
+    ignore:
+      # Exclude artifact registry plugin until Java 21 upgrade
+      - dependency-name: "com.google.cloud.artifactregistry.gradle-plugin"
