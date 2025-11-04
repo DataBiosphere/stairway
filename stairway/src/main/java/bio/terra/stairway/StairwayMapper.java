@@ -2,6 +2,7 @@ package bio.terra.stairway;
 
 import com.fasterxml.jackson.databind.DeserializationFeature;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.fasterxml.jackson.databind.jsontype.BasicPolymorphicTypeValidator;
 import com.fasterxml.jackson.datatype.guava.GuavaModule;
 import com.fasterxml.jackson.datatype.jdk8.Jdk8Module;
 import com.fasterxml.jackson.datatype.jsr310.JavaTimeModule;
@@ -17,6 +18,10 @@ public class StairwayMapper {
   @VisibleForTesting
   public static ObjectMapper getObjectMapper() {
     if (objectMapper == null) {
+      // Create a permissive type validator for backward compatibility
+      BasicPolymorphicTypeValidator typeValidator =
+          BasicPolymorphicTypeValidator.builder().allowIfSubType(Object.class).build();
+
       objectMapper =
           new ObjectMapper()
               .registerModule(new ParameterNamesModule())
@@ -25,9 +30,8 @@ public class StairwayMapper {
               .registerModule(new JsonNullableModule())
               .registerModule(new GuavaModule())
               .configure(DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES, false)
-              // TODO: replace with new method; the problem is we need to be promiscuous, because
-              //  Stairway does not control what objects are serialized into the map.
-              .enableDefaultTyping(ObjectMapper.DefaultTyping.NON_FINAL);
+              // Replace deprecated enableDefaultTyping with modern approach
+              .activateDefaultTyping(typeValidator, ObjectMapper.DefaultTyping.NON_FINAL);
     }
     return objectMapper;
   }

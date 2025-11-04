@@ -435,7 +435,7 @@ public class FlightFilter {
         case STRING -> new Value(this, (String) value);
         case LIST -> new Value(this, pgJsonMapper.writeValueAsString(value));
         case TIMESTAMP -> new Value(this, (Instant) value);
-          // Ignore the parameter in the null case
+        // Ignore the parameter in the null case
         case NULL -> new Value();
       };
     }

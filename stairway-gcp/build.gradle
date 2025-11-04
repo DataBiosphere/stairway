@@ -2,6 +2,12 @@ plugins {
     id 'stairway.library-conventions'
 }
 
+configurations.all {
+    resolutionStrategy {
+        force 'com.google.guava:guava:33.4.0-jre'
+    }
+}
+
 dependencies {
     api project(':stairway')
 
