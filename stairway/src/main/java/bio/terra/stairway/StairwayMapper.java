@@ -20,8 +20,10 @@ public class StairwayMapper {
     if (objectMapper == null) {
       // Create a permissive type validator for backward compatibility
       BasicPolymorphicTypeValidator typeValidator =
-          BasicPolymorphicTypeValidator.builder().allowIfSubType(Object.class).build();
-
+          BasicPolymorphicTypeValidator.builder()
+              .allowIfSubType(Object.class)
+              .build();
+              
       objectMapper =
           new ObjectMapper()
               .registerModule(new ParameterNamesModule())
@@ -30,7 +32,6 @@ public class StairwayMapper {
               .registerModule(new JsonNullableModule())
               .registerModule(new GuavaModule())
               .configure(DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES, false)
-              // Replace deprecated enableDefaultTyping with modern approach
               .activateDefaultTyping(typeValidator, ObjectMapper.DefaultTyping.NON_FINAL);
     }
     return objectMapper;
