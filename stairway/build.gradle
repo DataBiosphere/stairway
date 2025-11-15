@@ -38,7 +38,7 @@ dependencies {
     implementation group: 'com.google.cloud', name: 'google-cloud-pubsub'
 
     // File handling during testing
-    testImplementation group: 'commons-io', name: 'commons-io', version: '2.20.0'
+    testImplementation group: 'commons-io', name: 'commons-io', version: '2.21.0'
 
     // Mocks during testing
     testImplementation group: 'org.mockito', name: 'mockito-junit-jupiter', version: '5.20.0'
