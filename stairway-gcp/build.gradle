@@ -11,7 +11,7 @@ configurations.all {
 dependencies {
     api project(':stairway')
 
-    implementation group: 'org.apache.commons', name: 'commons-lang3', version: '3.19.0'
+    implementation group: 'org.apache.commons', name: 'commons-lang3', version: '3.20.0'
 
     // Google dependencies
     implementation platform('com.google.cloud:libraries-bom:26.72.0') // use common bom
