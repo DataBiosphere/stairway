@@ -14,7 +14,7 @@ dependencies {
     // If they update them in a future release, this may be removed:
     implementation platform('io.netty:netty-bom:4.2.8.Final')
 
-    testImplementation 'org.mockito:mockito-junit-jupiter:5.20.0'
+    testImplementation 'org.mockito:mockito-junit-jupiter:5.21.0'
 }
 
 apply from: "$rootDir/gradle/test.gradle"

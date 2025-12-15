@@ -41,7 +41,7 @@ dependencies {
     testImplementation group: 'commons-io', name: 'commons-io', version: '2.21.0'
 
     // Mocks during testing
-    testImplementation group: 'org.mockito', name: 'mockito-junit-jupiter', version: '5.20.0'
+    testImplementation group: 'org.mockito', name: 'mockito-junit-jupiter', version: '5.21.0'
 }
 
 apply from: "$rootDir/gradle/test.gradle"
