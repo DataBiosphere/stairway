@@ -24,8 +24,8 @@ dependencies {
     implementation group: 'org.openapitools', name: 'jackson-databind-nullable', version: '0.2.8'
 
     // Spring
-    implementation group: 'org.springframework', name: 'spring-context', version: '7.0.1'
-    implementation group: 'org.springframework', name: 'spring-web', version: '7.0.1'
+    implementation group: 'org.springframework', name: 'spring-context', version: '7.0.2'
+    implementation group: 'org.springframework', name: 'spring-web', version: '7.0.2'
 
     // Annotations
     implementation group: 'jakarta.annotation', name: 'jakarta.annotation-api', version: '3.0.0'
