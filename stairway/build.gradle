@@ -4,7 +4,7 @@ plugins {
 
 configurations.all {
     resolutionStrategy {
-        force 'com.google.guava:guava:33.4.0-jre'
+        force 'com.google.guava:guava:33.5.0-jre'
     }
 }
 
