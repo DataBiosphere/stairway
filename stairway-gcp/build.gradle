@@ -4,7 +4,7 @@ plugins {
 
 configurations.all {
     resolutionStrategy {
-        force 'com.google.guava:guava:33.4.0-jre'
+        force 'com.google.guava:guava:33.4.8-jre'
     }
 }
 
@@ -14,7 +14,7 @@ dependencies {
     implementation group: 'org.apache.commons', name: 'commons-lang3', version: '3.20.0'
 
     // Google dependencies
-    implementation platform('com.google.cloud:libraries-bom:26.72.0') // use common bom
+    implementation platform('com.google.cloud:libraries-bom:26.73.0') // use common bom
     implementation group: 'com.google.cloud', name: 'google-cloud-pubsub'
 }
 
