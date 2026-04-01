@@ -21,11 +21,11 @@ dependencies {
     implementation group: 'com.fasterxml.jackson.datatype', name: 'jackson-datatype-jdk8'
     implementation group: 'com.fasterxml.jackson.datatype', name: 'jackson-datatype-jsr310'
     implementation group: 'com.fasterxml.jackson.module', name: 'jackson-module-parameter-names'
-    implementation group: 'org.openapitools', name: 'jackson-databind-nullable', version: '0.2.8'
+    implementation group: 'org.openapitools', name: 'jackson-databind-nullable', version: '0.2.10'
 
     // Spring
-    implementation group: 'org.springframework', name: 'spring-context', version: '7.0.2'
-    implementation group: 'org.springframework', name: 'spring-web', version: '7.0.2'
+    implementation group: 'org.springframework', name: 'spring-context', version: '7.0.6'
+    implementation group: 'org.springframework', name: 'spring-web', version: '7.0.6'
 
     // Annotations
     implementation group: 'jakarta.annotation', name: 'jakarta.annotation-api', version: '3.0.0'
