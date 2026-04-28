@@ -19,8 +19,8 @@ class StairwayThreadPool {
    * get method will return null upon successful completion.
    *
    * @param flightRunner the flight to submit
-   * @param flightContext
-   * @return
+   * @param flightContext context for the flight
+   * @return the submitted task
    */
   protected Future<?> submitWithMdcAndFlightContext(
       Runnable flightRunner, FlightContext flightContext) {
